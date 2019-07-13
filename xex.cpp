@@ -1,5 +1,4 @@
 // TODO:
-// - add imports to imports window
 // - test export labelling
 // - create generic names for imports/exports we can't find (eg whateverLibrary_0001)
 // - test!
@@ -305,6 +304,7 @@ bool xex_read_image(linput_t* li, int key_index)
   else if (comp_format == 2)
     return xex_read_compressed(li, enc_flag);
 
+  warning("xex_read_image: Unhandled XEX compression format %d!", comp_format);
   return false;
 }
 
@@ -348,6 +348,9 @@ void xex_load_imports(linput_t* li)
   // read in each import library
   for (int i = 0; i < import_desc.ModuleCount; i++)
   {
+    netnode module_node;
+    module_node.create();
+
     auto table_addr = qltell(li);
     XEX_IMPORT_TABLE table_header;
     qlread(li, &table_header, sizeof(XEX_IMPORT_TABLE));
@@ -359,7 +362,8 @@ void xex_load_imports(linput_t* li)
     // track variable imports so we can rename them later
     // (all imports have a "variable" type, but only functions have a "thunk" type)
     // (so we add the import to variable list when variable type is loaded, but then remove it if a thunk for that import gets loaded)
-    std::map<int, int> variables;
+    std::map<int, ea_t> variables;
+    std::map<int, ea_t> import_ea;
     for (int j = 0; j < table_header.ImportCount; j++)
     {
       uint32 record_addr;
@@ -377,6 +381,7 @@ void xex_load_imports(linput_t* li)
         create_data(record_addr, FF_WORD, 2 * 2, BADADDR);
         set_name(record_addr, (std::string("__imp__") + import_name).c_str());
         variables[ordinal] = record_addr;
+        import_ea[ordinal] = record_addr;
       }
       else if (record_type == 1)
       {
@@ -389,25 +394,43 @@ void xex_load_imports(linput_t* li)
 
         put_dword(record_addr + 0, 0x38600000 | table_header.ModuleIndex);
         put_dword(record_addr + 4, 0x38800000 | ordinal);
-        add_func(record_addr, record_addr + 0x10);
         set_name(record_addr, import_name);
 
         // add comment to thunk like xorloser's loader
-        // idc.set_cmt(record_addr + 4, "%s :: %s" % (libname.rsplit('.', 1)[0], import_name), 1)
+        set_cmt(record_addr + 4, qstring().sprnt("%s :: %s", libname.c_str(), import_name).c_str(), 1);
 
-        // this should mark the func as a library function, but it doesn't do anything for some reason
-        // tried a bunch of things like idaapi.autoWait() before running it, just crashes IDA with internal errors...
-        // idc.set_func_flags(record_addr, idc.get_func_flags(record_addr) | idc.FUNC_LIB)
+        // force IDA to recognize addr as code, so we can add it as a function
+        auto_make_code(record_addr);
+        auto_recreate_insn(record_addr);
+        func_t func(record_addr, record_addr + 0x10, FUNC_LIB);
+        add_func_ex(&func);
 
         // thunk means this isn't a variable, remove from our variables map
         if (variables.count(ordinal))
           variables.erase(ordinal);
+
+        import_ea[ordinal] = record_addr;
       }
       else
         msg("[+] %s import %d (%s) (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, import_name, record_addr, record_type);
     }
 
-    // remove "__imp__" part from variable import names
+    // Imports window setup
+    for (auto kvp : import_ea)
+    {
+      // Set import name
+      auto import_name = DoNameGen(libname.c_str(), kvp.first);
+      module_node.supset_ea(kvp.second, import_name);
+
+      // Set import ordinal
+      nodeidx_t ndx = ea2node(kvp.second);
+      module_node.altset(kvp.first, ndx);
+    }
+
+    // Add module to imports window
+    import_module(libname.c_str(), NULL, module_node, NULL, "x360");
+
+    // Remove "__imp__" part from variable import names
     for (auto kvp : variables)
     {
       auto import_name = DoNameGen(libname.c_str(), kvp.first);
@@ -417,8 +440,6 @@ void xex_load_imports(linput_t* li)
     // Seek to end of this import table
     qlseek(li, table_addr + table_header.TableSize);
   }
-
-  // todo: add imports to imports window!!!
 }
 
 void xex_load_exports()
