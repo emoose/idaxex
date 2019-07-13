@@ -1,5 +1,4 @@
 // TODO:
-// - encryption support
 // - add imports to imports window
 // - test export labelling
 // - create generic names for imports/exports we can't find (eg whateverLibrary_0001)
@@ -11,10 +10,9 @@
 #include <bytes.hpp>
 #include <algorithm>
 #include <vector>
-
-extern "C" { 
-#include "lzx/lzx.h"
-}
+#include "lzx/lzx.hpp"
+#include "aes.hpp"
+#include "sha1.hpp"
 
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
 
@@ -28,20 +26,27 @@ const uint8 devkit_key[16] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
-const uint8 unused_key[16] = { // aka "XEX1 key", never seen it used, we'll try using it as last resort though
+// unsure if any of the xex1 keys get used, we'll still try them as last resort anyway
+const uint8 retail_key_xex1[16] = {
   0xA2, 0x6C, 0x10, 0xF7, 0x1F, 0xD9, 0x35, 0xE9,
   0x8B, 0x99, 0x92, 0x2C, 0xE9, 0x32, 0x15, 0x72
 };
+const uint8 devkit_key_xex1[16] = {
+  0xA8, 0xB0, 0x05, 0x12, 0xED, 0xE3, 0x63, 0x8D,
+  0xC6, 0x58, 0xB3, 0x10, 0x1F, 0x9F, 0x50, 0xD1
+};
 
-const uint8* key_bytes[3] = {
+const uint8* key_bytes[4] = {
   retail_key,
   devkit_key,
-  unused_key
+  retail_key_xex1,
+  devkit_key_xex1
 };
-const char* key_names[3] = {
+const char* key_names[4] = {
   "retail",
   "devkit",
-  "XEX1"
+  "retail-XEX1",
+  "devkit-XEX1"
 };
 
 IMAGE_XEX_HEADER xex_header;
@@ -53,6 +58,8 @@ int64 data_length = 0;
 uint32 base_address = 0;
 uint32 entry_point = 0;
 uint32 export_table_va = 0;
+
+uint8 session_key[16];
 
 void pe_add_section(const IMAGE_SECTION_HEADER& section)
 {
@@ -122,23 +129,36 @@ bool pe_load(uint8* data)
   return true;
 }
 
-bool xex_read_uncompressed(linput_t* li)
+bool xex_read_uncompressed(linput_t* li, bool encrypted)
 {
   int num_blocks = (data_descriptor.Size - 8) / 8;
   auto* xex_blocks = (XEX_RAW_DATA_DESCRIPTOR*)calloc(num_blocks, sizeof(XEX_RAW_DATA_DESCRIPTOR));
   qlseek(li, directory_entries[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8);
   qlread(li, xex_blocks, num_blocks * sizeof(XEX_RAW_DATA_DESCRIPTOR));
 
-  qlseek(li, xex_header.SizeOfHeaders);
+  AES_ctx aes;
+  if (encrypted)
+  {
+    uint8 iv[] = {
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    AES_init_ctx_iv(&aes, session_key, iv);
+  }
 
   uint8* pe_data = (uint8*)malloc(security_info.ImageSize);
   uint32_t position = 0;
+  qlseek(li, xex_header.SizeOfHeaders);
   for (int i = 0; i < num_blocks; i++)
   {
     xex_blocks[i].DataSize = swap32(xex_blocks[i].DataSize);
     xex_blocks[i].ZeroSize = swap32(xex_blocks[i].ZeroSize);
 
     qlread(li, pe_data + position, xex_blocks[i].DataSize);
+
+    if (encrypted)
+      AES_CBC_decrypt_buffer(&aes, pe_data + position, xex_blocks[i].DataSize);
+
     position += xex_blocks[i].DataSize;
     memset(pe_data + position, 0, xex_blocks[i].ZeroSize);
     position += xex_blocks[i].ZeroSize;
@@ -151,8 +171,18 @@ bool xex_read_uncompressed(linput_t* li)
   return result;
 }
 
-bool xex_read_compressed(linput_t* li)
+bool xex_read_compressed(linput_t* li, bool encrypted)
 {
+  AES_ctx aes;
+  if (encrypted)
+  {
+    uint8 iv[] = {
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    AES_init_ctx_iv(&aes, session_key, iv);
+  }
+
   // read windowsize & first block from file_data_descriptor header
   auto* compression_info = (XEX_COMPRESSED_DATA_DESCRIPTOR*)malloc(sizeof(XEX_COMPRESSED_DATA_DESCRIPTOR));
   qlseek(li, directory_entries[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8);
@@ -174,18 +204,37 @@ bool xex_read_compressed(linput_t* li)
   int retcode = 0;
 
   // Start decompressing
+  SHA1Context sha_state;
   qlseek(li, xex_header.SizeOfHeaders);
   XEX_DATA_DESCRIPTOR next_block;
+  uint8* block_data = 0;
   while (cur_block->Size)
   {
-    auto cur_addr = qltell(li);
-    qlread(li, &next_block, sizeof(XEX_DATA_DESCRIPTOR));
+    block_data = (uint8*)malloc(cur_block->Size);
+    qlread(li, block_data, cur_block->Size);
+
+    if (encrypted)
+      AES_CBC_decrypt_buffer(&aes, block_data, cur_block->Size);
+
+    // Check hash of the block - don't want to attempt decompressing invalid data!
+    uint8_t sha_hash[0x14];
+    SHA1Reset(&sha_state);
+    SHA1Input(&sha_state, block_data, cur_block->Size);
+    SHA1Result(&sha_state, sha_hash);
+
+    if (memcmp(sha_hash, cur_block->DataDigest, 0x14) != 0)
+    {
+      retcode = 2;
+      goto end;
+    }
+
+    memcpy(&next_block, block_data, sizeof(XEX_DATA_DESCRIPTOR));
     next_block.Size = swap32(next_block.Size);
+    uint8* p = block_data + sizeof(XEX_DATA_DESCRIPTOR);
     while (true)
     {
-      uint16 comp_size;
-      qlread(li, &comp_size, sizeof(uint16));
-
+      uint16 comp_size = *(uint16*)p;
+      p += 2;
       if (!comp_size)
         break;
 
@@ -195,9 +244,9 @@ bool xex_read_compressed(linput_t* li)
         retcode = 1;
         goto end;
       }
-      
       // Read in LZX buffer
-      qlread(li, comp_buffer, comp_size);
+      memcpy(comp_buffer, p, comp_size);
+      p += comp_size;
       if (comp_size < 0x9800) // if comp. size is below buffer size 0x9800, zero out the remainder of the buffer
         memset(comp_buffer + comp_size, 0, 0x9800 - comp_size);
 
@@ -210,11 +259,16 @@ bool xex_read_compressed(linput_t* li)
       size_done += dec_size;
       size_left -= dec_size;
     }
-    qlseek(li, cur_addr + cur_block->Size);
     memcpy(cur_block, &next_block, sizeof(XEX_DATA_DESCRIPTOR));
+
+    free(block_data);
+    block_data = 0;
   }
 
 end:
+  if (block_data)
+    free(block_data);
+
   free(compression_info);
   free(comp_buffer);
 
@@ -240,12 +294,16 @@ bool xex_read_image(linput_t* li, int key_index)
     enc_flag = data_descriptor.Flags = swap16(data_descriptor.Flags);
   }
 
-  // todo: setup session_key here
+  // Setup session key
+  memcpy(session_key, security_info.ImageInfo.ImageKey, 0x10);
+  AES_ctx key_ctx;
+  AES_init_ctx(&key_ctx, key_bytes[key_index]);
+  AES_ECB_decrypt(&key_ctx, session_key);
 
   if (comp_format == 1)
-    return xex_read_uncompressed(li);
+    return xex_read_uncompressed(li, enc_flag);
   else if (comp_format == 2)
-    return xex_read_compressed(li);
+    return xex_read_compressed(li, enc_flag);
 
   return false;
 }
@@ -285,7 +343,7 @@ void xex_load_imports(linput_t* li)
       cur_lib += name_char;
   }
 
-  printf("[+] Loading module imports... (%d import modules)\n", import_desc.ModuleCount);
+  msg("[+] Loading module imports... (%d import modules)\n", import_desc.ModuleCount);
 
   // read in each import library
   for (int i = 0; i < import_desc.ModuleCount; i++)
@@ -316,9 +374,7 @@ void xex_load_imports(linput_t* li)
       if (record_type == 0)
       {
         // variable
-        create_data(record_addr, FF_WORD, 2, BADADDR);
-        create_data(record_addr + 2, FF_WORD, 2, BADADDR);
-        //idc.make_array(record_addr, 2)
+        create_data(record_addr, FF_WORD, 2 * 2, BADADDR);
         set_name(record_addr, (std::string("__imp__") + import_name).c_str());
         variables[ordinal] = record_addr;
       }
@@ -348,7 +404,7 @@ void xex_load_imports(linput_t* li)
           variables.erase(ordinal);
       }
       else
-        printf("[+] %s import %d (%s) (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, import_name, record_addr, record_type);
+        msg("[+] %s import %d (%s) (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, import_name, record_addr, record_type);
     }
 
     // remove "__imp__" part from variable import names
@@ -383,11 +439,11 @@ void xex_load_exports()
     export_table.Magic[1] != XEX_EXPORT_MAGIC_1 ||
     export_table.Magic[2] != XEX_EXPORT_MAGIC_2)
   {
-    printf("[+] Export table magic is invalid! (0x%X 0x%X 0x%X)\n", export_table.Magic[0], export_table.Magic[1], export_table.Magic[2]);
+    msg("[+] Export table magic is invalid! (0x%X 0x%X 0x%X)\n", export_table.Magic[0], export_table.Magic[1], export_table.Magic[2]);
     return;
   }
 
-  printf("[+] Loading module exports...\n");
+  msg("[+] Loading module exports...\n");
   char module_name[256];
   get_root_filename(module_name, 256);
 
@@ -416,8 +472,6 @@ void xex_load_exports()
 //------------------------------------------------------------------------------
 void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
 {
-  printf("[+] IDAXEX load_file!\n");
-
   set_processor_type("ppc", SETPROC_LOADER);
   set_compiler_id(COMP_MS);
 
@@ -463,9 +517,9 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   if (directory_entries.count(XEX_HEADER_ENTRY_POINT))
     entry_point = directory_entries[XEX_HEADER_ENTRY_POINT];
 
-  if (!xex_read_image(li, 0) && !xex_read_image(li, 1) && !xex_read_image(li, 2))
+  if (!xex_read_image(li, 0) && !xex_read_image(li, 1) && !xex_read_image(li, 2) && !xex_read_image(li, 3))
   {
-    printf("[+] Failed to load PE image from XEX :(\n");
+    msg("[+] Failed to load PE image from XEX :(\n");
     return;
   }
 
@@ -479,7 +533,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
     xex_load_exports();
 
   // Done :)
-  printf("[+] XEX loaded, voila!\n");
+  msg("[+] XEX loaded, voila!\n");
   return;
 }
 

@@ -106,13 +106,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="aes.c" />
     <ClCompile Include="lzx\lzx.c" />
     <ClCompile Include="namegen.cpp" />
+    <ClCompile Include="sha1.c" />
     <ClCompile Include="xex.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="aes.h" />
+    <ClInclude Include="aes.hpp" />
     <ClInclude Include="lzx\lzx.h" />
+    <ClInclude Include="lzx\lzx.hpp" />
     <ClInclude Include="lzx\lzx_int.h" />
+    <ClInclude Include="sha1.h" />
+    <ClInclude Include="sha1.hpp" />
     <ClInclude Include="xex.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

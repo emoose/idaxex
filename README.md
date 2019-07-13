@@ -10,7 +10,7 @@ Only XEX2 is supported right now, hopefully can add support for XEX1 etc once XE
 
 Both uncompressed & compressed XEXs should now be supported, thanks to LZX code from cabextract 0.2. 
 
-Encryption support hasn't been added yet, will copy over from python loader soon.
+Encrypted & unencrypted XEXs should both be supported (with support for 4 different XEX keys: devkit/retail pairs for both final & pre-release XEXs)
 
 Imports seem to get read in & labelled fine, haven't looked into adding to imports window yet though, but looks like it should be possible.
 
