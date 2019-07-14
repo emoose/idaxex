@@ -807,8 +807,8 @@ void xex_info_comment(linput_t* li)
       add_pgm_cmt(" - Encrypted (using %s key) (flags: %d)", key_names[key_idx], data_descriptor.Flags);
   }
 
-  if (image_flags.RevocationCheckRequired)
-    add_pgm_cmt(" - Revocation Check Required");
+  if (image_flags.Unknown1)
+    add_pgm_cmt(" - Unknown1 (Revocation Check Required?)");
   if (image_flags.ManufacturingUtility)
     add_pgm_cmt(" - Manufacturing Utility");
   if (image_flags.ManufacturingSupportTool)
@@ -845,6 +845,8 @@ void xex_info_comment(linput_t* li)
     add_pgm_cmt(" - No Game Region");
   if (image_flags.RevocationCheckOptional)
     add_pgm_cmt(" - Revocation Check Optional");
+  if (image_flags.RevocationCheckRequired)
+    add_pgm_cmt(" - Revocation Check Required");
 
   add_pgm_cmt("");
 
@@ -896,6 +898,8 @@ void xex_info_comment(linput_t* li)
         regions << "AustraliaNewZealand ";
       if (game_regions & Region_RestOfEurope)
         regions << "RestOfEurope ";
+      if (game_regions & Region_Europe)
+        regions << "Europe ";
       if (game_regions & Region_RestOfWorld)
         regions << "RestOfWorld ";
     }
@@ -913,13 +917,13 @@ void xex_info_comment(linput_t* li)
       if (media_types.HardDisk)
         regions << "HardDisk ";
       if (media_types.DvdX2)
-        regions << "DVDX2 ";
+        regions << "DVD-X2 ";
       if (media_types.DvdCd)
-        regions << "DVDCD ";
+        regions << "DVD/CD ";
       if (media_types.Dvd5)
-        regions << "DVD5 ";
+        regions << "DVD-5 ";
       if (media_types.Dvd9)
-        regions << "DVD9 ";
+        regions << "DVD-9 ";
       if (media_types.SystemFlash)
         regions << "SystemFlash ";
       if (media_types._Unknown40)
@@ -940,6 +944,8 @@ void xex_info_comment(linput_t* li)
         regions << "WirelessNStorageDevice ";
       if (media_types.SystemExtendedPartition)
         regions << "SystemExtendedPartition ";
+      if (media_types.SystemAuxiliaryPartition)
+        regions << "SystemAuxiliaryPartition ";
       if (media_types.InsecurePackage)
         regions << "InsecurePackage ";
       if (media_types.SaveGamePackage)
@@ -1149,8 +1155,8 @@ void xex_info_comment(linput_t* li)
         approval = "approved";
       else if (lib.Version.ApprovalType == ApprovalType_Expired)
         approval = "expired";
-      else if (lib.Version.ApprovalType == ApprovalType_PossibleApproved)
-        approval = "possible-approved";
+      else if (lib.Version.ApprovalType == ApprovalType_PossiblyApproved)
+        approval = "possibly-approved";
 
       // Create buffer for lib name so we can terminate it properly
       char name[9];

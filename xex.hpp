@@ -95,7 +95,7 @@ typedef struct _HV_IMAGE_EXPORT_TABLE {
 enum ApprovalType : uint8
 {
   ApprovalType_Unapproved = 0x00,
-  ApprovalType_PossibleApproved = 0x20,
+  ApprovalType_PossiblyApproved = 0x20,
   ApprovalType_Approved = 0x40,
   ApprovalType_Expired = 0x60
 };
@@ -186,6 +186,7 @@ enum GameRegion : uint32
   Region_RestOfAsia = 0x0000FC00,
   Region_AustraliaNewZealand = 0x00010000,
   Region_RestOfEurope = 0x00FE0000,
+  Region_Europe = 0xFF0000,
   Region_RestOfWorld = 0xFF000000,
   Region_All = 0xFFFFFFFF
 };
@@ -204,9 +205,10 @@ typedef struct _ALLOWEDMEDIATYPES {
   uint32   DirectFromRam               : 1; //= 0x00000400
   uint32   _Unknown800                 : 1; //= 0x00000800
   uint32   SecureVirtualOpticalDevice  : 1; //= 0x00001000
-  uint32   WirelessNStorageDevice      : 1; //= 0x00002000
+  uint32   WirelessNStorageDevice      : 1; //= 0x00002000 (\Device\Nomnil)
   uint32   SystemExtendedPartition     : 1; //= 0x00004000 (SEP)
-  uint32                               : 9; //= 0x00008000-0x00800000
+  uint32   SystemAuxiliaryPartition    : 1; //= 0x00008000 (SAP)
+  uint32                               : 8; //= 0x00010000-0x00800000
   uint32   InsecurePackage             : 1; //= 0x01000000
   uint32   SaveGamePackage             : 1; //= 0x02000000
   uint32   LocallySignedPackage        : 1; //= 0x04000000
@@ -216,12 +218,14 @@ typedef struct _ALLOWEDMEDIATYPES {
 static_assert(sizeof(ALLOWEDMEDIATYPES) == 4, "ALLOWEDMEDIATYPES");
 
 typedef struct _IMAGEFLAGS {
-  uint32   RevocationCheckRequired    : 1; //= 0x00000001
+  uint32   Unknown1                   : 1; //= 0x00000001
   uint32   ManufacturingUtility       : 1; //= 0x00000002
   uint32   ManufacturingSupportTool   : 1; //= 0x00000004
         // ManufacturingAwareModule          = 0x00000006
   uint32   Xgd2MediaOnly              : 1; //= 0x00000008
-  uint32                              : 4; //= 0x00000010-0x00000080
+  uint32   DataCenterRequired         : 1; //= 0x00000010
+  uint32   DataCenterAware            : 1; //= 0x00000020
+  uint32                              : 2; //= 0x00000040-0x00000080
   uint32   CardeaKey                  : 1; //= 0x00000100
   uint32   XeikaKey                   : 1; //= 0x00000200
   uint32   TitleUserMode              : 1; //= 0x00000400
@@ -238,47 +242,60 @@ typedef struct _IMAGEFLAGS {
   uint32   PageSize4Kb                : 1; //= 0x10000000
   uint32   NoGameRegion               : 1; //= 0x20000000
   uint32   RevocationCheckOptional    : 1; //= 0x40000000
+  uint32   RevocationCheckRequired    : 1; //= 0x80000000
 } IMAGEFLAGS, *PIMAGEFLAGS;
 static_assert(sizeof(IMAGEFLAGS) == 4, "IMAGEFLAGS");
 
 typedef struct _XEX_PRIVILEGES {
-  uint32   NoForceReboot : 1; //= 0x00000001
-  uint32   ForegroundTasks : 1; //= 0x00000002
-  uint32   NoOddMapping : 1; //= 0x00000004
-  uint32   HandleMceInput : 1; //= 0x00000008
-  uint32   RestrictHudFeatures : 1; //= 0x00000010
-  uint32   HandleGamepadDisconnect : 1; //= 0x00000020
-  uint32   InsecureSockets : 1; //= 0x00000040
-  uint32   Xbox1XspInterop : 1; //= 0x00000080
-  uint32   SetDashContext : 1; //= 0x00000100
-  uint32   TitleUsesGameVoiceChannel : 1; //= 0x00000200
-  uint32   TitlePal50Incompatible : 1; //= 0x00000400
-  uint32   TitleInsecureUtilityDrive : 1; //= 0x00000800
-  uint32   TitleXamHooks : 1; //= 0x00001000
-  uint32   TitlePii : 1; //= 0x00002000
-  uint32   CrossplatformSystemLink : 1; //= 0x00004000
-  uint32   MultidiscSwap : 1; //= 0x00008000
-  uint32   MultidiscInsecureMedia : 1; //= 0x00010000
-  uint32   Ap25Media : 1; //= 0x00020000
-  uint32   NoConfirmExit : 1; //= 0x00040000
-  uint32   AllowBackgroundDownload : 1; //= 0x00080000
-  uint32   CreatePersistableRamdrive : 1; //= 0x00100000
-  uint32   InheritPersistedRamdrive : 1; //= 0x00200000
-  uint32   AllowHudVibration : 1; //= 0x00400000
-  uint32   TitleBothUtilityPartitions : 1; //= 0x00800000
-  uint32   HandleIPTVInput : 1; //= 0x01000000
-  uint32   PreferBigButtonInput : 1; //= 0x02000000
-  uint32   Reserved26 : 1; //= 0x04000000
-  uint32   MultidiscCrossTitle : 1; //= 0x08000000
-  uint32   TitleInstallIncompatible : 1; //= 0x10000000
-  uint32   AllowAvatarGetMetadataByXUID : 1; //= 0x20000000
-  uint32   AllowControllerSwapping : 1; //= 0x40000000
-  uint32   DashExtensibilityModule : 1; //= 0x80000000
+  uint32   NoForceReboot                   : 1; //= 0x00000001
+  uint32   ForegroundTasks                 : 1; //= 0x00000002
+  uint32   NoOddMapping                    : 1; //= 0x00000004
+  uint32   HandleMceInput                  : 1; //= 0x00000008
+  uint32   RestrictHudFeatures             : 1; //= 0x00000010
+  uint32   HandleGamepadDisconnect         : 1; //= 0x00000020
+  uint32   InsecureSockets                 : 1; //= 0x00000040
+  uint32   Xbox1XspInterop                 : 1; //= 0x00000080
+  uint32   SetDashContext                  : 1; //= 0x00000100
+  uint32   TitleUsesGameVoiceChannel       : 1; //= 0x00000200
+  uint32   TitlePal50Incompatible          : 1; //= 0x00000400
+  uint32   TitleInsecureUtilityDrive       : 1; //= 0x00000800
+  uint32   TitleXamHooks                   : 1; //= 0x00001000
+  uint32   TitlePii                        : 1; //= 0x00002000
+  uint32   CrossplatformSystemLink         : 1; //= 0x00004000
+  uint32   MultidiscSwap                   : 1; //= 0x00008000
+  uint32   MultidiscInsecureMedia          : 1; //= 0x00010000
+  uint32   Ap25Media                       : 1; //= 0x00020000
+  uint32   NoConfirmExit                   : 1; //= 0x00040000
+  uint32   AllowBackgroundDownload         : 1; //= 0x00080000
+  uint32   CreatePersistableRamdrive       : 1; //= 0x00100000
+  uint32   InheritPersistedRamdrive        : 1; //= 0x00200000
+  uint32   AllowHudVibration               : 1; //= 0x00400000
+  uint32   TitleBothUtilityPartitions      : 1; //= 0x00800000
+  uint32   HandleIPTVInput                 : 1; //= 0x01000000
+  uint32   PreferBigButtonInput            : 1; //= 0x02000000
+  uint32   Reserved26                      : 1; //= 0x04000000
+  uint32   MultidiscCrossTitle             : 1; //= 0x08000000
+  uint32   TitleInstallIncompatible        : 1; //= 0x10000000
+  uint32   AllowAvatarGetMetadataByXUID    : 1; //= 0x20000000
+  uint32   AllowControllerSwapping         : 1; //= 0x40000000
+  uint32   DashExtensibilityModule         : 1; //= 0x80000000
   /* These next ones dont even fit into a uint32?
   uint32   AllowNetworkReadCancel          : 1; //= 0x100000000
-  uint32   XexUninterruptableReads         : 1; //= 0x200000000
+  uint32   UninterruptableReads            : 1; //= 0x200000000
   uint32   RequireExperienceFull           : 1; //= 0x400000000
   uint32   GameVoiceRequiredUI             : 1; //= 0x800000000
+  uint32   TitleSetPresenceString          : 1;
+  uint32   NatalTiltControl                : 1;
+  uint32   TitleRequiresSkeletalTracking   : 1;
+  uint32   TitleSupportsSkeletalTracking   : 1;
+  uint32   UseLargeHDsFileCache            : 1;
+  uint32   TitleSupportsDeepLink           : 1;
+  uint32   TitleBodyProfile                : 1;
+  uint32   TitleWinUSB                     : 1;
+  uint32   TitleSupportsDeepLinkRefresh    : 1;
+  uint32   LocalOnlySockets                : 1;
+  uint32   TitleContentAcquireAndDownload  : 1;
+  uint32   AllowSystemForeground           : 1;
   */
 } XEX_PRIVILEGES, *PXEX_PRIVILEGES;
 static_assert(sizeof(XEX_PRIVILEGES) == 4, "XEX_PRIVILEGES");
