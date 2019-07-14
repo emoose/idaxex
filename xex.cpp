@@ -1,5 +1,5 @@
 // TODO:
-// - figure out why encrypted & compressed files won't decrypt properly
+// - fix export loading so that a segment isn't required (read from linput_t instead of reading thru IDA?)
 // - improve speed of file load & analysis?
 // - add more checks to things
 // - test!
@@ -21,7 +21,7 @@
 
 bool write_pe_to_disk = false;
 bool add_xex_sections = true;
-bool exclude_unneeded_sections = true;
+bool exclude_unneeded_sections = false;
 
 std::string DoNameGen(const std::string& libName, int id); // namegen.cpp
 
@@ -435,7 +435,7 @@ bool xex_read_compressed(linput_t* li, bool encrypted)
         break;
 
       comp_size = swap16(comp_size);
-      if (comp_size > 0x8000) // sanity check: shouldn't be above 0x8000
+      if (comp_size > 0x9800) // sanity check: shouldn't be above 0x9800
       {
         retcode = 1;
         goto end;
@@ -975,6 +975,9 @@ void xex_info_comment(linput_t* li)
 
   add_pgm_cmt(" - Base Address: 0x%X", base_address);
   add_pgm_cmt(" - Entrypoint: 0x%X", entry_point);
+
+  if (export_table_va)
+    add_pgm_cmt(" - Export Table Address: 0x%X", export_table_va);
 
   if (directory_entries.count(XEX_HEADER_ORIGINAL_BASE_ADDRESS))
     add_pgm_cmt(" - Original Base Address: 0x%X", directory_entries[XEX_HEADER_ORIGINAL_BASE_ADDRESS]);
