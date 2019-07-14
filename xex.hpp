@@ -28,19 +28,28 @@
 
 #define XEX_HEADER_PE_BASE XEX_HEADER_ULONG(0x0102)
 
+#define XEX_HEADER_IMPORTS XEX_HEADER_SIZEDSTRUCT(0x0103)
+
+typedef struct _VERSION {
+  uint32 QFE : 8;
+  uint32 Build : 16;
+  uint32 Minor : 4;
+  uint32 Major : 4;
+} VERSION, *PVERSION;
+static_assert(sizeof(VERSION) == 4, "VERSION");
+
 typedef struct _XEX_IMPORT_DESCRIPTOR {
   uint32 Size;
   uint32 NameTableSize;
   uint32 ModuleCount;
 } XEX_IMPORT_DESCRIPTOR, *PXEX_IMPORT_DESCRIPTOR;
 
-#define XEX_HEADER_IMPORTS XEX_HEADER_SIZEDSTRUCT(0x0103)
-
 typedef struct _XEX_IMPORT_TABLE {
   uint32 TableSize;
   uint8 NextImportDigest[0x14];
   uint32 ModuleNumber;
-  uint32 Version[2];
+  VERSION Version;
+  VERSION VersionMin;
   uint8 Unused;
   uint8 ModuleIndex;
   uint16 ImportCount;

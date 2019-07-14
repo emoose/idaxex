@@ -417,6 +417,8 @@ void xex_load_imports(linput_t* li)
     qlread(li, &table_header, sizeof(XEX_IMPORT_TABLE));
     table_header.TableSize = swap32(table_header.TableSize);
     table_header.ImportCount = swap16(table_header.ImportCount);
+    *(uint32*)&table_header.Version = swap32(*(uint32*)&table_header.Version);
+    *(uint32*)&table_header.VersionMin = swap32(*(uint32*)&table_header.VersionMin);
 
     auto& libname = import_libs.at(table_header.ModuleIndex);
 
@@ -425,6 +427,9 @@ void xex_load_imports(linput_t* li)
     // (so we add the import to variable list when variable type is loaded, but then remove it if a thunk for that import gets loaded)
     std::map<int, ea_t> variables;
     std::map<int, ea_t> import_ea;
+
+    // Track lowest record addr so we can add import module comment to it later
+    ea_t lowest_addr = BADADDR;
 
     // Loop through table entries
     for (int j = 0; j < table_header.ImportCount; j++)
@@ -445,6 +450,9 @@ void xex_load_imports(linput_t* li)
         set_name(record_addr, ("__imp__" + import_name).c_str());
         variables[ordinal] = record_addr;
         import_ea[ordinal] = record_addr;
+
+        if (lowest_addr == BADADDR || lowest_addr > record_addr)
+          lowest_addr = record_addr;
       }
       else if (record_type == 1)
       {
@@ -477,6 +485,11 @@ void xex_load_imports(linput_t* li)
       else
         msg("[+] %s import %d (%s) (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, import_name, record_addr, record_type);
     }
+
+    if (lowest_addr != BADADDR)
+      add_extra_line(lowest_addr, true, "\n\nImports from %s v%d.%d.%d.%d (minimum v%d.%d.%d.%d)\n", libname.c_str(),
+        table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
+        table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE);
 
     // Imports window setup
     for (auto kvp : import_ea)
@@ -626,8 +639,10 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
     msg("[+] Failed to load PE image from XEX :(\n");
     return;
   }
-
   // basefile loaded!
+
+  // Let IDA know our base address
+  inf.baseaddr = base_address >> 4;
 
   // Setup imports & exports if we have them
   if (directory_entries.count(XEX_HEADER_IMPORTS))
