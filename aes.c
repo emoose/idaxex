@@ -37,6 +37,8 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 /*****************************************************************************/
 #include <stdint.h>
 #include <string.h> // CBC mode, for memset
+#include <wmmintrin.h>  //for intrinsics for AES-NI
+#include <intrin.h> // cpuid
 #include "aes.h"
 
 /*****************************************************************************/
@@ -71,8 +73,6 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 /*****************************************************************************/
 // state - array holding the intermediate results during decryption.
 typedef uint8_t state_t[4][4];
-
-
 
 // The lookup-tables are marked const so they can be placed in read-only storage instead of RAM
 // The numbers below can be computed dynamically trading ROM for RAM - 
@@ -222,14 +222,84 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
   }
 }
 
+/* Define some variables to hold pointers to the Cipher/InvCipher functions  */
+/* This will let us switch them out if AESNI is supported */
+typedef void(*AESCipher_fn)(state_t* state, const uint8_t* RoundKey);
+
+static void Cipher(state_t* state, const uint8_t* RoundKey);
+static void InvCipher(state_t* state, const uint8_t* RoundKey);
+static void Cipher_AESNI(state_t* state, const uint8_t* RoundKey);
+static void InvCipher_AESNI(state_t* state, const uint8_t* RoundKey);
+
+AESCipher_fn var_CipherFn = Cipher;
+AESCipher_fn var_InvCipherFn = InvCipher;
+
+static int supports_aesni = 0;
+int cpu_aesni_support()
+{
+  int regs[4];
+  __cpuid(regs, 1);
+  supports_aesni = (regs[2] >> 25) & 1;
+
+  var_CipherFn = supports_aesni ? Cipher_AESNI : Cipher;
+  var_InvCipherFn = supports_aesni ? InvCipher_AESNI : InvCipher;
+}
+
+/* AESNI code from https://gist.github.com/acapola/d5b940da024080dfaf5f */
+#define AES_128_key_exp(k, rcon) aes_128_key_expansion(k, _mm_aeskeygenassist_si128(k, rcon))
+
+static __m128i aes_128_key_expansion(__m128i key, __m128i keygened) {
+  keygened = _mm_shuffle_epi32(keygened, _MM_SHUFFLE(3, 3, 3, 3));
+  key = _mm_xor_si128(key, _mm_slli_si128(key, 4));
+  key = _mm_xor_si128(key, _mm_slli_si128(key, 4));
+  key = _mm_xor_si128(key, _mm_slli_si128(key, 4));
+  return _mm_xor_si128(key, keygened);
+}
+
+void aesni128_load_key(uint8_t* RoundKey, int8_t *enc_key) {
+  __m128i* key_schedule = (__m128i*)RoundKey;
+
+  key_schedule[0] = _mm_loadu_si128((const __m128i*) enc_key);
+  key_schedule[1] = AES_128_key_exp(key_schedule[0], 0x01);
+  key_schedule[2] = AES_128_key_exp(key_schedule[1], 0x02);
+  key_schedule[3] = AES_128_key_exp(key_schedule[2], 0x04);
+  key_schedule[4] = AES_128_key_exp(key_schedule[3], 0x08);
+  key_schedule[5] = AES_128_key_exp(key_schedule[4], 0x10);
+  key_schedule[6] = AES_128_key_exp(key_schedule[5], 0x20);
+  key_schedule[7] = AES_128_key_exp(key_schedule[6], 0x40);
+  key_schedule[8] = AES_128_key_exp(key_schedule[7], 0x80);
+  key_schedule[9] = AES_128_key_exp(key_schedule[8], 0x1B);
+  key_schedule[10] = AES_128_key_exp(key_schedule[9], 0x36);
+
+  // generate decryption keys in reverse order.
+    // k[10] is shared by last encryption and first decryption rounds
+    // k[0] is shared by first encryption round and last decryption round (and is the original user key)
+    // For some implementation reasons, decryption key schedule is NOT the encryption key schedule in reverse order
+  key_schedule[11] = _mm_aesimc_si128(key_schedule[9]);
+  key_schedule[12] = _mm_aesimc_si128(key_schedule[8]);
+  key_schedule[13] = _mm_aesimc_si128(key_schedule[7]);
+  key_schedule[14] = _mm_aesimc_si128(key_schedule[6]);
+  key_schedule[15] = _mm_aesimc_si128(key_schedule[5]);
+  key_schedule[16] = _mm_aesimc_si128(key_schedule[4]);
+  key_schedule[17] = _mm_aesimc_si128(key_schedule[3]);
+  key_schedule[18] = _mm_aesimc_si128(key_schedule[2]);
+  key_schedule[19] = _mm_aesimc_si128(key_schedule[1]);
+}
+
 void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key)
 {
-  KeyExpansion(ctx->RoundKey, key);
+  if(cpu_aesni_support())
+    aesni128_load_key(ctx->RoundKey, key);
+  else
+    KeyExpansion(ctx->RoundKey, key);
 }
 #if (defined(CBC) && (CBC == 1)) || (defined(CTR) && (CTR == 1))
 void AES_init_ctx_iv(struct AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
 {
-  KeyExpansion(ctx->RoundKey, key);
+  if (cpu_aesni_support())
+    aesni128_load_key(ctx->RoundKey, key);
+  else
+    KeyExpansion(ctx->RoundKey, key);
   memcpy(ctx->Iv, iv, AES_BLOCKLEN);
 }
 void AES_ctx_set_iv(struct AES_ctx* ctx, const uint8_t* iv)
@@ -407,6 +477,31 @@ static void InvShiftRows(state_t* state)
 }
 #endif // #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
+#define DO_ENC_BLOCK(m,k) \
+	do{\
+        m = _mm_xor_si128       (m, k[ 0]); \
+        m = _mm_aesenc_si128    (m, k[ 1]); \
+        m = _mm_aesenc_si128    (m, k[ 2]); \
+        m = _mm_aesenc_si128    (m, k[ 3]); \
+        m = _mm_aesenc_si128    (m, k[ 4]); \
+        m = _mm_aesenc_si128    (m, k[ 5]); \
+        m = _mm_aesenc_si128    (m, k[ 6]); \
+        m = _mm_aesenc_si128    (m, k[ 7]); \
+        m = _mm_aesenc_si128    (m, k[ 8]); \
+        m = _mm_aesenc_si128    (m, k[ 9]); \
+        m = _mm_aesenclast_si128(m, k[10]);\
+    }while(0)
+
+static void Cipher_AESNI(state_t* state, const uint8_t* RoundKey)
+{
+  __m128i m = _mm_loadu_si128((__m128i *) state);
+  __m128i* key_schedule = (__m128i*)RoundKey;
+
+  DO_ENC_BLOCK(m, key_schedule);
+
+  _mm_storeu_si128((__m128i *) state, m);
+}
+
 // Cipher is the main function that encrypts the PlainText.
 static void Cipher(state_t* state, const uint8_t* RoundKey)
 {
@@ -434,6 +529,32 @@ static void Cipher(state_t* state, const uint8_t* RoundKey)
 }
 
 #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
+
+#define DO_DEC_BLOCK(m,k) \
+	do{\
+        m = _mm_xor_si128       (m, k[10+0]); \
+        m = _mm_aesdec_si128    (m, k[10+1]); \
+        m = _mm_aesdec_si128    (m, k[10+2]); \
+        m = _mm_aesdec_si128    (m, k[10+3]); \
+        m = _mm_aesdec_si128    (m, k[10+4]); \
+        m = _mm_aesdec_si128    (m, k[10+5]); \
+        m = _mm_aesdec_si128    (m, k[10+6]); \
+        m = _mm_aesdec_si128    (m, k[10+7]); \
+        m = _mm_aesdec_si128    (m, k[10+8]); \
+        m = _mm_aesdec_si128    (m, k[10+9]); \
+        m = _mm_aesdeclast_si128(m, k[0]);\
+    }while(0)
+
+static void InvCipher_AESNI(state_t* state, const uint8_t* RoundKey)
+{
+  __m128i m = _mm_loadu_si128((__m128i *) state);
+  __m128i* key_schedule = (__m128i*)RoundKey;
+
+  DO_DEC_BLOCK(m, key_schedule);
+
+  _mm_storeu_si128((__m128i *) state, m);
+}
+
 static void InvCipher(state_t* state, const uint8_t* RoundKey)
 {
   uint8_t round = 0;
@@ -469,13 +590,13 @@ static void InvCipher(state_t* state, const uint8_t* RoundKey)
 void AES_ECB_encrypt(const struct AES_ctx* ctx, uint8_t* buf)
 {
   // The next function call encrypts the PlainText with the Key using AES algorithm.
-  Cipher((state_t*)buf, ctx->RoundKey);
+  var_CipherFn((state_t*)buf, ctx->RoundKey);
 }
 
 void AES_ECB_decrypt(const struct AES_ctx* ctx, uint8_t* buf)
 {
   // The next function call decrypts the PlainText with the Key using AES algorithm.
-  InvCipher((state_t*)buf, ctx->RoundKey);
+  var_InvCipherFn((state_t*)buf, ctx->RoundKey);
 }
 
 
@@ -504,7 +625,7 @@ void AES_CBC_encrypt_buffer(struct AES_ctx *ctx, uint8_t* buf, uint32_t length)
   for (i = 0; i < length; i += AES_BLOCKLEN)
   {
     XorWithIv(buf, Iv);
-    Cipher((state_t*)buf, ctx->RoundKey);
+    var_CipherFn((state_t*)buf, ctx->RoundKey);
     Iv = buf;
     buf += AES_BLOCKLEN;
     //printf("Step %d - %d", i/16, i);
@@ -520,7 +641,7 @@ void AES_CBC_decrypt_buffer(struct AES_ctx* ctx, uint8_t* buf, uint32_t length)
   for (i = 0; i < length; i += AES_BLOCKLEN)
   {
     memcpy(storeNextIv, buf, AES_BLOCKLEN);
-    InvCipher((state_t*)buf, ctx->RoundKey);
+    var_InvCipherFn((state_t*)buf, ctx->RoundKey);
     XorWithIv(buf, ctx->Iv);
     memcpy(ctx->Iv, storeNextIv, AES_BLOCKLEN);
     buf += AES_BLOCKLEN;

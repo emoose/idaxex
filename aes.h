@@ -40,9 +40,12 @@
 #define AES_keyExpSize 176
 #endif
 
+#define AES_keyExpSizeNI 20 * 16
+
 struct AES_ctx
 {
-  uint8_t RoundKey[AES_keyExpSize];
+  uint8_t RoundKey[AES_keyExpSizeNI];
+
 #if (defined(CBC) && (CBC == 1)) || (defined(CTR) && (CTR == 1))
   uint8_t Iv[AES_BLOCKLEN];
 #endif
