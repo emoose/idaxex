@@ -479,19 +479,19 @@ static void InvShiftRows(state_t* state)
 #endif // #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
 #define DO_ENC_BLOCK(m,k) \
-	do{\
-        m = _mm_xor_si128       (m, k[ 0]); \
-        m = _mm_aesenc_si128    (m, k[ 1]); \
-        m = _mm_aesenc_si128    (m, k[ 2]); \
-        m = _mm_aesenc_si128    (m, k[ 3]); \
-        m = _mm_aesenc_si128    (m, k[ 4]); \
-        m = _mm_aesenc_si128    (m, k[ 5]); \
-        m = _mm_aesenc_si128    (m, k[ 6]); \
-        m = _mm_aesenc_si128    (m, k[ 7]); \
-        m = _mm_aesenc_si128    (m, k[ 8]); \
-        m = _mm_aesenc_si128    (m, k[ 9]); \
-        m = _mm_aesenclast_si128(m, k[10]);\
-    }while(0)
+  do{\
+    m = _mm_xor_si128       (m, k[ 0]); \
+    m = _mm_aesenc_si128    (m, k[ 1]); \
+    m = _mm_aesenc_si128    (m, k[ 2]); \
+    m = _mm_aesenc_si128    (m, k[ 3]); \
+    m = _mm_aesenc_si128    (m, k[ 4]); \
+    m = _mm_aesenc_si128    (m, k[ 5]); \
+    m = _mm_aesenc_si128    (m, k[ 6]); \
+    m = _mm_aesenc_si128    (m, k[ 7]); \
+    m = _mm_aesenc_si128    (m, k[ 8]); \
+    m = _mm_aesenc_si128    (m, k[ 9]); \
+    m = _mm_aesenclast_si128(m, k[10]);\
+  }while(0)
 
 static void Cipher_AESNI(state_t* state, const uint8_t* RoundKey)
 {
@@ -532,19 +532,19 @@ static void Cipher(state_t* state, const uint8_t* RoundKey)
 #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
 #define DO_DEC_BLOCK(m,k) \
-	do{\
-        m = _mm_xor_si128       (m, k[10+0]); \
-        m = _mm_aesdec_si128    (m, k[10+1]); \
-        m = _mm_aesdec_si128    (m, k[10+2]); \
-        m = _mm_aesdec_si128    (m, k[10+3]); \
-        m = _mm_aesdec_si128    (m, k[10+4]); \
-        m = _mm_aesdec_si128    (m, k[10+5]); \
-        m = _mm_aesdec_si128    (m, k[10+6]); \
-        m = _mm_aesdec_si128    (m, k[10+7]); \
-        m = _mm_aesdec_si128    (m, k[10+8]); \
-        m = _mm_aesdec_si128    (m, k[10+9]); \
-        m = _mm_aesdeclast_si128(m, k[0]);\
-    }while(0)
+  do{\
+    m = _mm_xor_si128       (m, k[10+0]); \
+    m = _mm_aesdec_si128    (m, k[10+1]); \
+    m = _mm_aesdec_si128    (m, k[10+2]); \
+    m = _mm_aesdec_si128    (m, k[10+3]); \
+    m = _mm_aesdec_si128    (m, k[10+4]); \
+    m = _mm_aesdec_si128    (m, k[10+5]); \
+    m = _mm_aesdec_si128    (m, k[10+6]); \
+    m = _mm_aesdec_si128    (m, k[10+7]); \
+    m = _mm_aesdec_si128    (m, k[10+8]); \
+    m = _mm_aesdec_si128    (m, k[10+9]); \
+    m = _mm_aesdeclast_si128(m, k[0]);\
+  }while(0)
 
 static void InvCipher_AESNI(state_t* state, const uint8_t* RoundKey)
 {
