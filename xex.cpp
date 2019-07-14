@@ -1,6 +1,6 @@
 // TODO:
-// - XEX1 and older
-// - improve speed of file load & analysis
+// - figure out why encrypted & compressed XEX1 files won't decrypt properly
+// - improve speed of file load & analysis?
 // - add more checks to things
 // - test!
 
@@ -684,6 +684,35 @@ void xex_info_comment(linput_t* li)
     else
       add_pgm_cmt(" - Encrypted (using %s key) (flags: %d)", key_names[key_idx], data_descriptor.Flags);
   }
+  add_pgm_cmt("");
+
+  if (directory_entries.count(XEX_HEADER_PE_MODULE_NAME))
+  {
+    uint32 length = 0;
+    qlseek(li, directory_entries[XEX_HEADER_PE_MODULE_NAME]);
+    qlread(li, &length, sizeof(uint32));
+    length = swap32(length);
+
+    char* module_name = (char*)malloc(length);
+    qlread(li, module_name, length);
+
+    add_pgm_cmt(" - PE Module Name: %s", module_name);
+    free(module_name);
+  }
+
+  if (directory_entries.count(XEX_HEADER_BOUND_PATH))
+  {
+    uint32 length = 0;
+    qlseek(li, directory_entries[XEX_HEADER_BOUND_PATH]);
+    qlread(li, &length, sizeof(uint32));
+    length = swap32(length);
+
+    char* bound_path = (char*)malloc(length);
+    qlread(li, bound_path, length);
+
+    add_pgm_cmt(" - Bound Path: %s", bound_path);
+    free(bound_path);
+  }
 
   if (directory_entries.count(XEX_HEADER_VITAL_STATS))
   {
@@ -697,14 +726,60 @@ void xex_info_comment(linput_t* li)
     add_pgm_cmt(" - Timestamp: %s", ctime(&timest));
   }
 
+  add_pgm_cmt(" - Base Address: 0x%X", base_address);
+  add_pgm_cmt(" - Entrypoint: 0x%X", entry_point);
+
+  if (directory_entries.count(XEX_HEADER_ORIGINAL_BASE_ADDRESS))
+    add_pgm_cmt(" - Original Base Address: 0x%X", directory_entries[XEX_HEADER_ORIGINAL_BASE_ADDRESS]);
+
+  if (directory_entries.count(XEX_HEADER_PE_BASE))
+    add_pgm_cmt(" - PE Base: 0x%X", directory_entries[XEX_HEADER_PE_BASE]);
+
+  if (directory_entries.count(XEX_HEADER_STACK_SIZE))
+    add_pgm_cmt(" - Stack Size: 0x%X", directory_entries[XEX_HEADER_STACK_SIZE]);
+
+  if (directory_entries.count(XEX_HEADER_FSCACHE_SIZE))
+    add_pgm_cmt(" - FS Cache Size: 0x%X", directory_entries[XEX_HEADER_FSCACHE_SIZE]);
+
+  if (directory_entries.count(XEX_HEADER_XAPI_HEAP_SIZE))
+    add_pgm_cmt(" - XAPI Heap Size: 0x%X", directory_entries[XEX_HEADER_XAPI_HEAP_SIZE]);
+
+  if (directory_entries.count(XEX_HEADER_WORKSPACE_SIZE))
+    add_pgm_cmt(" - Workspace Size: 0x%X", directory_entries[XEX_HEADER_WORKSPACE_SIZE]);
+
+  if (directory_entries.count(XEX_HEADER_EXECUTION_ID))
+  {
+    qlseek(li, directory_entries[XEX_HEADER_EXECUTION_ID]);
+    XEX_EXECUTION_ID exec_id;
+    qlread(li, &exec_id, sizeof(XEX_EXECUTION_ID));
+    exec_id.MediaID = swap32(exec_id.MediaID);
+    *(uint32*)&exec_id.Version = swap32(*(uint32*)&exec_id.Version);
+    *(uint32*)&exec_id.BaseVersion = swap32(*(uint32*)&exec_id.BaseVersion);
+    exec_id.TitleID = swap32(exec_id.TitleID);
+    exec_id.SaveGameID = swap32(exec_id.SaveGameID);
+
+    add_pgm_cmt("\nExecution ID:");
+    add_pgm_cmt(" - Media ID: %X", exec_id.MediaID);
+    add_pgm_cmt(" - Title ID: %X", exec_id.TitleID);
+    add_pgm_cmt(" - Savegame ID: %X", exec_id.SaveGameID);
+    add_pgm_cmt(" - Version: %d.%d.%d.%d (base version: %d.%d.%d.%d)", exec_id.Version.Major, exec_id.Version.Minor, exec_id.Version.Build, exec_id.Version.QFE,
+      exec_id.BaseVersion.Major, exec_id.BaseVersion.Minor, exec_id.BaseVersion.Build, exec_id.BaseVersion.QFE);
+    add_pgm_cmt(" - Platform: %d", exec_id.Platform);
+    add_pgm_cmt(" - Executable Type: %d", exec_id.ExecutableType);
+    add_pgm_cmt(" - Disc Number: %d/%d", exec_id.DiscNum, exec_id.DiscsInSet);
+  }
+
   if (directory_entries.count(XEX_HEADER_BUILD_VERSIONS))
   {
-    uint32 size;
     qlseek(li, directory_entries[XEX_HEADER_BUILD_VERSIONS]);
+
+    // Get number of libs from the size field
+    uint32 size;
     qlread(li, &size, sizeof(uint32));
     size = swap32(size);
     uint32 num_libs = (size - 4) / sizeof(XEXIMAGE_LIBRARY_VERSION);
-    add_pgm_cmt("\n Library versions:");
+
+    add_pgm_cmt("\nLibrary versions (%d libraries):", num_libs);
     for (int i = 0; i < num_libs; i++)
     {
       XEXIMAGE_LIBRARY_VERSION lib;
@@ -718,6 +793,7 @@ void xex_info_comment(linput_t* li)
       else if (lib.Version.ApprovalType == ApprovalType_PossibleApproved)
         approval = "possible-approved";
 
+      // Create buffer for lib name so we can terminate it properly
       char name[9];
       memset(name, 0, 9);
       memcpy(name, lib.LibraryName, 8);
@@ -727,7 +803,7 @@ void xex_info_comment(linput_t* li)
   }
 
   if (xex_header.Magic != MAGIC_XEX2)
-    add_pgm_cmt("\nWarning: import names are based on final (1888 or newer) system libraries\nThis XEX is for a pre-1888 system, so it's likely import names will be very wrong!");
+    add_pgm_cmt("\nWarning: import names are based on final (1888 or newer) system libraries\nThis XEX is for a pre-1888 system, so it's very likely import names will be incorrect!");
 }
 
 //------------------------------------------------------------------------------

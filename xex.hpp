@@ -17,7 +17,7 @@
 #define XEX_HEADER_ULONG(key) (((key) << 8) | 1)
 #define XEX_HEADER_FLAG(key) ((key) << 8)
 #define XEX_HEADER_SIZEDSTRUCT(key) (((key) << 8) | 0xFF)
-#define XEX_HEADER_STRING(key) XEX_HEADER_SIZEDSTRUCT(key)
+#define XEX_HEADER_STRING_FIELD(key)	XEX_HEADER_SIZEDSTRUCT(key)
 
 #define XEX_HEADER_SECTION_TABLE XEX_HEADER_SIZEDSTRUCT(2)
 
@@ -27,7 +27,7 @@
 
 #define XEX_HEADER_DELTA_PATCH_DESCRIPTOR XEX_HEADER_SIZEDSTRUCT(5)
 
-#define XEX_HEADER_BOUND_PATH XEX_HEADER_STRING(0x0080)
+#define XEX_HEADER_BOUND_PATH XEX_HEADER_STRING_FIELD(0x0080)
 
 #define XEX_HEADER_ORIGINAL_BASE_ADDRESS XEX_HEADER_ULONG(0x0100)
 
@@ -37,7 +37,15 @@
 
 #define XEX_HEADER_IMPORTS XEX_HEADER_SIZEDSTRUCT(0x0103)
 #define XEX_BETAHEADER_IMPORTS XEX_HEADER_SIZEDSTRUCT(0x0102)
+
 #define XEX_HEADER_BUILD_VERSIONS			XEX_HEADER_SIZEDSTRUCT(0x0200)
+
+#define XEX_HEADER_PE_MODULE_NAME			XEX_HEADER_STRING_FIELD(0x0183)
+
+#define XEX_HEADER_STACK_SIZE				XEX_HEADER_FLAG(0x0202)
+#define XEX_HEADER_FSCACHE_SIZE				XEX_HEADER_ULONG(0x203)
+#define XEX_HEADER_XAPI_HEAP_SIZE			XEX_HEADER_ULONG(0x0204)
+#define XEX_HEADER_WORKSPACE_SIZE			XEX_HEADER_ULONG(0x0402)
 
 typedef struct _VERSION {
   uint32 QFE : 8;
@@ -73,6 +81,10 @@ typedef struct _HV_IMAGE_EXPORT_TABLE {
   uint32 Base;
 } HV_IMAGE_EXPORT_TABLE, *PHV_IMAGE_EXPORT_TABLE;
 
+#define XEX_EXPORT_MAGIC_0      0x48000000
+#define XEX_EXPORT_MAGIC_1      0x00485645
+#define XEX_EXPORT_MAGIC_2      0x48000000
+
 enum ApprovalType : uint8
 {
   ApprovalType_Unapproved = 0x00,
@@ -92,9 +104,26 @@ typedef struct _XEXIMAGE_LIBRARY_VERSION {
   } Version;
 } XEXIMAGE_LIBRARY_VERSION, *PXEXIMAGE_LIBRARY_VERSION;
 
-#define XEX_EXPORT_MAGIC_0      0x48000000
-#define XEX_EXPORT_MAGIC_1      0x00485645
-#define XEX_EXPORT_MAGIC_2      0x48000000
+typedef struct _XEX_EXECUTION_ID {
+  uint32 MediaID; // 0x0 sz:0x4
+  VERSION Version; // 0x4 sz:0x4
+  VERSION BaseVersion; // 0x8 sz:0x4
+  union {
+    uint32 TitleID; // 0xC sz:0x4
+    struct {
+      uint16 PublisherID; // 0xC sz:0x2
+      uint16 GameID; // 0xE sz:0x2
+    };
+  };
+  uint8 Platform; // 0x10 sz:0x1
+  uint8 ExecutableType; // 0x11 sz:0x1
+  uint8 DiscNum; // 0x12 sz:0x1
+  uint8 DiscsInSet; // 0x13 sz:0x1
+  uint32 SaveGameID; // 0x14 sz:0x4
+} XEX_EXECUTION_ID, *PXEX_EXECUTION_ID; // size 24
+static_assert(sizeof(XEX_EXECUTION_ID) == 0x18, "XEX_EXECUTION_ID");
+
+#define XEX_HEADER_EXECUTION_ID XEX_HEADER_STRUCT(0x400, XEX_EXECUTION_ID)
 
 typedef struct _IMAGE_XEX_HEADER {
   uint32 Magic; // 0x0 sz:0x4
