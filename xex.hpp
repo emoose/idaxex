@@ -1,9 +1,16 @@
 #pragma once
 #include <assert.h>
 
-#define XEX2_MAGIC 0x32584558
 #define EXE_MZ_SIGNATURE 0x5A4D
 #define EXE_NT_SIGNATURE 0x4550
+
+#define MAGIC_XEX2  0x32584558
+#define MAGIC_XEX1  0x31584558
+#define MAGIC_XEX25 0x25584558
+#define MAGIC_XEX2D 0x2D584558
+#define MAGIC_XEX3F 0x3F584558
+
+#define MAGIC_XUIZ  0x5A495558
 
 #define XEX_HEADER_STRUCT(key, struct) (((key) << 8) | (sizeof (struct) >> 2))
 #define XEX_HEADER_FIXED_SIZE(key, size) (((key) << 8) | ((size) >> 2))
@@ -29,6 +36,8 @@
 #define XEX_HEADER_PE_BASE XEX_HEADER_ULONG(0x0102)
 
 #define XEX_HEADER_IMPORTS XEX_HEADER_SIZEDSTRUCT(0x0103)
+#define XEX_BETAHEADER_IMPORTS XEX_HEADER_SIZEDSTRUCT(0x0102)
+#define XEX_HEADER_BUILD_VERSIONS			XEX_HEADER_SIZEDSTRUCT(0x0200)
 
 typedef struct _VERSION {
   uint32 QFE : 8;
@@ -64,6 +73,25 @@ typedef struct _HV_IMAGE_EXPORT_TABLE {
   uint32 Base;
 } HV_IMAGE_EXPORT_TABLE, *PHV_IMAGE_EXPORT_TABLE;
 
+enum ApprovalType : uint8
+{
+  ApprovalType_Unapproved = 0x00,
+  ApprovalType_PossibleApproved = 0x20,
+  ApprovalType_Approved = 0x40,
+  ApprovalType_Expired = 0x60
+};
+
+typedef struct _XEXIMAGE_LIBRARY_VERSION {
+  char LibraryName[8];
+  struct LIBVERSION {
+    uint16        Major;
+    uint16        Minor;
+    uint16        Build;
+    ApprovalType  ApprovalType;
+    uint8         QFE;
+  } Version;
+} XEXIMAGE_LIBRARY_VERSION, *PXEXIMAGE_LIBRARY_VERSION;
+
 #define XEX_EXPORT_MAGIC_0      0x48000000
 #define XEX_EXPORT_MAGIC_1      0x00485645
 #define XEX_EXPORT_MAGIC_2      0x48000000
@@ -77,6 +105,33 @@ typedef struct _IMAGE_XEX_HEADER {
   uint32 HeaderDirectoryEntryCount; // 0x14 sz:0x4
 } IMAGE_XEX_HEADER, *PIMAGE_XEX_HEADER; // size 24
 static_assert(sizeof(IMAGE_XEX_HEADER) == 0x18, "IMAGE_XEX_HEADER");
+
+typedef struct _IMAGE_XEX3F_HEADER {
+  uint32 Magic; // 0x0 sz:0x4
+  uint32 ModuleFlags; // 0x4 sz:0x4
+  uint32 SizeOfHeaders; // 0x8 sz:0x4
+  uint32 SizeOfDiscardableHeaders; // 0xC sz:0x4
+  uint32 LoadAddress; // 0x10 sz:0x4
+  uint32 Unknown14; // 0x14 sz:0x4
+  uint32 HeaderDirectoryEntryCount; // 0x18 sz:0x4
+} IMAGE_XEX3F_HEADER, *PIMAGE_XEX3F_HEADER; // size 0x1C
+static_assert(sizeof(IMAGE_XEX3F_HEADER) == 0x1C, "IMAGE_XEX3F_HEADER");
+
+#define XEX_MODULE_FLAG_TITLE_PROCESS 0x0001
+#define XEX_MODULE_FLAG_TITLE_IMPORTS 0x0002
+#define XEX_MODULE_FLAG_DEBUGGER 0x0004
+#define XEX_MODULE_FLAG_DLL 0x0008
+#define XEX_MODULE_FLAG_PATCH 0x0010
+#define XEX_MODULE_FLAG_PATCH_FULL 0x0020
+#define XEX_MODULE_FLAG_PATCH_DELTA 0x0040
+#define XEX_MODULE_FLAG_USER_MODE 0x0080
+#define XEX_MODULE_FLAG_BOUND_PATH 0x40000000
+#define XEX_MODULE_FLAG_SILENT_LOAD 0x80000000
+
+#define XEX_MODULE_TYPE_TITLE (XEX_MODULE_FLAG_TITLE_PROCESS)
+#define XEX_MODULE_TYPE_TITLE_DLL (XEX_MODULE_FLAG_TITLE_PROCESS | XEX_MODULE_FLAG_DLL)
+#define XEX_MODULE_TYPE_SYSTEM_APP (XEX_MODULE_FLAG_DLL)
+#define XEX_MODULE_TYPE_SYSTEM_DLL (XEX_MODULE_FLAG_DLL | XEX_MODULE_FLAG_TITLE_IMPORTS)
 
 typedef struct _IMAGE_XEX_DIRECTORY_ENTRY {
   uint32 Key; // 0x0 sz:0x4
@@ -107,6 +162,61 @@ typedef struct _XEX2_SECURITY_INFO {
   uint32 PageDescriptorCount;
 } XEX2_SECURITY_INFO, *PXEX2_SECURITY_INFO;
 
+typedef struct _XEX1_HV_IMAGE_INFO {
+  uint8 Signature[0x100];
+  uint8 ImageHash[0x14];
+  uint8 ImportDigest[0x14];
+  uint32 LoadAddress;
+  uint8 ImageKey[0x10];
+  uint8 MediaID[0x10];
+  uint32 GameRegion;
+  uint32 ImageFlags;
+  uint32 ExportTableAddress;
+} XEX1_HV_IMAGE_INFO, *PXEX1_HV_IMAGE_INFO;
+
+typedef struct _XEX1_SECURITY_INFO {
+  uint32 Size;
+  uint32 ImageSize;
+  XEX1_HV_IMAGE_INFO ImageInfo;
+  uint32 AllowedMediaTypes;
+  uint32 PageDescriptorCount;
+} XEX1_SECURITY_INFO, *PXEX1_SECURITY_INFO;
+
+typedef struct _XEX25_HV_IMAGE_INFO {
+  uint8 Signature[0x100];
+  uint8 ImageHash[0x14];
+  uint8 ImportDigest[0x14];
+  uint32 LoadAddress;
+  uint8 ImageKey[0x10];
+  uint32 ImageFlags;
+  uint32 ExportTableAddress;
+} XEX25_HV_IMAGE_INFO, *PXEX25_HV_IMAGE_INFO;
+
+typedef struct _XEX25_SECURITY_INFO {
+  uint32 Size;
+  uint32 ImageSize;
+  XEX25_HV_IMAGE_INFO ImageInfo;
+  uint32 AllowedMediaTypes;
+  uint32 PageDescriptorCount;
+} XEX25_SECURITY_INFO, *PXEX25_SECURITY_INFO;
+
+typedef struct _XEX2D_HV_IMAGE_INFO {
+  uint8 Signature[0x100];
+  uint8 ImageHash[0x14];
+  uint8 ImportDigest[0x14];
+  uint32 LoadAddress;
+  uint32 ImageFlags;
+  uint32 ExportTableAddress;
+  uint32 Unknown;
+} XEX2D_HV_IMAGE_INFO, *PXEX2D_HV_IMAGE_INFO;
+
+typedef struct _XEX2D_SECURITY_INFO {
+  uint32 Size;
+  XEX25_HV_IMAGE_INFO ImageInfo;
+  uint32 AllowedMediaTypes;
+  uint32 PageDescriptorCount;
+} XEX2D_SECURITY_INFO, *PXEX2D_SECURITY_INFO;
+
 typedef struct _XEX_FILE_DATA_DESCRIPTOR {
   uint32 Size;
   uint16 Flags;
@@ -130,6 +240,14 @@ typedef struct _XEX_COMPRESSED_DATA_DESCRIPTOR {
   uint32 WindowSize;
   XEX_DATA_DESCRIPTOR FirstDescriptor;
 } XEX_COMPRESSED_DATA_DESCRIPTOR, *P_XEX_COMPRESSED_DATA_DESCRIPTOR;
+
+typedef struct _XEX_VITAL_STATS {
+  uint32 Checksum;
+  __time32_t Timestamp;
+} XEX_VITAL_STATS, *PXEX_VITAL_STATS;
+
+#define XEX_HEADER_VITAL_STATS				XEX_HEADER_STRUCT(0x0180, XEX_VITAL_STATS)
+
 
 typedef struct _IMAGE_DOS_HEADER
 {

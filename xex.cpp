@@ -50,15 +50,20 @@ const char* key_names[4] = {
   "devkit-XEX1"
 };
 
-IMAGE_XEX_HEADER xex_header;
-XEX2_SECURITY_INFO security_info;
 std::map<uint32, uint32> directory_entries;
 XEX_FILE_DATA_DESCRIPTOR data_descriptor;
 
-int64 data_length = 0;
+bool abort_load = false;
+
+uint8 image_key[0x10];
+uint32 image_size = 0;
 uint32 base_address = 0;
 uint32 entry_point = 0;
 uint32 export_table_va = 0;
+int64 data_length = 0;
+
+int key_idx = 0;
+IMAGE_XEX_HEADER xex_header;
 
 uint8 session_key[16];
 
@@ -147,6 +152,14 @@ bool pe_add_section(const IMAGE_SECTION_HEADER& section)
 
 bool pe_load(uint8* data)
 {
+  uint32* magic = (uint32*)data;
+  if (*magic == MAGIC_XUIZ)
+  {
+    warning("This XEX is an XUIZ resource XEX, and doesn't contain any code.");
+    abort_load = true;
+    return false;
+  }
+
   IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
   if (dos_header->MZSignature != EXE_MZ_SIGNATURE)
     return false;
@@ -172,11 +185,11 @@ bool pe_load(uint8* data)
   {
     auto& section = sections[i];
 
-    uint32 sec_addr = section.VirtualAddress; // if xex_magic != _MAGIC_XEX3F else section.PointerToRawData
+    uint32 sec_addr = xex_header.Magic != MAGIC_XEX3F ? section.VirtualAddress : section.PointerToRawData;
     int sec_size = std::min(section.VirtualSize, section.SizeOfRawData);
 
-    if (sec_addr + sec_size > security_info.ImageSize)
-      sec_size = security_info.ImageSize - sec_addr;
+    if (sec_addr + sec_size > image_size)
+      sec_size = image_size - sec_addr;
 
     // Add section as IDA segment
     bool code_section = pe_add_section(section);
@@ -197,6 +210,31 @@ bool pe_load(uint8* data)
   return true;
 }
 
+bool xex_read_raw(linput_t* li, bool encrypted)
+{
+  uint8* pe_data = (uint8*)malloc(std::max(data_length, (int64)image_size));
+  memset(pe_data, 0, std::max(data_length, (int64)image_size));
+
+  qlseek(li, xex_header.SizeOfHeaders);
+  qlread(li, pe_data, data_length);
+
+  AES_ctx aes;
+  uint8 iv[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  };
+
+  if (encrypted)
+  {
+    AES_init_ctx_iv(&aes, session_key, iv);
+    AES_CBC_decrypt_buffer(&aes, pe_data, data_length);
+  }
+
+  auto result = pe_load(pe_data);
+  free(pe_data);
+  return result;
+}
+
 bool xex_read_uncompressed(linput_t* li, bool encrypted)
 {
   int num_blocks = (data_descriptor.Size - 8) / 8;
@@ -213,7 +251,7 @@ bool xex_read_uncompressed(linput_t* li, bool encrypted)
   if (encrypted)
     AES_init_ctx_iv(&aes, session_key, iv);
 
-  uint8* pe_data = (uint8*)malloc(security_info.ImageSize);
+  uint8* pe_data = (uint8*)malloc(image_size);
   uint32_t position = 0;
   qlseek(li, xex_header.SizeOfHeaders);
   for (int i = 0; i < num_blocks; i++)
@@ -282,13 +320,13 @@ bool xex_read_compressed(linput_t* li, bool encrypted)
   cur_block->Size = swap32(cur_block->Size);
 
   // Alloc memory for the PE
-  uint8* pe_data = (uint8*)malloc(security_info.ImageSize);
+  uint8* pe_data = (uint8*)malloc(image_size);
 
   // LZX init...
   LZXinit(compression_info->WindowSize);
   uint8* comp_buffer = (uint8*)malloc(0x9800); // 0x9800 = max comp. block size (0x8000) + MAX_GROWTH (0x1800)
 
-  uint32 size_left = security_info.ImageSize;
+  uint32 size_left = image_size;
   uint32 size_done = 0;
   int retcode = 0;
 
@@ -371,6 +409,9 @@ end:
 
 bool xex_read_image(linput_t* li, int key_index)
 {
+  if (abort_load)
+    return false;
+
   int comp_format = 0;
   int enc_flag = 0;
 
@@ -385,17 +426,27 @@ bool xex_read_image(linput_t* li, int key_index)
     enc_flag = data_descriptor.Flags = swap16(data_descriptor.Flags);
   }
 
+  key_idx = key_index;
+  if (key_index == 0)
+  {
+    msg("[+] %s\n", (comp_format == 2) ? "Compressed" : "Uncompressed");
+    msg("[+] %s\n", (enc_flag != 0) ? "Encrypted" : "Decrypted");
+  }
+
   // Setup session key
   if (enc_flag)
   {
-    memcpy(session_key, security_info.ImageInfo.ImageKey, 0x10);
+    msg("[+] Attempting decrypt with %s key...\n", key_names[key_index]);
+    memcpy(session_key, image_key, 0x10);
     AES_ctx key_ctx;
     AES_init_ctx(&key_ctx, key_bytes[key_index]);
     AES_ECB_decrypt(&key_ctx, session_key);
   }
 
   bool result = false;
-  if (comp_format == 1)
+  if (comp_format == 0)
+    result = xex_read_raw(li, enc_flag);
+  else if (comp_format == 1)
     result = xex_read_uncompressed(li, enc_flag);
   else if (comp_format == 2)
     result = xex_read_compressed(li, enc_flag);
@@ -621,6 +672,64 @@ void xex_load_exports()
   }
 }
 
+void xex_info_comment(linput_t* li)
+{
+  create_filename_cmt();
+  add_pgm_cmt("\nXEX information:");
+  if (directory_entries.count(XEX_FILE_DATA_DESCRIPTOR_HEADER))
+  {
+    add_pgm_cmt(" - %s (flags: %d)", (data_descriptor.Format == 2) ? "Compressed" : "Uncompressed", data_descriptor.Format);
+    if (data_descriptor.Flags == 0)
+      add_pgm_cmt(" - Decrypted (flags: %d)", data_descriptor.Flags);
+    else
+      add_pgm_cmt(" - Encrypted (using %s key) (flags: %d)", key_names[key_idx], data_descriptor.Flags);
+  }
+
+  if (directory_entries.count(XEX_HEADER_VITAL_STATS))
+  {
+    XEX_VITAL_STATS stats;
+    qlseek(li, directory_entries[XEX_HEADER_VITAL_STATS]);
+    qlread(li, &stats, sizeof(XEX_VITAL_STATS));
+    stats.Checksum = swap32(stats.Checksum);
+    stats.Timestamp = swap32(stats.Timestamp);
+    add_pgm_cmt(" - Checksum: 0x%X", stats.Checksum);
+    time_t timest = stats.Timestamp;
+    add_pgm_cmt(" - Timestamp: %s", ctime(&timest));
+  }
+
+  if (directory_entries.count(XEX_HEADER_BUILD_VERSIONS))
+  {
+    uint32 size;
+    qlseek(li, directory_entries[XEX_HEADER_BUILD_VERSIONS]);
+    qlread(li, &size, sizeof(uint32));
+    size = swap32(size);
+    uint32 num_libs = (size - 4) / sizeof(XEXIMAGE_LIBRARY_VERSION);
+    add_pgm_cmt("\n Library versions:");
+    for (int i = 0; i < num_libs; i++)
+    {
+      XEXIMAGE_LIBRARY_VERSION lib;
+      qlread(li, &lib, sizeof(XEXIMAGE_LIBRARY_VERSION));
+
+      char* approval = "unapproved";
+      if (lib.Version.ApprovalType == ApprovalType_Approved)
+        approval = "approved";
+      else if (lib.Version.ApprovalType == ApprovalType_Expired)
+        approval = "expired";
+      else if (lib.Version.ApprovalType == ApprovalType_PossibleApproved)
+        approval = "possible-approved";
+
+      char name[9];
+      memset(name, 0, 9);
+      memcpy(name, lib.LibraryName, 8);
+
+      add_pgm_cmt(" - %s v%d.%d.%d.%d (%s)", name, swap16(lib.Version.Major), swap16(lib.Version.Minor), swap16(lib.Version.Build), lib.Version.QFE, approval);
+    }
+  }
+
+  if (xex_header.Magic != MAGIC_XEX2)
+    add_pgm_cmt("\nWarning: import names are based on final (1888 or newer) system libraries\nThis XEX is for a pre-1888 system, so it's likely import names will be very wrong!");
+}
+
 //------------------------------------------------------------------------------
 void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
 {
@@ -650,36 +759,101 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   int64 fsize = qlsize(li);
   qlseek(li, 0);
 
-  auto read = qlread(li, &xex_header, sizeof(IMAGE_XEX_HEADER));
+  uint32 xex_magic;
+  qlread(li, &xex_magic, sizeof(uint32));
+  qlseek(li, 0);
 
-  // byteswap xex_header
-  xex_header.Magic = swap32(xex_header.Magic);
+  if(xex_magic != MAGIC_XEX2 && xex_magic != MAGIC_XEX1 && xex_magic != MAGIC_XEX25 && xex_magic != MAGIC_XEX2D && xex_magic != MAGIC_XEX3F)
+  {
+    warning("idaxex: unknown magic %X!", xex_magic);
+    return;
+  }
+
+  qlread(li, &xex_header, sizeof(IMAGE_XEX_HEADER));
   xex_header.ModuleFlags = swap32(xex_header.ModuleFlags);
-  xex_header.SizeOfHeaders = swap32(xex_header.SizeOfHeaders);
   xex_header.SizeOfDiscardableHeaders = swap32(xex_header.SizeOfDiscardableHeaders);
   xex_header.SecurityInfo = swap32(xex_header.SecurityInfo);
   xex_header.HeaderDirectoryEntryCount = swap32(xex_header.HeaderDirectoryEntryCount);
+  xex_header.SizeOfHeaders = swap32(xex_header.SizeOfHeaders);
 
   data_length = fsize - xex_header.SizeOfHeaders;
+
+  if (xex_magic == MAGIC_XEX3F)
+  {
+    // XEX3F has some unknown data in place of the directory entry count, with the actual count being after it
+    qlread(li, &xex_header.HeaderDirectoryEntryCount, sizeof(uint32));
+    xex_header.HeaderDirectoryEntryCount = swap32(xex_header.HeaderDirectoryEntryCount);
+
+    base_address = xex_header.SecurityInfo; // 0x3F has base address here instead of securityinfo offset!
+  }
+
+  if (xex_header.ModuleFlags & XEX_MODULE_FLAG_PATCH)
+  {
+    warning("This XEX is a patch file, and doesn't contain any code.");
+    return;
+  }
 
   // Read in directory entry / optional header keyvalues
   for (int i = 0; i < xex_header.HeaderDirectoryEntryCount; i++)
   {
     IMAGE_XEX_DIRECTORY_ENTRY header;
-    read = qlread(li, &header, sizeof(IMAGE_XEX_DIRECTORY_ENTRY));
+    qlread(li, &header, sizeof(IMAGE_XEX_DIRECTORY_ENTRY));
     header.Key = swap32(header.Key);
     header.Value = swap32(header.Value);
 
     directory_entries[header.Key] = header.Value;
+
+    // XEX25 (and probably XEX2D) use a different imports key
+    // some part of them isn't loading properly though, so disable loading imports for those for now
+    /*if (header.Key == XEX_BETAHEADER_IMPORTS)
+      directory_entries[XEX_HEADER_IMPORTS] = header.Value;*/
   }
 
-  // Read in SecurityInfo
-  qlseek(li, xex_header.SecurityInfo);
-  read = qlread(li, &security_info, sizeof(XEX2_SECURITY_INFO));
-  security_info.ImageSize = swap32(security_info.ImageSize);
+  // Read in SecurityInfo fields
+  if(xex_magic != MAGIC_XEX3F) // 0x3F doesn't have securityinfo...
+  {
+    // ImageSize - always at SecurityInfo[0x4]
+    qlseek(li, xex_header.SecurityInfo + 4);
+    qlread(li, &image_size, sizeof(uint32));
+    image_size = swap32(image_size);
 
-  base_address = security_info.ImageInfo.LoadAddress = swap32(security_info.ImageInfo.LoadAddress);
-  export_table_va = security_info.ImageInfo.ExportTableAddress = swap32(security_info.ImageInfo.ExportTableAddress);
+    // ImageKey
+    if (xex_magic != MAGIC_XEX2D)
+    {
+      std::map<uint32, size_t> offs_ImageKey = {
+        {MAGIC_XEX2, offsetof(XEX2_SECURITY_INFO, ImageInfo.ImageKey)},
+        {MAGIC_XEX1, offsetof(XEX1_SECURITY_INFO, ImageInfo.ImageKey)},
+        {MAGIC_XEX25, offsetof(XEX25_SECURITY_INFO, ImageInfo.ImageKey)}
+      };
+
+      qlseek(li, xex_header.SecurityInfo + offs_ImageKey[xex_magic]);
+      qlread(li, image_key, 0x10);
+    }
+
+    // LoadAddress
+    std::map<uint32, size_t> offs_LoadAddress = {
+      {MAGIC_XEX2, offsetof(XEX2_SECURITY_INFO, ImageInfo.LoadAddress)},
+      {MAGIC_XEX1, offsetof(XEX1_SECURITY_INFO, ImageInfo.LoadAddress)},
+      {MAGIC_XEX25, offsetof(XEX25_SECURITY_INFO, ImageInfo.LoadAddress)},
+      {MAGIC_XEX2D, offsetof(XEX2D_SECURITY_INFO, ImageInfo.LoadAddress)}
+    };
+
+    qlseek(li, xex_header.SecurityInfo + offs_LoadAddress[xex_magic]);
+    qlread(li, &base_address, sizeof(uint32));
+    base_address = swap32(base_address);
+
+    // ExportTableAddress
+    std::map<uint32, size_t> offs_ExportTableAddress = {
+      {MAGIC_XEX2, offsetof(XEX2_SECURITY_INFO, ImageInfo.ExportTableAddress)},
+      {MAGIC_XEX1, offsetof(XEX1_SECURITY_INFO, ImageInfo.ExportTableAddress)},
+      {MAGIC_XEX25, offsetof(XEX25_SECURITY_INFO, ImageInfo.ExportTableAddress)},
+      {MAGIC_XEX2D, offsetof(XEX2D_SECURITY_INFO, ImageInfo.ExportTableAddress)}
+    };
+
+    qlseek(li, xex_header.SecurityInfo + offs_ExportTableAddress[xex_magic]);
+    qlread(li, &export_table_va, sizeof(uint32));
+    export_table_va = swap32(export_table_va);
+  }
 
   // todo: should we actually be using the PE_BASE header?
   if (directory_entries.count(XEX_HEADER_PE_BASE))
@@ -708,7 +882,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
   // Done :)
   msg("[+] XEX loaded, voila!\n");
-  return;
+  xex_info_comment(li);
 }
 
 //--------------------------------------------------------------------------
@@ -719,15 +893,41 @@ static int idaapi accept_file(
         const char *)
 {
   qlseek(li, 0);
-  uint32 type;
-  if ( qlread(li, &type, sizeof(uint32)) == sizeof(uint32)
-    && type == XEX2_MAGIC )
+  uint32 magic;
+  if (qlread(li, &magic, sizeof(uint32)) != sizeof(uint32))
+    return 0;
+
+  int valid = 0;
+  if (magic == MAGIC_XEX2)
   {
-    *fileformatname = "Xbox360 XEX File";
-    *processor      = "PPC";
-    return 1;
+    valid = 1;
+    *fileformatname = "Xbox360 XEX2 File";
   }
-  return 0;
+  else if (magic == MAGIC_XEX1)
+  {
+    valid = 1;
+    *fileformatname = "Xbox360 XEX1 File";
+  }
+  else if(magic == MAGIC_XEX25)
+  {
+    valid = 1;
+    *fileformatname = "Xbox360 XEX25 File";
+  }
+  else if(magic == MAGIC_XEX2D)
+  {
+    valid = 1;
+    *fileformatname = "Xbox360 XEX2D File";
+  }
+  else if (magic == MAGIC_XEX3F)
+  {
+    valid = 1;
+    *fileformatname = "Xbox360 XEX3F File";
+  }
+
+  if (valid)
+    *processor = "PPC";
+
+  return valid;
 }
 
 //--------------------------------------------------------------------------
