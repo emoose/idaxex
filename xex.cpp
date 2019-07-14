@@ -1,6 +1,6 @@
 // TODO:
-// - test export labelling
-// - create generic names for imports/exports we can't find (eg whateverLibrary_0001)
+// - XEX1 and older
+// - improve speed of decryption/decompression (AES-NI? SHA1 NEON?)
 // - test!
 
 #include "../idaldr.h"
@@ -84,11 +84,11 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section)
 bool pe_load(uint8* data)
 {
   IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
-  if (dos_header->MZSignature != 0x5A4D)
+  if (dos_header->MZSignature != EXE_MZ_SIGNATURE)
     return false;
 
   IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(data + dos_header->AddressOfNewExeHeader);
-  if (nt_header->Signature != 0x4550)
+  if (nt_header->Signature != EXE_NT_SIGNATURE)
     return false;
 
   // Get base address/entrypoint from optionalheader if we don't already have them
@@ -137,14 +137,13 @@ bool xex_read_uncompressed(linput_t* li, bool encrypted)
   qlread(li, xex_blocks, num_blocks * sizeof(XEX_RAW_DATA_DESCRIPTOR));
 
   AES_ctx aes;
+  uint8 iv[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  };
+
   if (encrypted)
-  {
-    uint8 iv[] = {
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    };
     AES_init_ctx_iv(&aes, session_key, iv);
-  }
 
   uint8* pe_data = (uint8*)malloc(security_info.ImageSize);
   uint32_t position = 0;
@@ -153,6 +152,28 @@ bool xex_read_uncompressed(linput_t* li, bool encrypted)
   {
     xex_blocks[i].DataSize = swap32(xex_blocks[i].DataSize);
     xex_blocks[i].ZeroSize = swap32(xex_blocks[i].ZeroSize);
+
+    // if it's the first block & encrypted, we'll test-decrypt the first 16 bytes
+    // so we can test if it decrypted properly with this key, without needing to process the entire block
+    if (i == 0 && encrypted)
+    {
+      // Read first 16 bytes of block and decrypt
+      auto pos = qltell(li);
+      qlread(li, pe_data, 0x10);
+      AES_ECB_decrypt(&aes, pe_data);
+
+      // Check MZ signature
+      uint16 pe_sig = *(uint16*)pe_data;
+      if (pe_sig != EXE_MZ_SIGNATURE)
+      {
+        free(pe_data);
+        return false;
+      }
+
+      // Reinit AES & seek back to start of block
+      AES_init_ctx_iv(&aes, session_key, iv);
+      qlseek(li, pos);
+    }
 
     qlread(li, pe_data + position, xex_blocks[i].DataSize);
 
@@ -284,6 +305,8 @@ bool xex_read_image(linput_t* li, int key_index)
 {
   int comp_format = 0;
   int enc_flag = 0;
+
+  // Read compression/encryption info from data descriptor header if we have one
   if (directory_entries.count(XEX_FILE_DATA_DESCRIPTOR_HEADER))
   {
     qlseek(li, directory_entries[XEX_FILE_DATA_DESCRIPTOR_HEADER]);
@@ -295,18 +318,26 @@ bool xex_read_image(linput_t* li, int key_index)
   }
 
   // Setup session key
-  memcpy(session_key, security_info.ImageInfo.ImageKey, 0x10);
-  AES_ctx key_ctx;
-  AES_init_ctx(&key_ctx, key_bytes[key_index]);
-  AES_ECB_decrypt(&key_ctx, session_key);
+  if (enc_flag)
+  {
+    memcpy(session_key, security_info.ImageInfo.ImageKey, 0x10);
+    AES_ctx key_ctx;
+    AES_init_ctx(&key_ctx, key_bytes[key_index]);
+    AES_ECB_decrypt(&key_ctx, session_key);
+  }
 
+  bool result = false;
   if (comp_format == 1)
-    return xex_read_uncompressed(li, enc_flag);
+    result = xex_read_uncompressed(li, enc_flag);
   else if (comp_format == 2)
-    return xex_read_compressed(li, enc_flag);
+    result = xex_read_compressed(li, enc_flag);
+  else
+    warning("xex_read_image: Unhandled XEX compression format %d!", comp_format);
 
-  warning("xex_read_image: Unhandled XEX compression format %d!", comp_format);
-  return false;
+  if(result && enc_flag)
+    msg("[+] Decrypted successfully using %s key!\n", key_names[key_index]);
+
+  return result;
 }
 
 void xex_load_imports(linput_t* li)

@@ -2,6 +2,8 @@
 #include <assert.h>
 
 #define XEX2_MAGIC 0x32584558
+#define EXE_MZ_SIGNATURE 0x5A4D
+#define EXE_NT_SIGNATURE 0x4550
 
 #define XEX_HEADER_STRUCT(key, struct) (((key) << 8) | (sizeof (struct) >> 2))
 #define XEX_HEADER_FIXED_SIZE(key, size) (((key) << 8) | ((size) >> 2))
