@@ -45,6 +45,8 @@
 #define XEX_HEADER_XAPI_HEAP_SIZE			XEX_HEADER_ULONG(0x0204)
 #define XEX_HEADER_WORKSPACE_SIZE			XEX_HEADER_ULONG(0x0402)
 
+#define XEX_HEADER_PRIVILEGES         XEX_HEADER_FLAG(0x0300)
+
 typedef struct _VERSION {
   uint32 QFE : 8;
   uint32 Build : 16;
@@ -176,6 +178,111 @@ static_assert(sizeof(IMAGE_XEX3F_HEADER) == 0x1C, "IMAGE_XEX3F_HEADER");
 #define XEX_MODULE_TYPE_SYSTEM_APP (XEX_MODULE_FLAG_DLL)
 #define XEX_MODULE_TYPE_SYSTEM_DLL (XEX_MODULE_FLAG_DLL | XEX_MODULE_FLAG_TITLE_IMPORTS)
 
+enum GameRegion : uint32
+{
+  Region_NorthAmerica = 0x000000FF,
+  Region_Japan = 0x00000100,
+  Region_China = 0x00000200,
+  Region_RestOfAsia = 0x0000FC00,
+  Region_AustraliaNewZealand = 0x00010000,
+  Region_RestOfEurope = 0x00FE0000,
+  Region_RestOfWorld = 0xFF000000,
+  Region_All = 0xFFFFFFFF
+};
+
+typedef struct _ALLOWEDMEDIATYPES {
+  uint32   HardDisk                    : 1; //= 0x00000001
+  uint32   DvdX2                       : 1; //= 0x00000002
+  uint32   DvdCd                       : 1; //= 0x00000004
+  uint32   Dvd5                        : 1; //= 0x00000008
+  uint32   Dvd9                        : 1; //= 0x00000010
+  uint32   SystemFlash                 : 1; //= 0x00000020
+  uint32   _Unknown40                  : 1; //= 0x00000040
+  uint32   MemoryUnit                  : 1; //= 0x00000080
+  uint32   MassStorageDevice           : 1; //= 0x00000100
+  uint32   SmbFilesystem               : 1; //= 0x00000200
+  uint32   DirectFromRam               : 1; //= 0x00000400
+  uint32   _Unknown800                 : 1; //= 0x00000800
+  uint32   SecureVirtualOpticalDevice  : 1; //= 0x00001000
+  uint32   WirelessNStorageDevice      : 1; //= 0x00002000
+  uint32   SystemExtendedPartition     : 1; //= 0x00004000 (SEP)
+  uint32                               : 9; //= 0x00008000-0x00800000
+  uint32   InsecurePackage             : 1; //= 0x01000000
+  uint32   SaveGamePackage             : 1; //= 0x02000000
+  uint32   LocallySignedPackage        : 1; //= 0x04000000
+  uint32   LiveSignedPackage           : 1; //= 0x08000000
+  uint32   XboxPlatformPackage         : 1; //= 0x10000000
+} ALLOWEDMEDIATYPES, *PALLOWEDMEDIATYPES;
+static_assert(sizeof(ALLOWEDMEDIATYPES) == 4, "ALLOWEDMEDIATYPES");
+
+typedef struct _IMAGEFLAGS {
+  uint32   RevocationCheckRequired    : 1; //= 0x00000001
+  uint32   ManufacturingUtility       : 1; //= 0x00000002
+  uint32   ManufacturingSupportTool   : 1; //= 0x00000004
+        // ManufacturingAwareModule          = 0x00000006
+  uint32   Xgd2MediaOnly              : 1; //= 0x00000008
+  uint32                              : 4; //= 0x00000010-0x00000080
+  uint32   CardeaKey                  : 1; //= 0x00000100
+  uint32   XeikaKey                   : 1; //= 0x00000200
+  uint32   TitleUserMode              : 1; //= 0x00000400
+  uint32   SystemUserMode             : 1; //= 0x00000800
+  uint32   Orange0                    : 1; //= 0x00001000
+  uint32   Orange1                    : 1; //= 0x00002000
+  uint32   Orange2                    : 1; //= 0x00004000
+  uint32                              : 1; //= 0x00008000
+  uint32   IptvSignupApplication      : 1; //= 0x00010000
+  uint32   IptvTitleApplication       : 1; //= 0x00020000
+  uint32                              : 8; //= 0x00040000-0x02000000
+  uint32   KeyVaultPrivilegesRequired : 1; //= 0x04000000
+  uint32   OnlineActivationRequired   : 1; //= 0x08000000
+  uint32   PageSize4Kb                : 1; //= 0x10000000
+  uint32   NoGameRegion               : 1; //= 0x20000000
+  uint32   RevocationCheckOptional    : 1; //= 0x40000000
+} IMAGEFLAGS, *PIMAGEFLAGS;
+static_assert(sizeof(IMAGEFLAGS) == 4, "IMAGEFLAGS");
+
+typedef struct _XEX_PRIVILEGES {
+  uint32   NoForceReboot : 1; //= 0x00000001
+  uint32   ForegroundTasks : 1; //= 0x00000002
+  uint32   NoOddMapping : 1; //= 0x00000004
+  uint32   HandleMceInput : 1; //= 0x00000008
+  uint32   RestrictHudFeatures : 1; //= 0x00000010
+  uint32   HandleGamepadDisconnect : 1; //= 0x00000020
+  uint32   InsecureSockets : 1; //= 0x00000040
+  uint32   Xbox1XspInterop : 1; //= 0x00000080
+  uint32   SetDashContext : 1; //= 0x00000100
+  uint32   TitleUsesGameVoiceChannel : 1; //= 0x00000200
+  uint32   TitlePal50Incompatible : 1; //= 0x00000400
+  uint32   TitleInsecureUtilityDrive : 1; //= 0x00000800
+  uint32   TitleXamHooks : 1; //= 0x00001000
+  uint32   TitlePii : 1; //= 0x00002000
+  uint32   CrossplatformSystemLink : 1; //= 0x00004000
+  uint32   MultidiscSwap : 1; //= 0x00008000
+  uint32   MultidiscInsecureMedia : 1; //= 0x00010000
+  uint32   Ap25Media : 1; //= 0x00020000
+  uint32   NoConfirmExit : 1; //= 0x00040000
+  uint32   AllowBackgroundDownload : 1; //= 0x00080000
+  uint32   CreatePersistableRamdrive : 1; //= 0x00100000
+  uint32   InheritPersistedRamdrive : 1; //= 0x00200000
+  uint32   AllowHudVibration : 1; //= 0x00400000
+  uint32   TitleBothUtilityPartitions : 1; //= 0x00800000
+  uint32   HandleIPTVInput : 1; //= 0x01000000
+  uint32   PreferBigButtonInput : 1; //= 0x02000000
+  uint32   Reserved26 : 1; //= 0x04000000
+  uint32   MultidiscCrossTitle : 1; //= 0x08000000
+  uint32   TitleInstallIncompatible : 1; //= 0x10000000
+  uint32   AllowAvatarGetMetadataByXUID : 1; //= 0x20000000
+  uint32   AllowControllerSwapping : 1; //= 0x40000000
+  uint32   DashExtensibilityModule : 1; //= 0x80000000
+  /* These next ones dont even fit into a uint32?
+  uint32   AllowNetworkReadCancel          : 1; //= 0x100000000
+  uint32   XexUninterruptableReads         : 1; //= 0x200000000
+  uint32   RequireExperienceFull           : 1; //= 0x400000000
+  uint32   GameVoiceRequiredUI             : 1; //= 0x800000000
+  */
+} XEX_PRIVILEGES, *PXEX_PRIVILEGES;
+static_assert(sizeof(XEX_PRIVILEGES) == 4, "XEX_PRIVILEGES");
+
 typedef struct _IMAGE_XEX_DIRECTORY_ENTRY {
   uint32 Key; // 0x0 sz:0x4
   uint32 Value; // 0x4 sz:0x4
@@ -185,7 +292,7 @@ static_assert(sizeof(IMAGE_XEX_DIRECTORY_ENTRY) == 8, "IMAGE_XEX_DIRECTORY_ENTRY
 typedef struct _XEX2_HV_IMAGE_INFO {
   uint8 Signature[0x100];
   uint32 InfoSize;
-  uint32 ImageFlags;
+  IMAGEFLAGS ImageFlags;
   uint32 LoadAddress;
   uint8 ImageHash[0x14];
   uint32 ImportTableCount;
@@ -194,14 +301,14 @@ typedef struct _XEX2_HV_IMAGE_INFO {
   uint8 ImageKey[0x10];
   uint32 ExportTableAddress;
   uint8 HeaderHash[0x14];
-  uint32 GameRegion;
+  GameRegion GameRegion;
 } XEX2_HV_IMAGE_INFO, *PXEX2_HV_IMAGE_INFO;
 
 typedef struct _XEX2_SECURITY_INFO {
   uint32 Size;
   uint32 ImageSize;
   XEX2_HV_IMAGE_INFO ImageInfo;
-  uint32 AllowedMediaTypes;
+  ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX2_SECURITY_INFO, *PXEX2_SECURITY_INFO;
 
@@ -212,8 +319,8 @@ typedef struct _XEX1_HV_IMAGE_INFO {
   uint32 LoadAddress;
   uint8 ImageKey[0x10];
   uint8 MediaID[0x10];
-  uint32 GameRegion;
-  uint32 ImageFlags;
+  GameRegion GameRegion;
+  IMAGEFLAGS ImageFlags;
   uint32 ExportTableAddress;
 } XEX1_HV_IMAGE_INFO, *PXEX1_HV_IMAGE_INFO;
 
@@ -221,7 +328,7 @@ typedef struct _XEX1_SECURITY_INFO {
   uint32 Size;
   uint32 ImageSize;
   XEX1_HV_IMAGE_INFO ImageInfo;
-  uint32 AllowedMediaTypes;
+  ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX1_SECURITY_INFO, *PXEX1_SECURITY_INFO;
 
@@ -231,7 +338,7 @@ typedef struct _XEX25_HV_IMAGE_INFO {
   uint8 ImportDigest[0x14];
   uint32 LoadAddress;
   uint8 ImageKey[0x10];
-  uint32 ImageFlags;
+  IMAGEFLAGS ImageFlags;
   uint32 ExportTableAddress;
 } XEX25_HV_IMAGE_INFO, *PXEX25_HV_IMAGE_INFO;
 
@@ -239,7 +346,7 @@ typedef struct _XEX25_SECURITY_INFO {
   uint32 Size;
   uint32 ImageSize;
   XEX25_HV_IMAGE_INFO ImageInfo;
-  uint32 AllowedMediaTypes;
+  ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX25_SECURITY_INFO, *PXEX25_SECURITY_INFO;
 
@@ -248,7 +355,7 @@ typedef struct _XEX2D_HV_IMAGE_INFO {
   uint8 ImageHash[0x14];
   uint8 ImportDigest[0x14];
   uint32 LoadAddress;
-  uint32 ImageFlags;
+  IMAGEFLAGS ImageFlags;
   uint32 ExportTableAddress;
   uint32 Unknown;
 } XEX2D_HV_IMAGE_INFO, *PXEX2D_HV_IMAGE_INFO;
@@ -256,7 +363,7 @@ typedef struct _XEX2D_HV_IMAGE_INFO {
 typedef struct _XEX2D_SECURITY_INFO {
   uint32 Size;
   XEX25_HV_IMAGE_INFO ImageInfo;
-  uint32 AllowedMediaTypes;
+  ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX2D_SECURITY_INFO, *PXEX2D_SECURITY_INFO;
 

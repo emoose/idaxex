@@ -1,5 +1,5 @@
 // TODO:
-// - figure out why encrypted & compressed XEX1 files won't decrypt properly
+// - figure out why encrypted & compressed files won't decrypt properly
 // - improve speed of file load & analysis?
 // - add more checks to things
 // - test!
@@ -62,10 +62,15 @@ XEX_FILE_DATA_DESCRIPTOR data_descriptor;
 bool abort_load = false;
 
 uint8 image_key[0x10];
-uint32 image_size = 0;
 uint32 base_address = 0;
 uint32 entry_point = 0;
 uint32 export_table_va = 0;
+GameRegion game_regions;
+IMAGEFLAGS image_flags;
+ALLOWEDMEDIATYPES media_types;
+XEX_PRIVILEGES privileges;
+
+uint32 image_size = 0;
 int64 data_length = 0;
 
 int key_idx = 0;
@@ -801,6 +806,46 @@ void xex_info_comment(linput_t* li)
     else
       add_pgm_cmt(" - Encrypted (using %s key) (flags: %d)", key_names[key_idx], data_descriptor.Flags);
   }
+
+  if (image_flags.RevocationCheckRequired)
+    add_pgm_cmt(" - Revocation Check Required");
+  if (image_flags.ManufacturingUtility)
+    add_pgm_cmt(" - Manufacturing Utility");
+  if (image_flags.ManufacturingSupportTool)
+    add_pgm_cmt(" - Manufacturing Support Tool");
+  if (image_flags.ManufacturingUtility && image_flags.ManufacturingSupportTool)
+    add_pgm_cmt(" - Manufacturing Aware Module");
+  if (image_flags.Xgd2MediaOnly)
+    add_pgm_cmt(" - XGD2 Media Only");
+  if (image_flags.CardeaKey)
+    add_pgm_cmt(" - Cardea Key");
+  if (image_flags.XeikaKey)
+    add_pgm_cmt(" - Xeika Key");
+  if (image_flags.TitleUserMode)
+    add_pgm_cmt(" - Title UserMode");
+  if (image_flags.SystemUserMode)
+    add_pgm_cmt(" - System UserMode");
+  if (image_flags.Orange0)
+    add_pgm_cmt(" - Orange0");
+  if (image_flags.Orange1)
+    add_pgm_cmt(" - Orange1");
+  if (image_flags.Orange2)
+    add_pgm_cmt(" - Orange2");
+  if (image_flags.IptvSignupApplication)
+    add_pgm_cmt(" - IPTV Signup Application");
+  if (image_flags.IptvTitleApplication)
+    add_pgm_cmt(" - IPTV Title Application");
+  if (image_flags.KeyVaultPrivilegesRequired)
+    add_pgm_cmt(" - KeyVault Privileges Required");
+  if (image_flags.OnlineActivationRequired)
+    add_pgm_cmt(" - Online Activation Required");
+  if (image_flags.PageSize4Kb)
+    add_pgm_cmt(" - Page Size 4Kb");
+  if (image_flags.NoGameRegion)
+    add_pgm_cmt(" - No Game Region");
+  if (image_flags.RevocationCheckOptional)
+    add_pgm_cmt(" - Revocation Check Optional");
+
   add_pgm_cmt("");
 
   if (directory_entries.count(XEX_HEADER_PE_MODULE_NAME))
@@ -829,6 +874,84 @@ void xex_info_comment(linput_t* li)
 
     add_pgm_cmt(" - Bound Path: %s", bound_path);
     free(bound_path);
+  }
+
+  if ((uint32)game_regions != 0)
+  {
+    std::stringstream regions;
+    regions << " - Allowed Regions: ";
+    if (game_regions == Region_All)
+      regions << "All";
+    else
+    {
+      if (game_regions & Region_NorthAmerica)
+        regions << "NorthAmerica ";
+      if (game_regions & Region_Japan)
+        regions << "Japan ";
+      if (game_regions & Region_China)
+        regions << "China ";
+      if (game_regions & Region_RestOfAsia)
+        regions << "RestOfAsia ";
+      if (game_regions & Region_AustraliaNewZealand)
+        regions << "AustraliaNewZealand ";
+      if (game_regions & Region_RestOfEurope)
+        regions << "RestOfEurope ";
+      if (game_regions & Region_RestOfWorld)
+        regions << "RestOfWorld ";
+    }
+    add_pgm_cmt(regions.str().c_str());
+  }
+
+  if (*(uint32*)&media_types != 0)
+  {
+    std::stringstream regions;
+    regions << " - Allowed Media: ";
+    if (*(uint32*)&media_types == Region_All)
+      regions << "All";
+    else
+    {
+      if (media_types.HardDisk)
+        regions << "HardDisk ";
+      if (media_types.DvdX2)
+        regions << "DVDX2 ";
+      if (media_types.DvdCd)
+        regions << "DVDCD ";
+      if (media_types.Dvd5)
+        regions << "DVD5 ";
+      if (media_types.Dvd9)
+        regions << "DVD9 ";
+      if (media_types.SystemFlash)
+        regions << "SystemFlash ";
+      if (media_types._Unknown40)
+        regions << "Unknown40 ";
+      if (media_types.MemoryUnit)
+        regions << "MemoryUnit ";
+      if (media_types.MassStorageDevice)
+        regions << "MassStorageDevice ";
+      if (media_types.SmbFilesystem)
+        regions << "SMBFilesystem ";
+      if (media_types.DirectFromRam)
+        regions << "DirectFromRAM ";
+      if (media_types._Unknown800)
+        regions << "Unknown800 ";
+      if (media_types.SecureVirtualOpticalDevice)
+        regions << "SVOD ";
+      if (media_types.WirelessNStorageDevice)
+        regions << "WirelessNStorageDevice ";
+      if (media_types.SystemExtendedPartition)
+        regions << "SystemExtendedPartition ";
+      if (media_types.InsecurePackage)
+        regions << "InsecurePackage ";
+      if (media_types.SaveGamePackage)
+        regions << "SaveGamePackage ";
+      if (media_types.LocallySignedPackage)
+        regions << "LocallySignedPackage ";
+      if (media_types.LiveSignedPackage)
+        regions << "LiveSignedPackage ";
+      if (media_types.XboxPlatformPackage)
+        regions << "XboxPlatformPackage ";
+    }
+    add_pgm_cmt(regions.str().c_str());
   }
 
   if (directory_entries.count(XEX_HEADER_VITAL_STATS))
@@ -863,6 +986,84 @@ void xex_info_comment(linput_t* li)
 
   if (directory_entries.count(XEX_HEADER_WORKSPACE_SIZE))
     add_pgm_cmt(" - Workspace Size: 0x%X", directory_entries[XEX_HEADER_WORKSPACE_SIZE]);
+
+  if (directory_entries.count(XEX_HEADER_PRIVILEGES) && *(uint32*)&privileges != 0)
+  {
+    add_pgm_cmt("\nXEX Privileges:");
+
+    if (privileges.NoForceReboot)
+      add_pgm_cmt(" - No Force Reboot");
+    if (privileges.ForegroundTasks)
+      add_pgm_cmt(" - Foreground Tasks");
+    if (privileges.NoOddMapping)
+      add_pgm_cmt(" - No Odd Mapping");
+    if (privileges.HandleMceInput)
+      add_pgm_cmt(" - Handle Mce Input");
+    if (privileges.RestrictHudFeatures)
+      add_pgm_cmt(" - Restrict Hud Features");
+    if (privileges.HandleGamepadDisconnect)
+      add_pgm_cmt(" - Handle Gamepad Disconnect");
+    if (privileges.InsecureSockets)
+      add_pgm_cmt(" - Insecure Sockets");
+    if (privileges.Xbox1XspInterop)
+      add_pgm_cmt(" - Xbox1 Xsp Interop");
+    if (privileges.SetDashContext)
+      add_pgm_cmt(" - SetDashContext");
+    if (privileges.TitleUsesGameVoiceChannel)
+      add_pgm_cmt(" - Title Uses GameVoice Channel");
+    if (privileges.TitlePal50Incompatible)
+      add_pgm_cmt(" - Title Pal50 Incompatible");
+    if (privileges.TitleInsecureUtilityDrive)
+      add_pgm_cmt(" - Title Insecure Utility Drive");
+    if (privileges.TitleXamHooks)
+      add_pgm_cmt(" - Title Xam Hooks");
+    if (privileges.CrossplatformSystemLink)
+      add_pgm_cmt(" - Crossplatform System Link");
+    if (privileges.MultidiscSwap)
+      add_pgm_cmt(" - Multidisc Swap");
+    if (privileges.MultidiscInsecureMedia)
+      add_pgm_cmt(" - Multidisc Insecure Media");
+    if (privileges.Ap25Media)
+      add_pgm_cmt(" - AP25 Media");
+    if (privileges.NoConfirmExit)
+      add_pgm_cmt(" - No Confirm Exit");
+    if (privileges.AllowBackgroundDownload)
+      add_pgm_cmt(" - Allow Background Download");
+    if (privileges.CreatePersistableRamdrive)
+      add_pgm_cmt(" - Create Persistable Ramdrive");
+    if (privileges.InheritPersistedRamdrive)
+      add_pgm_cmt(" - Inherit Persisted Ramdrive");
+    if (privileges.AllowHudVibration)
+      add_pgm_cmt(" - Allow Hud Vibration");
+    if (privileges.TitleBothUtilityPartitions)
+      add_pgm_cmt(" - Title Both Utility Partitions");
+    if (privileges.HandleIPTVInput)
+      add_pgm_cmt(" - Handle IPTV Input");
+    if (privileges.PreferBigButtonInput)
+      add_pgm_cmt(" - Prefer Big Button Input");
+    if (privileges.Reserved26)
+      add_pgm_cmt(" - Reserved26");
+    if (privileges.MultidiscCrossTitle)
+      add_pgm_cmt(" - Multidisc Cross Title");
+    if (privileges.TitleInstallIncompatible)
+      add_pgm_cmt(" - Title Install Incompatible");
+    if (privileges.AllowAvatarGetMetadataByXUID)
+      add_pgm_cmt(" - Allow Avatar GetMetadataByXUID");
+    if (privileges.AllowControllerSwapping)
+      add_pgm_cmt(" - Allow Controller Swapping");
+    if (privileges.DashExtensibilityModule)
+      add_pgm_cmt(" - Dash Extensibility Module");
+    /* These next ones dont even fit into a uint32?
+    if (privileges.AllowNetworkReadCancel)
+      add_pgm_cmt(" - Allow Network Read Cancel");
+    if (privileges.XexUninterruptableReads)
+      add_pgm_cmt(" - Xex Uninterruptable Reads");
+    if (privileges.RequireExperienceFull)
+      add_pgm_cmt(" - Require Experience Full");
+    if (privileges.GameVoiceRequiredUI)
+      add_pgm_cmt(" - GameVoice Required UI");
+    */
+  }
 
   if (directory_entries.count(XEX_HEADER_EXECUTION_ID))
   {
@@ -1087,6 +1288,48 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
     qlseek(li, xex_header.SecurityInfo + offs_ExportTableAddress[xex_magic]);
     qlread(li, &export_table_va, sizeof(uint32));
     export_table_va = swap32(export_table_va);
+
+    // ImageFlags
+    std::map<uint32, size_t> offs_ImageFlags = {
+      {MAGIC_XEX2, offsetof(XEX2_SECURITY_INFO, ImageInfo.ImageFlags)},
+      {MAGIC_XEX1, offsetof(XEX1_SECURITY_INFO, ImageInfo.ImageFlags)},
+      {MAGIC_XEX25, offsetof(XEX25_SECURITY_INFO, ImageInfo.ImageFlags)},
+      {MAGIC_XEX2D, offsetof(XEX2D_SECURITY_INFO, ImageInfo.ImageFlags)}
+    };
+
+    uint32 tmp = 0;
+
+    qlseek(li, xex_header.SecurityInfo + offs_ImageFlags[xex_magic]);
+    qlread(li, &tmp, sizeof(uint32));
+    *(uint32*)&image_flags = swap32(tmp);
+
+    // GameRegion
+    std::map<uint32, size_t> offs_GameRegion = {
+      {MAGIC_XEX2, offsetof(XEX2_SECURITY_INFO, ImageInfo.GameRegion)},
+      {MAGIC_XEX1, offsetof(XEX1_SECURITY_INFO, ImageInfo.GameRegion)},
+      {MAGIC_XEX25, 0},
+      {MAGIC_XEX2D, 0}
+    };
+
+    tmp = 0;
+    if (offs_GameRegion[xex_magic])
+    {
+      qlseek(li, xex_header.SecurityInfo + offs_GameRegion[xex_magic]);
+      qlread(li, &tmp, sizeof(uint32));
+    }
+    *(uint32*)&game_regions = swap32(tmp);
+
+    // AllowedMediaTypes
+    std::map<uint32, size_t> offs_AllowedMediaTypes = {
+      {MAGIC_XEX2, offsetof(XEX2_SECURITY_INFO, AllowedMediaTypes)},
+      {MAGIC_XEX1, offsetof(XEX1_SECURITY_INFO, AllowedMediaTypes)},
+      {MAGIC_XEX25, offsetof(XEX25_SECURITY_INFO, AllowedMediaTypes)},
+      {MAGIC_XEX2D, offsetof(XEX2D_SECURITY_INFO, AllowedMediaTypes)}
+    };
+
+    qlseek(li, xex_header.SecurityInfo + offs_AllowedMediaTypes[xex_magic]);
+    qlread(li, &tmp, sizeof(uint32));
+    *(uint32*)&media_types = swap32(tmp);
   }
 
   // todo: should we actually be using the PE_BASE header?
@@ -1095,6 +1338,9 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
   if (directory_entries.count(XEX_HEADER_ENTRY_POINT))
     entry_point = directory_entries[XEX_HEADER_ENTRY_POINT];
+
+  if (directory_entries.count(XEX_HEADER_PRIVILEGES))
+    *(uint32*)&privileges = directory_entries[XEX_HEADER_PRIVILEGES];
 
   // Try decrypting with all 4 keys
   if (!xex_read_image(li, 0) && !xex_read_image(li, 1) && !xex_read_image(li, 2) && !xex_read_image(li, 3))
