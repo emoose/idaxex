@@ -89,16 +89,10 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section)
   segment_t segm;
   segm.start_ea = seg_addr;
   segm.end_ea = seg_addr + section.VirtualSize;
-  segm.align = saRelPara;
+  segm.align = saRelDble;
+  segm.bitness = 1;
   segm.perm = seg_perms;
   add_segm_ex(&segm, name, seg_class, 0);
-
-  // some reason IDA is refusing to analyze entire chunks of code
-  // so we'll mark the whole segment as code if we're sure there's no data
-  // drastic times call for drastic measures...
-  if (has_code && !has_data)
-    for (ea_t i = segm.start_ea; i < segm.end_ea; i += 4)
-      auto_make_code(i);
 }
 
 bool pe_load(uint8* data)
