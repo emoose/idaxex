@@ -1,4 +1,6 @@
-#include <string.h>
+#include <string>
+#include <sstream>
+#include <iomanip>
 
 const char* connectxNameGen(int id)
 {
@@ -3112,30 +3114,36 @@ const char* syscallNameGen(int id)
   return 0;
 }
 
-bool prefix(const char *str, const char *pre)
+std::string DoNameGen(const std::string& libName, int id)
 {
-  return strncmp(pre, str, strlen(pre)) == 0;
-}
+  std::string lib = libName;
+  auto pos = lib.find_last_of('.');
+  if (pos != std::string::npos)
+    lib = lib.substr(0, pos);
 
-const char* DoNameGen(const char* libName, int id)
-{
+  const char* name = 0;
+  if (lib == "connectx")
+    name = connectxNameGen(id);
+  if (lib == "createprofile")
+    name = createprofileNameGen(id);
+  if (lib == "vk")
+    name = vkNameGen(id);
+  if (lib == "xam")
+    name = xamNameGen(id);
+  if (lib == "xapi")
+    name = xapiNameGen(id);
+  if (lib == "xbdm")
+    name = xbdmNameGen(id);
+  if (lib == "xboxkrnl")
+    name = xboxkrnlNameGen(id);
+  if (lib == "syscall")
+    name = syscallNameGen(id);
 
-  if (prefix(libName, "connectx"))
-    return connectxNameGen(id);
-  if (prefix(libName, "createprofile"))
-    return createprofileNameGen(id);
-  if (prefix(libName, "vk"))
-    return vkNameGen(id);
-  if (prefix(libName, "xam"))
-    return xamNameGen(id);
-  if (prefix(libName, "xapi"))
-    return xapiNameGen(id);
-  if (prefix(libName, "xbdm"))
-    return xbdmNameGen(id);
-  if (prefix(libName, "xboxkrnl"))
-    return xboxkrnlNameGen(id);
-  if (prefix(libName, "syscall"))
-    return syscallNameGen(id);
+  if (name)
+    return std::string(name);
 
-  return 0; // todo: return generic libname_id
+  std::stringstream ss;
+  ss << lib << "_";
+  ss << std::setfill('0') << std::setw(4) << std::hex << id;
+  return ss.str();
 }

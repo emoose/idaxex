@@ -15,7 +15,7 @@
 
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
 
-const char* DoNameGen(const char* libName, int id); // namegen.cpp
+std::string DoNameGen(const std::string& libName, int id); // namegen.cpp
 
 const uint8 retail_key[16] = {
   0x20, 0xB1, 0x85, 0xA5, 0x9D, 0x28, 0xFD, 0xC3,
@@ -74,6 +74,7 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section)
   uint32 seg_addr = base_address + section.VirtualAddress;
 
   add_segm(0, seg_addr, seg_addr + section.VirtualSize, section.Name, seg_class);
+
   //idc.set_segm_alignment(seg_addr, idc.saRelPara)
   //idc.set_segm_attr(seg_addr, idc.SEGATTR_PERM, seg_perms)
   //idc.set_default_sreg_value(seg_addr, "DS", 0) # how is DS meant to be set ? prolly don't matter but still
@@ -374,12 +375,12 @@ void xex_load_imports(linput_t* li)
       auto record_type = (record_value & 0xFF000000) >> 24;
       auto ordinal = record_value & 0xFFFF;
 
-      auto import_name = DoNameGen(libname.c_str(), ordinal);
+      auto import_name = DoNameGen(libname, ordinal);
       if (record_type == 0)
       {
         // variable
         create_data(record_addr, FF_WORD, 2 * 2, BADADDR);
-        set_name(record_addr, (std::string("__imp__") + import_name).c_str());
+        set_name(record_addr, ("__imp__" + import_name).c_str());
         variables[ordinal] = record_addr;
         import_ea[ordinal] = record_addr;
       }
@@ -394,7 +395,7 @@ void xex_load_imports(linput_t* li)
 
         put_dword(record_addr + 0, 0x38600000 | table_header.ModuleIndex);
         put_dword(record_addr + 4, 0x38800000 | ordinal);
-        set_name(record_addr, import_name);
+        set_name(record_addr, import_name.c_str());
 
         // add comment to thunk like xorloser's loader
         set_cmt(record_addr + 4, qstring().sprnt("%s :: %s", libname.c_str(), import_name).c_str(), 1);
@@ -419,8 +420,8 @@ void xex_load_imports(linput_t* li)
     for (auto kvp : import_ea)
     {
       // Set import name
-      auto import_name = DoNameGen(libname.c_str(), kvp.first);
-      module_node.supset_ea(kvp.second, import_name);
+      auto import_name = DoNameGen(libname, kvp.first);
+      module_node.supset_ea(kvp.second, import_name.c_str());
 
       // Set import ordinal
       nodeidx_t ndx = ea2node(kvp.second);
@@ -433,8 +434,8 @@ void xex_load_imports(linput_t* li)
     // Remove "__imp__" part from variable import names
     for (auto kvp : variables)
     {
-      auto import_name = DoNameGen(libname.c_str(), kvp.first);
-      set_name(kvp.second, import_name);
+      auto import_name = DoNameGen(libname, kvp.first);
+      set_name(kvp.second, import_name.c_str());
     }
 
     // Seek to end of this import table
@@ -482,9 +483,9 @@ void xex_load_exports()
     // Add to exports list & mark as func if inside a code section
     qstring func_segmclass;
     get_segm_class(&func_segmclass, getseg(func_va));
-    
-    bool func_iscode = !strcmp(func_segmclass.c_str(), "CODE");
-    add_entry(func_ord, func_va, func_name, func_iscode);
+
+    bool func_iscode = func_segmclass == "CODE";
+    add_entry(func_ord, func_va, func_name.c_str(), func_iscode);
     if (func_iscode)
       add_func(func_va); // make doubly sure it gets marked as code
   }
