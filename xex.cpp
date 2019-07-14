@@ -75,12 +75,17 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section)
   char* seg_class = (section.Characteristics & IMAGE_SCN_CNT_CODE) ? "CODE" : "DATA";
   uint32 seg_addr = base_address + section.VirtualAddress;
 
-  add_segm(0, seg_addr, seg_addr + section.VirtualSize, section.Name, seg_class);
+  // Create buffer for section name so we can terminate it properly
+  char name[9];
+  memset(name, 0, 9);
+  memcpy(name, section.Name, 8);
 
-  //idc.set_segm_alignment(seg_addr, idc.saRelPara)
-  //idc.set_segm_attr(seg_addr, idc.SEGATTR_PERM, seg_perms)
-  //idc.set_default_sreg_value(seg_addr, "DS", 0) # how is DS meant to be set ? prolly don't matter but still
-  //idc.set_default_sreg_value(seg_addr, "VLE", 0)
+  segment_t segm;
+  segm.start_ea = seg_addr;
+  segm.end_ea = seg_addr + section.VirtualSize;
+  segm.align = saRelPara;
+  segm.perm = seg_perms;
+  add_segm_ex(&segm, name, seg_class, 0);
 }
 
 bool pe_load(uint8* data)
