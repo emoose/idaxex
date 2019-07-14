@@ -53,6 +53,8 @@
 #define XEX_HEADER_SECTION_TABLE          XEX_HEADER_SIZEDSTRUCT(0x0002)
 #define XEX_HEADER_VITAL_STATS            XEX_HEADER_STRUCT(0x0180, XEX_VITAL_STATS)
 
+#define XEX_HEADER_CALLCAP_IMPORTS        XEX_HEADER_STRUCT(0x0181, XEX_CALLCAP_IMPORTS)
+
 typedef struct _VERSION {
   uint32 QFE : 8;
   uint32 Build : 16;
@@ -66,6 +68,7 @@ typedef struct _XEX_IMPORT_DESCRIPTOR {
   uint32 NameTableSize;
   uint32 ModuleCount;
 } XEX_IMPORT_DESCRIPTOR, *PXEX_IMPORT_DESCRIPTOR;
+static_assert(sizeof(XEX_IMPORT_DESCRIPTOR) == 0xC, "XEX_IMPORT_DESCRIPTOR");
 
 typedef struct _XEX_IMPORT_TABLE {
   uint32 TableSize;
@@ -77,13 +80,17 @@ typedef struct _XEX_IMPORT_TABLE {
   uint8 ModuleIndex;
   uint16 ImportCount;
 } XEX_IMPORT_TABLE, *PXEX_IMPORT_TABLE;
+static_assert(sizeof(XEX_IMPORT_TABLE) == 0x28, "XEX_IMPORT_TABLE");
 
 typedef struct _XEX_CALLCAP_IMPORTS {
   uint32 BeginFunctionThunkAddress;
   uint32 EndFunctionThunkAddress;
 } XEX_CALLCAP_IMPORTS, *PXEX_CALLCAP_IMPORTS;
+static_assert(sizeof(XEX_CALLCAP_IMPORTS) == 0x8, "XEX_CALLCAP_IMPORTS");
 
-#define XEX_HEADER_CALLCAP_IMPORTS XEX_HEADER_STRUCT(0x0181, XEX_CALLCAP_IMPORTS)
+#define XEX_EXPORT_MAGIC_0      0x48000000
+#define XEX_EXPORT_MAGIC_1      0x00485645
+#define XEX_EXPORT_MAGIC_2      0x48000000
 
 typedef struct _HV_IMAGE_EXPORT_TABLE {
   uint32 Magic[3];
@@ -93,10 +100,7 @@ typedef struct _HV_IMAGE_EXPORT_TABLE {
   uint32 Count;
   uint32 Base;
 } HV_IMAGE_EXPORT_TABLE, *PHV_IMAGE_EXPORT_TABLE;
-
-#define XEX_EXPORT_MAGIC_0      0x48000000
-#define XEX_EXPORT_MAGIC_1      0x00485645
-#define XEX_EXPORT_MAGIC_2      0x48000000
+static_assert(sizeof(HV_IMAGE_EXPORT_TABLE) == 0x2C, "HV_IMAGE_EXPORT_TABLE");
 
 enum ApprovalType : uint8
 {
@@ -116,6 +120,7 @@ typedef struct _XEXIMAGE_LIBRARY_VERSION {
     uint8         QFE;
   } Version;
 } XEXIMAGE_LIBRARY_VERSION, *PXEXIMAGE_LIBRARY_VERSION;
+static_assert(sizeof(XEXIMAGE_LIBRARY_VERSION) == 0x10, "XEXIMAGE_LIBRARY_VERSION");
 
 typedef struct _XEX_EXECUTION_ID {
   uint32 MediaID; // 0x0 sz:0x4
@@ -142,7 +147,6 @@ typedef struct _XEX_SECTION_HEADER {
   uint32 VirtualSize; // 0xC sz:0x4
 } XEX_SECTION_HEADER, *PXEX_SECTION_HEADER; // size 16
 static_assert(sizeof(XEX_SECTION_HEADER) == 0x10, "XEX_SECTION_HEADER");
-
 
 typedef struct _IMAGE_XEX_HEADER {
   uint32 Magic; // 0x0 sz:0x4
@@ -325,6 +329,7 @@ typedef struct _XEX2_HV_IMAGE_INFO {
   uint8 HeaderHash[0x14];
   GameRegion GameRegion;
 } XEX2_HV_IMAGE_INFO, *PXEX2_HV_IMAGE_INFO;
+static_assert(sizeof(XEX2_HV_IMAGE_INFO) == 0x174, "XEX2_HV_IMAGE_INFO");
 
 typedef struct _XEX2_SECURITY_INFO {
   uint32 Size;
@@ -333,6 +338,7 @@ typedef struct _XEX2_SECURITY_INFO {
   ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX2_SECURITY_INFO, *PXEX2_SECURITY_INFO;
+static_assert(sizeof(XEX2_SECURITY_INFO) == 0x184, "XEX2_SECURITY_INFO");
 
 typedef struct _XEX1_HV_IMAGE_INFO {
   uint8 Signature[0x100];
@@ -345,6 +351,7 @@ typedef struct _XEX1_HV_IMAGE_INFO {
   IMAGEFLAGS ImageFlags;
   uint32 ExportTableAddress;
 } XEX1_HV_IMAGE_INFO, *PXEX1_HV_IMAGE_INFO;
+static_assert(sizeof(XEX1_HV_IMAGE_INFO) == 0x158, "XEX1_HV_IMAGE_INFO");
 
 typedef struct _XEX1_SECURITY_INFO {
   uint32 Size;
@@ -353,6 +360,7 @@ typedef struct _XEX1_SECURITY_INFO {
   ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX1_SECURITY_INFO, *PXEX1_SECURITY_INFO;
+static_assert(sizeof(XEX1_SECURITY_INFO) == 0x168, "XEX1_SECURITY_INFO");
 
 typedef struct _XEX25_HV_IMAGE_INFO {
   uint8 Signature[0x100];
@@ -363,6 +371,7 @@ typedef struct _XEX25_HV_IMAGE_INFO {
   IMAGEFLAGS ImageFlags;
   uint32 ExportTableAddress;
 } XEX25_HV_IMAGE_INFO, *PXEX25_HV_IMAGE_INFO;
+static_assert(sizeof(XEX25_HV_IMAGE_INFO) == 0x144, "XEX25_HV_IMAGE_INFO");
 
 typedef struct _XEX25_SECURITY_INFO {
   uint32 Size;
@@ -371,6 +380,7 @@ typedef struct _XEX25_SECURITY_INFO {
   ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX25_SECURITY_INFO, *PXEX25_SECURITY_INFO;
+static_assert(sizeof(XEX25_SECURITY_INFO) == 0x154, "XEX25_SECURITY_INFO");
 
 typedef struct _XEX2D_HV_IMAGE_INFO {
   uint8 Signature[0x100];
@@ -381,25 +391,29 @@ typedef struct _XEX2D_HV_IMAGE_INFO {
   uint32 ExportTableAddress;
   uint32 Unknown;
 } XEX2D_HV_IMAGE_INFO, *PXEX2D_HV_IMAGE_INFO;
+static_assert(sizeof(XEX2D_HV_IMAGE_INFO) == 0x138, "XEX2D_HV_IMAGE_INFO");
 
 typedef struct _XEX2D_SECURITY_INFO {
   uint32 Size;
-  XEX25_HV_IMAGE_INFO ImageInfo;
+  XEX2D_HV_IMAGE_INFO ImageInfo;
   ALLOWEDMEDIATYPES AllowedMediaTypes;
   uint32 PageDescriptorCount;
 } XEX2D_SECURITY_INFO, *PXEX2D_SECURITY_INFO;
+static_assert(sizeof(XEX2D_SECURITY_INFO) == 0x144, "XEX2D_SECURITY_INFO");
 
 typedef struct _XEX_FILE_DATA_DESCRIPTOR {
   uint32 Size;
   uint16 Flags;
   uint16 Format;
 } XEX_FILE_DATA_DESCRIPTOR, *PXEX_FILE_DATA_DESCRIPTOR;
+static_assert(sizeof(XEX_FILE_DATA_DESCRIPTOR) == 8, "XEX_FILE_DATA_DESCRIPTOR");
 
 // After XEX_FILE_DATA_DESCRIPTOR when Format == 1 (aka "uncompressed")
 typedef struct _XEX_RAW_DATA_DESCRIPTOR {
   uint32 DataSize;
   uint32 ZeroSize;
 } XEX_RAW_DATA_DESCRIPTOR, *PXEX_RAW_DATA_DESCRIPTOR;
+static_assert(sizeof(XEX_RAW_DATA_DESCRIPTOR) == 8, "XEX_RAW_DATA_DESCRIPTOR");
 
 // After XEX_FILE_DATA_DESCRIPTOR when Format == 2 (aka compressed)
 // (first block has WindowSize prepended to it!)
@@ -407,16 +421,19 @@ typedef struct _XEX_DATA_DESCRIPTOR {
   uint32 Size;
   uint8 DataDigest[0x14];
 } XEX_DATA_DESCRIPTOR, *PXEX_DATA_DESCRIPTOR;
+static_assert(sizeof(XEX_DATA_DESCRIPTOR) == 0x18, "XEX_DATA_DESCRIPTOR");
 
 typedef struct _XEX_COMPRESSED_DATA_DESCRIPTOR {
   uint32 WindowSize;
   XEX_DATA_DESCRIPTOR FirstDescriptor;
 } XEX_COMPRESSED_DATA_DESCRIPTOR, *P_XEX_COMPRESSED_DATA_DESCRIPTOR;
+static_assert(sizeof(XEX_COMPRESSED_DATA_DESCRIPTOR) == 0x1C, "XEX_COMPRESSED_DATA_DESCRIPTOR");
 
 typedef struct _XEX_VITAL_STATS {
   uint32 Checksum;
   __time32_t Timestamp;
 } XEX_VITAL_STATS, *PXEX_VITAL_STATS;
+static_assert(sizeof(XEX_VITAL_STATS) == 8, "XEX_VITAL_STATS");
 
 typedef struct _IMAGE_DOS_HEADER
 {
@@ -440,6 +457,7 @@ typedef struct _IMAGE_DOS_HEADER
   uint16 Reserved2[10];
   uint32 AddressOfNewExeHeader;
 } IMAGE_DOS_HEADER;
+static_assert(sizeof(IMAGE_DOS_HEADER) == 0x40, "IMAGE_DOS_HEADER");
 
 //
 // Directory format.
@@ -449,6 +467,7 @@ typedef struct _IMAGE_DATA_DIRECTORY {
   uint32 VirtualAddress;
   uint32 Size;
 } IMAGE_DATA_DIRECTORY, *PIMAGE_DATA_DIRECTORY;
+static_assert(sizeof(IMAGE_DATA_DIRECTORY) == 8, "IMAGE_DATA_DIRECTORY");
 
 #define IMAGE_NUMBEROF_DIRECTORY_ENTRIES    16
 
@@ -486,6 +505,7 @@ typedef struct _IMAGE_OPTIONAL_HEADER32
   uint32 NumberOfRvaAndSizes;
   IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
 } IMAGE_OPTIONAL_HEADER32;
+static_assert(sizeof(IMAGE_OPTIONAL_HEADER32) == 0xE0, "IMAGE_OPTIONAL_HEADER32");
 
 typedef struct _IMAGE_FILE_HEADER
 {
@@ -497,6 +517,7 @@ typedef struct _IMAGE_FILE_HEADER
   uint16 SizeOfOptionalHeader;
   uint16 Characteristics;
 } IMAGE_FILE_HEADER;
+static_assert(sizeof(IMAGE_FILE_HEADER) == 0x14, "IMAGE_FILE_HEADER");
 
 typedef struct _IMAGE_NT_HEADERS
 {
@@ -504,6 +525,7 @@ typedef struct _IMAGE_NT_HEADERS
   IMAGE_FILE_HEADER FileHeader;
   IMAGE_OPTIONAL_HEADER32 OptionalHeader;
 } IMAGE_NT_HEADERS;
+static_assert(sizeof(IMAGE_NT_HEADERS) == 0xF8, "IMAGE_NT_HEADERS");
 
 typedef struct _IMAGE_SECTION_HEADER
 {
@@ -518,6 +540,7 @@ typedef struct _IMAGE_SECTION_HEADER
   uint16 NumberOfLineNumbers;
   uint32 Characteristics;
 } IMAGE_SECTION_HEADER;
+static_assert(sizeof(IMAGE_SECTION_HEADER) == 0x28, "IMAGE_SECTION_HEADER");
 
 // Characteristics flags
 #define IMAGE_SCN_CNT_CODE 0x20
