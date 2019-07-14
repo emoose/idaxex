@@ -46,6 +46,8 @@
 #define XEX_HEADER_WORKSPACE_SIZE			XEX_HEADER_ULONG(0x0402)
 
 #define XEX_HEADER_PRIVILEGES         XEX_HEADER_FLAG(0x0300)
+#define XEX_HEADER_PRIVILEGES_32			XEX_HEADER_FLAG(0x0301) // privilege IDs 32 onward
+#define XEX_HEADER_PRIVILEGES_64			XEX_HEADER_FLAG(0x0302) // privilege IDs 64 onward
 
 typedef struct _VERSION {
   uint32 QFE : 8;
@@ -279,26 +281,28 @@ typedef struct _XEX_PRIVILEGES {
   uint32   AllowAvatarGetMetadataByXUID    : 1; //= 0x20000000
   uint32   AllowControllerSwapping         : 1; //= 0x40000000
   uint32   DashExtensibilityModule         : 1; //= 0x80000000
-  /* These next ones dont even fit into a uint32?
-  uint32   AllowNetworkReadCancel          : 1; //= 0x100000000
-  uint32   UninterruptableReads            : 1; //= 0x200000000
-  uint32   RequireExperienceFull           : 1; //= 0x400000000
-  uint32   GameVoiceRequiredUI             : 1; //= 0x800000000
-  uint32   TitleSetPresenceString          : 1;
-  uint32   NatalTiltControl                : 1;
-  uint32   TitleRequiresSkeletalTracking   : 1;
-  uint32   TitleSupportsSkeletalTracking   : 1;
-  uint32   UseLargeHDsFileCache            : 1;
-  uint32   TitleSupportsDeepLink           : 1;
-  uint32   TitleBodyProfile                : 1;
-  uint32   TitleWinUSB                     : 1;
-  uint32   TitleSupportsDeepLinkRefresh    : 1;
-  uint32   LocalOnlySockets                : 1;
-  uint32   TitleContentAcquireAndDownload  : 1;
-  uint32   AllowSystemForeground           : 1;
-  */
 } XEX_PRIVILEGES, *PXEX_PRIVILEGES;
 static_assert(sizeof(XEX_PRIVILEGES) == 4, "XEX_PRIVILEGES");
+
+typedef struct _XEX_PRIVILEGES_32 {
+  uint32   AllowNetworkReadCancel          : 1; //= 0x00000001
+  uint32   UninterruptableReads            : 1; //= 0x00000002
+  uint32   RequireExperienceFull           : 1; //= 0x00000004
+  uint32   GameVoiceRequiredUI             : 1; //= 0x00000008
+  uint32   TitleSetPresenceString          : 1; //= 0x00000010
+  uint32   NatalTiltControl                : 1; //= 0x00000020
+  uint32   TitleRequiresSkeletalTracking   : 1; //= 0x00000040
+  uint32   TitleSupportsSkeletalTracking   : 1; //= 0x00000080
+  uint32   UseLargeHDsFileCache            : 1; //= 0x00000100
+  uint32   TitleSupportsDeepLink           : 1; //= 0x00000200
+  uint32   TitleBodyProfile                : 1; //= 0x00000400
+  uint32   TitleWinUSB                     : 1; //= 0x00000800
+  uint32   TitleSupportsDeepLinkRefresh    : 1; //= 0x00001000
+  uint32   LocalOnlySockets                : 1; //= 0x00002000
+  uint32   TitleContentAcquireAndDownload  : 1; //= 0x00004000
+  uint32   AllowSystemForeground           : 1; //= 0x00008000
+} XEX_PRIVILEGES_32, *PXEX_PRIVILEGES_32;
+static_assert(sizeof(XEX_PRIVILEGES_32) == 4, "XEX_PRIVILEGES_32");
 
 typedef struct _IMAGE_XEX_DIRECTORY_ENTRY {
   uint32 Key; // 0x0 sz:0x4

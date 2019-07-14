@@ -69,6 +69,7 @@ GameRegion game_regions;
 IMAGEFLAGS image_flags;
 ALLOWEDMEDIATYPES media_types;
 XEX_PRIVILEGES privileges;
+XEX_PRIVILEGES_32 privileges_32;
 
 uint32 image_size = 0;
 int64 data_length = 0;
@@ -1059,16 +1060,44 @@ void xex_info_comment(linput_t* li)
       add_pgm_cmt(" - Allow Controller Swapping");
     if (privileges.DashExtensibilityModule)
       add_pgm_cmt(" - Dash Extensibility Module");
-    /* These next ones dont even fit into a uint32?
-    if (privileges.AllowNetworkReadCancel)
+  }
+
+  if (directory_entries.count(XEX_HEADER_PRIVILEGES_32) && *(uint32*)&privileges_32 != 0)
+  {
+    add_pgm_cmt("\nXEX Privileges (extended):");
+
+    if (privileges_32.AllowNetworkReadCancel)
       add_pgm_cmt(" - Allow Network Read Cancel");
-    if (privileges.XexUninterruptableReads)
-      add_pgm_cmt(" - Xex Uninterruptable Reads");
-    if (privileges.RequireExperienceFull)
+    if (privileges_32.UninterruptableReads)
+      add_pgm_cmt(" - Uninterruptable Reads");
+    if (privileges_32.RequireExperienceFull)
       add_pgm_cmt(" - Require Experience Full");
-    if (privileges.GameVoiceRequiredUI)
+    if (privileges_32.GameVoiceRequiredUI)
       add_pgm_cmt(" - GameVoice Required UI");
-    */
+    if (privileges_32.TitleSetPresenceString)
+      add_pgm_cmt(" - Title Set Presence String");
+    if (privileges_32.NatalTiltControl)
+      add_pgm_cmt(" - Natal Tilt Control");
+    if (privileges_32.TitleRequiresSkeletalTracking)
+      add_pgm_cmt(" - Title Requires Skeletal Tracking");
+    if (privileges_32.TitleSupportsSkeletalTracking)
+      add_pgm_cmt(" - Title Supports Skeletal Tracking");
+    if (privileges_32.UseLargeHDsFileCache)
+      add_pgm_cmt(" - Use Large HDs File Cache");
+    if (privileges_32.TitleSupportsDeepLink)
+      add_pgm_cmt(" - Title Supports Deep Link");
+    if (privileges_32.TitleBodyProfile)
+      add_pgm_cmt(" - Title Body Profile");
+    if (privileges_32.TitleWinUSB)
+      add_pgm_cmt(" - Title WinUSB");
+    if (privileges_32.TitleSupportsDeepLinkRefresh)
+      add_pgm_cmt(" - Title Supports Deep Link Refresh");
+    if (privileges_32.LocalOnlySockets)
+      add_pgm_cmt(" - Local Only Sockets");
+    if (privileges_32.TitleContentAcquireAndDownload)
+      add_pgm_cmt(" - Title Content Acquire And Download");
+    if (privileges_32.AllowSystemForeground)
+      add_pgm_cmt(" - Allow System Foreground");
   }
 
   if (directory_entries.count(XEX_HEADER_EXECUTION_ID))
@@ -1345,8 +1374,15 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   if (directory_entries.count(XEX_HEADER_ENTRY_POINT))
     entry_point = directory_entries[XEX_HEADER_ENTRY_POINT];
 
+  uint32 privs = 0;
   if (directory_entries.count(XEX_HEADER_PRIVILEGES))
-    *(uint32*)&privileges = directory_entries[XEX_HEADER_PRIVILEGES];
+    privs = directory_entries[XEX_HEADER_PRIVILEGES];
+  *(uint32*)&privileges = privs;
+
+  privs = 0;
+  if (directory_entries.count(XEX_HEADER_PRIVILEGES_32))
+    privs = directory_entries[XEX_HEADER_PRIVILEGES_32];
+  *(uint32*)&privileges_32 = privs;
 
   // Try decrypting with all 4 keys
   if (!xex_read_image(li, 0) && !xex_read_image(li, 1) && !xex_read_image(li, 2) && !xex_read_image(li, 3))
