@@ -72,6 +72,13 @@ typedef struct _XEX_IMPORT_TABLE {
   uint16 ImportCount;
 } XEX_IMPORT_TABLE, *PXEX_IMPORT_TABLE;
 
+typedef struct _XEX_CALLCAP_IMPORTS {
+  uint32 BeginFunctionThunkAddress;
+  uint32 EndFunctionThunkAddress;
+} XEX_CALLCAP_IMPORTS, *PXEX_CALLCAP_IMPORTS;
+
+#define XEX_HEADER_CALLCAP_IMPORTS XEX_HEADER_STRUCT(0x0181, XEX_CALLCAP_IMPORTS)
+
 typedef struct _HV_IMAGE_EXPORT_TABLE {
   uint32 Magic[3];
   uint32 ModuleNumber[2];
@@ -301,6 +308,17 @@ typedef struct _IMAGE_DOS_HEADER
   uint32 AddressOfNewExeHeader;
 } IMAGE_DOS_HEADER;
 
+//
+// Directory format.
+//
+
+typedef struct _IMAGE_DATA_DIRECTORY {
+  uint32 VirtualAddress;
+  uint32 Size;
+} IMAGE_DATA_DIRECTORY, *PIMAGE_DATA_DIRECTORY;
+
+#define IMAGE_NUMBEROF_DIRECTORY_ENTRIES    16
+
 typedef struct _IMAGE_OPTIONAL_HEADER32
 {
   uint16 Magic;
@@ -333,6 +351,7 @@ typedef struct _IMAGE_OPTIONAL_HEADER32
   uint32 SizeOfHeapCommit;
   uint32 LoaderFlags;
   uint32 NumberOfRvaAndSizes;
+  IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
 } IMAGE_OPTIONAL_HEADER32;
 
 typedef struct _IMAGE_FILE_HEADER
@@ -374,3 +393,21 @@ typedef struct _IMAGE_SECTION_HEADER
 #define IMAGE_SCN_MEM_EXECUTE 0x20000000
 #define IMAGE_SCN_MEM_READ 0x40000000
 #define IMAGE_SCN_MEM_WRITE 0x80000000
+
+// Data directory indices
+#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory
+#define IMAGE_DIRECTORY_ENTRY_IMPORT          1   // Import Directory
+#define IMAGE_DIRECTORY_ENTRY_RESOURCE        2   // Resource Directory
+#define IMAGE_DIRECTORY_ENTRY_EXCEPTION       3   // Exception Directory
+#define IMAGE_DIRECTORY_ENTRY_SECURITY        4   // Security Directory
+#define IMAGE_DIRECTORY_ENTRY_BASERELOC       5   // Base Relocation Table
+#define IMAGE_DIRECTORY_ENTRY_DEBUG           6   // Debug Directory
+//      IMAGE_DIRECTORY_ENTRY_COPYRIGHT       7   // (X86 usage)
+#define IMAGE_DIRECTORY_ENTRY_ARCHITECTURE    7   // Architecture Specific Data
+#define IMAGE_DIRECTORY_ENTRY_GLOBALPTR       8   // RVA of GP
+#define IMAGE_DIRECTORY_ENTRY_TLS             9   // TLS Directory
+#define IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG    10   // Load Configuration Directory
+#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers
+#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
+#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
+#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor

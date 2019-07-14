@@ -2,6 +2,7 @@
 // - figure out why encrypted & compressed XEX1 files won't decrypt properly
 // - improve speed of file load & analysis?
 // - add more checks to things
+// - load & name XEX resources? (sometimes resources aren't being mapped into IDA properly tho?)
 // - test!
 
 #include "../idaldr.h"
@@ -175,12 +176,11 @@ bool pe_load(uint8* data)
   if (!entry_point)
     entry_point = base_address + nt_header->OptionalHeader.AddressOfEntryPoint;
 
+  // Read in PE sections & copy section data into IDA
   IMAGE_SECTION_HEADER* sections = (IMAGE_SECTION_HEADER*)(data + 
                                                            dos_header->AddressOfNewExeHeader + 
-                                                           sizeof(IMAGE_NT_HEADERS) + 
-                                                           (nt_header->OptionalHeader.NumberOfRvaAndSizes * 8)); // skip past data directories (for now? will we ever need them?)
+                                                           sizeof(IMAGE_NT_HEADERS)); // skip past data directories (for now? will we ever need them?)
 
-  // Read in PE sections & copy section data into IDA
   for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
   {
     auto& section = sections[i];
@@ -621,6 +621,60 @@ void xex_load_imports(linput_t* li)
 
     // Seek to end of this import table
     qlseek(li, table_addr + table_header.TableSize);
+  }
+
+  // Try adding callcap imports
+  // TODO: register them in imports window?
+  // TODO2: refactor imports stuff
+  if (directory_entries.count(XEX_HEADER_CALLCAP_IMPORTS))
+  {
+    XEX_CALLCAP_IMPORTS imports;
+    qlseek(li, directory_entries[XEX_HEADER_CALLCAP_IMPORTS]);
+    qlread(li, &imports, sizeof(XEX_CALLCAP_IMPORTS));
+    imports.BeginFunctionThunkAddress = swap32(imports.BeginFunctionThunkAddress);
+    imports.EndFunctionThunkAddress = swap32(imports.EndFunctionThunkAddress);
+
+    if (imports.BeginFunctionThunkAddress != 0 && imports.EndFunctionThunkAddress != 0)
+    {
+      msg("[+] Naming callcap imports... (0x%X - 0x%X)\n", imports.BeginFunctionThunkAddress, imports.EndFunctionThunkAddress);
+      for (ea_t i = imports.BeginFunctionThunkAddress; i < imports.EndFunctionThunkAddress + 0x10; i += 0x10)
+      {
+        uint32 info_1 = get_dword(i);
+        uint32 info_2 = get_dword(i + 4);
+
+        auto ordinal_1 = info_1 & 0xFFFF;
+        auto ordinal_2 = info_2 & 0xFFFF;
+        auto moduleidx_1 = (info_1 & 0xFF0000) >> 16;
+        auto moduleidx_2 = (info_2 & 0xFF0000) >> 16;
+
+        // Sanity check the callcap info, values from first dword should match values in second
+        if (ordinal_1 != ordinal_2 || moduleidx_1 != moduleidx_2)
+        {
+          msg("[!] Invalid callcap at 0x%X ?", i);
+          continue;
+        }
+
+        // Not sure if it should always be xbdm or not...
+        std::string libname = "xbdm.xex";
+        if (import_libs.size() > moduleidx_1)
+          libname = import_libs.at(moduleidx_1);
+
+        auto import_name = DoNameGen(libname, ordinal_1);
+
+        put_dword(i + 0, 0x38600000 | moduleidx_1);
+        put_dword(i + 4, 0x38800000 | ordinal_1);
+        set_name(i, import_name.c_str());
+
+        // add comment to thunk like xorloser's loader
+        set_cmt(i + 4, qstring().sprnt("%s :: %s (callcap import)", libname.c_str(), import_name.c_str()).c_str(), 1);
+
+        // force IDA to recognize addr as code, so we can add it as a library function
+        auto_make_code(i);
+        auto_recreate_insn(i);
+        func_t func(i, i + 0x10, FUNC_LIB);
+        add_func_ex(&func);
+      }
+    }
   }
 }
 
