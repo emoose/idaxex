@@ -2,7 +2,6 @@
 // - figure out why encrypted & compressed XEX1 files won't decrypt properly
 // - improve speed of file load & analysis?
 // - add more checks to things
-// - load & name XEX resources? (sometimes resources aren't being mapped into IDA properly tho?)
 // - test!
 
 #include "../idaldr.h"
@@ -15,8 +14,14 @@
 #include "lzx/lzx.hpp"
 #include "aes.hpp"
 #include "sha1.hpp"
+#include <sstream>
+#include <iomanip>
 
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
+
+bool write_pe_to_disk = false;
+bool add_xex_sections = true;
+bool exclude_unneeded_sections = true;
 
 std::string DoNameGen(const std::string& libName, int id); // namegen.cpp
 
@@ -119,39 +124,72 @@ void label_regsaveloads(ea_t start, ea_t end)
   }
 }
 
-bool pe_add_section(const IMAGE_SECTION_HEADER& section)
+void pe_add_section(const IMAGE_SECTION_HEADER& section, uint8* data)
 {
-  uint32 seg_perms = 0;
-  if (section.Characteristics & IMAGE_SCN_MEM_EXECUTE)
-    seg_perms |= SEGPERM_EXEC;
-  if (section.Characteristics & IMAGE_SCN_MEM_READ)
-    seg_perms |= SEGPERM_READ;
-  if (section.Characteristics & IMAGE_SCN_MEM_WRITE)
-    seg_perms |= SEGPERM_WRITE;
-
-  bool has_code = (section.Characteristics & IMAGE_SCN_CNT_CODE);
-  bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
-
-  char* seg_class = has_code ? "CODE" : "DATA";
-  uint32 seg_addr = base_address + section.VirtualAddress;
-
-  // Create buffer for section name so we can terminate it properly
   char name[9];
   memset(name, 0, 9);
   memcpy(name, section.Name, 8);
 
-  segment_t segm;
-  segm.start_ea = seg_addr;
-  segm.end_ea = seg_addr + section.VirtualSize;
-  segm.align = saRelDble;
-  segm.bitness = 1;
-  segm.perm = seg_perms;
-  add_segm_ex(&segm, name, seg_class, 0);
+  // Exclude some sections from being added - not really sure why xorlosers loader seems to exclude them
+  // they don't seem important anyway, so maybe it's a good idea
+  if (exclude_unneeded_sections)
+  {
+    if (!strcmp(name, ".edata"))
+      return; // no .edata
+    if (!strcmp(name, ".idata"))
+      return; // no .idata
+    if (!strcmp(name, ".XBLD"))
+      return; // no .XBLD
+  }
 
-  return has_code;
+  uint32 sec_addr = xex_header.Magic != MAGIC_XEX3F ? section.VirtualAddress : section.PointerToRawData;
+  int sec_size = std::min(section.VirtualSize, section.SizeOfRawData);
+
+  if (sec_addr + sec_size > image_size)
+    sec_size = image_size - sec_addr;
+
+  // Add section as IDA segment
+  bool has_code = false;
+  {
+    uint32 seg_perms = 0;
+    if (section.Characteristics & IMAGE_SCN_MEM_EXECUTE)
+      seg_perms |= SEGPERM_EXEC;
+    if (section.Characteristics & IMAGE_SCN_MEM_READ)
+      seg_perms |= SEGPERM_READ;
+    if (section.Characteristics & IMAGE_SCN_MEM_WRITE)
+      seg_perms |= SEGPERM_WRITE;
+
+    has_code = (section.Characteristics & IMAGE_SCN_CNT_CODE);
+    bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
+
+    char* seg_class = has_code ? "CODE" : "DATA";
+    uint32 seg_addr = base_address + section.VirtualAddress;
+
+    // Create buffer for section name so we can terminate it properly
+    char name[9];
+    memset(name, 0, 9);
+    memcpy(name, section.Name, 8);
+
+    segment_t segm;
+    segm.start_ea = seg_addr;
+    segm.end_ea = seg_addr + section.VirtualSize;
+    segm.align = saRelDble;
+    segm.bitness = 1;
+    segm.perm = seg_perms;
+    add_segm_ex(&segm, name, seg_class, 0);
+  }
+
+  if (sec_size <= 0)
+    return;
+
+  // Load data into IDA
+  mem2base(data + sec_addr, base_address + section.VirtualAddress, base_address + section.VirtualAddress + sec_size, -1);
+
+  if (has_code)
+    label_regsaveloads(base_address + section.VirtualAddress, base_address + section.VirtualAddress + section.VirtualSize);
 }
 
-bool pe_load(uint8* data)
+bool pe_load(linput_t* li, uint8* data)
 {
   uint32* magic = (uint32*)data;
   if (*magic == MAGIC_XUIZ)
@@ -169,6 +207,16 @@ bool pe_load(uint8* data)
   if (nt_header->Signature != EXE_NT_SIGNATURE)
     return false;
 
+  if (write_pe_to_disk)
+  {
+    FILE* file = qfopen("d:\\pefile.exe", "wb");
+    if (file)
+    {
+      qfwrite(file, data, image_size);
+      qfclose(file);
+    }
+  }
+
   // Get base address/entrypoint from optionalheader if we don't already have them
   if (!base_address)
     base_address = nt_header->OptionalHeader.ImageBase;
@@ -182,26 +230,41 @@ bool pe_load(uint8* data)
                                                            sizeof(IMAGE_NT_HEADERS)); // skip past data directories (for now? will we ever need them?)
 
   for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
+    pe_add_section(sections[i], data);
+
+  // Let's map in the XEX sections too
+  if(add_xex_sections && directory_entries.count(XEX_HEADER_SECTION_TABLE))
   {
-    auto& section = sections[i];
+    qlseek(li, directory_entries[XEX_HEADER_SECTION_TABLE]);
 
-    uint32 sec_addr = xex_header.Magic != MAGIC_XEX3F ? section.VirtualAddress : section.PointerToRawData;
-    int sec_size = std::min(section.VirtualSize, section.SizeOfRawData);
+    // Get number of sections from the size field
+    uint32 size;
+    qlread(li, &size, sizeof(uint32));
+    size = swap32(size);
+    uint32 num_sects = (size - 4) / sizeof(XEX_SECTION_HEADER);
 
-    if (sec_addr + sec_size > image_size)
-      sec_size = image_size - sec_addr;
+    if (num_sects > 0)
+    {
+      for (int i = 0; i < num_sects; i++)
+      {
+        XEX_SECTION_HEADER section;
+        qlread(li, &section, sizeof(XEX_SECTION_HEADER));
+        section.VirtualAddress = swap32(section.VirtualAddress);
+        section.VirtualSize = swap32(section.VirtualSize);
 
-    // Add section as IDA segment
-    bool code_section = pe_add_section(section);
+        if (getseg(section.VirtualAddress) != 0)
+          continue; // already part of a segment
 
-    if (sec_size <= 0)
-      continue;
+        IMAGE_SECTION_HEADER pe_sec;
+        pe_sec.Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ;
+        pe_sec.VirtualAddress = section.VirtualAddress - base_address;
+        pe_sec.VirtualSize = section.VirtualSize;
+        pe_sec.SizeOfRawData = section.VirtualSize;
+        memcpy(pe_sec.Name, section.SectionName, 8);
 
-    // Load data into IDA
-    mem2base(data + sec_addr, base_address + section.VirtualAddress, base_address + section.VirtualAddress + sec_size, -1);
-
-    if (code_section)
-      label_regsaveloads(base_address + section.VirtualAddress, base_address + section.VirtualAddress + section.VirtualSize);
+        pe_add_section(pe_sec, data);
+      }
+    }
   }
 
   if (entry_point)
@@ -230,7 +293,7 @@ bool xex_read_raw(linput_t* li, bool encrypted)
     AES_CBC_decrypt_buffer(&aes, pe_data, data_length);
   }
 
-  auto result = pe_load(pe_data);
+  auto result = pe_load(li, pe_data);
   free(pe_data);
   return result;
 }
@@ -292,7 +355,7 @@ bool xex_read_uncompressed(linput_t* li, bool encrypted)
   }
   // todo: verify block size sum == ImageSize ?
 
-  auto result = pe_load(pe_data);
+  auto result = pe_load(li, pe_data);
   free(pe_data);
 
   return result;
@@ -401,7 +464,7 @@ end:
 
   bool result = false;
   if (retcode == 0)
-    result = pe_load(pe_data);
+    result = pe_load(li, pe_data);
 
   free(pe_data);
   return result;
@@ -821,6 +884,47 @@ void xex_info_comment(linput_t* li)
     add_pgm_cmt(" - Platform: %d", exec_id.Platform);
     add_pgm_cmt(" - Executable Type: %d", exec_id.ExecutableType);
     add_pgm_cmt(" - Disc Number: %d/%d", exec_id.DiscNum, exec_id.DiscsInSet);
+  }
+
+  if (directory_entries.count(XEX_HEADER_SECTION_TABLE))
+  {
+    qlseek(li, directory_entries[XEX_HEADER_SECTION_TABLE]);
+
+    // Get number of sections from the size field
+    uint32 size;
+    qlread(li, &size, sizeof(uint32));
+    size = swap32(size);
+    uint32 num_sects = (size - 4) / sizeof(XEX_SECTION_HEADER);
+
+    if (num_sects > 0)
+    {
+      //add_pgm_cmt("\nXEX Sections/Resources: (%d sections):", num_sects);
+      std::stringstream table;
+      table << "\nXEX Sections/Resources: (" << num_sects << " sections)";
+      for (int i = 0; i < num_sects; i++)
+      {
+        XEX_SECTION_HEADER section;
+        qlread(li, &section, sizeof(XEX_SECTION_HEADER));
+        section.VirtualAddress = swap32(section.VirtualAddress);
+        section.VirtualSize = swap32(section.VirtualSize);
+
+        // Create buffer for section name so we can terminate it properly
+        char name[9];
+        memset(name, 0, 9);
+        memcpy(name, section.SectionName, 8);
+
+        // Add comment & name to sections address if possible
+        add_extra_line(section.VirtualAddress, true, "\n\nXEX section \"%s\", 0x%X - 0x%X (0x%X bytes)\n", name, section.VirtualAddress, section.VirtualAddress + section.VirtualSize, section.VirtualSize);
+        set_name(section.VirtualAddress, qstring().sprnt("section_%s", name).c_str());
+
+        // Add to section table
+        table << std::endl << " - " << std::left << std::setw(9) << std::setfill(' ') << name;
+        table << " = 0x" << std::hex << section.VirtualAddress << " - 0x" << std::hex << section.VirtualAddress + section.VirtualSize;
+        table << " (0x" << std::hex << section.VirtualSize << " bytes)";
+      }
+
+      add_pgm_cmt(table.str().c_str());
+    }
   }
 
   if (directory_entries.count(XEX_HEADER_BUILD_VERSIONS))
