@@ -1,7 +1,6 @@
 // TODO:
 // - XEX1 and older
-// - improve speed of file load
-// - label __savegprlr_* and __restgprlr_*
+// - improve speed of file load & analysis
 // - add more checks to things
 // - test!
 
@@ -63,7 +62,58 @@ uint32 export_table_va = 0;
 
 uint8 session_key[16];
 
-void pe_add_section(const IMAGE_SECTION_HEADER& section)
+void label_regsaveloads(ea_t start, ea_t end)
+{
+  // "std %r14, -0x98(%sp)" followed by "std %r15, -0x90(%sp)"
+  uint8 save_pattern[] = {
+    0xF9, 0xC1, 0xFF, 0x68, 0xF9, 0xE1, 0xFF, 0x70
+  };
+  // "ld %r14, -0x98(%sp)" followed by "ld %r15, -0x90(%sp)"
+  uint8 load_pattern[] = {
+    0xE9, 0xC1, 0xFF, 0x68, 0xE9, 0xE1, 0xFF, 0x70
+  };
+
+  uint8* patterns[] = {
+    save_pattern,
+    load_pattern
+  };
+  char* pattern_labels[] = {
+    "__savegprlr_%d",
+    "__restgprlr_%d"
+  };
+
+  for (int pat_idx = 0; pat_idx < 2; pat_idx++)
+  {
+    ea_t addr = start;
+
+    while (addr != BADADDR)
+    {
+      addr = bin_search2(addr, end, patterns[pat_idx], NULL, 8, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
+      if (addr == BADADDR)
+        break;
+
+      for (int i = 14; i < 32; i++)
+      {
+        int size = 4;
+
+        // final one is 0xC bytes when saving, 0x10 when loading
+        if (i == 31)
+          size = (pat_idx == 0) ? 0xC : 0x10;
+
+        // reset addr
+        del_items(addr, 0, 8);
+        create_insn(addr);
+
+        set_name(addr, qstring().sprnt(pattern_labels[pat_idx], i).c_str());
+        add_func(addr, addr + size);
+
+        addr += size;
+      }
+    }
+  }
+}
+
+bool pe_add_section(const IMAGE_SECTION_HEADER& section)
 {
   uint32 seg_perms = 0;
   if (section.Characteristics & IMAGE_SCN_MEM_EXECUTE)
@@ -91,6 +141,8 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section)
   segm.bitness = 1;
   segm.perm = seg_perms;
   add_segm_ex(&segm, name, seg_class, 0);
+
+  return has_code;
 }
 
 bool pe_load(uint8* data)
@@ -127,13 +179,16 @@ bool pe_load(uint8* data)
       sec_size = security_info.ImageSize - sec_addr;
 
     // Add section as IDA segment
-    pe_add_section(section);
+    bool code_section = pe_add_section(section);
 
     if (sec_size <= 0)
       continue;
 
     // Load data into IDA
     mem2base(data + sec_addr, base_address + section.VirtualAddress, base_address + section.VirtualAddress + sec_size, -1);
+
+    if (code_section)
+      label_regsaveloads(base_address + section.VirtualAddress, base_address + section.VirtualAddress + section.VirtualSize);
   }
 
   if (entry_point)
