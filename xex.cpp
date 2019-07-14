@@ -1,6 +1,7 @@
 // TODO:
 // - XEX1 and older
 // - improve speed of decryption/decompression (AES-NI? SHA1 NEON?)
+// - add more checks to things
 // - test!
 
 #include "../idaldr.h"
@@ -103,6 +104,7 @@ bool pe_load(uint8* data)
                                                            sizeof(IMAGE_NT_HEADERS) + 
                                                            (nt_header->OptionalHeader.NumberOfRvaAndSizes * 8)); // skip past data directories (for now? will we ever need them?)
 
+  // Read in PE sections & copy section data into IDA
   for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
   {
     auto& section = sections[i];
@@ -355,7 +357,7 @@ void xex_load_imports(linput_t* li)
   import_desc.NameTableSize = swap32(import_desc.NameTableSize);
   import_desc.Size = swap32(import_desc.Size);
 
-  // seperate the library names in the name table
+  // Seperate the library names in the name table
   std::vector<std::string> import_libs;
   std::string cur_lib = "";
   for (int i = 0; i < import_desc.NameTableSize; i++)
@@ -377,12 +379,14 @@ void xex_load_imports(linput_t* li)
 
   msg("[+] Loading module imports... (%d import modules)\n", import_desc.ModuleCount);
 
-  // read in each import library
+  // Read in each import library
   for (int i = 0; i < import_desc.ModuleCount; i++)
   {
+    // Create netcode for this module, used for populating imports window
     netnode module_node;
     module_node.create();
 
+    // Read in import table header
     auto table_addr = qltell(li);
     XEX_IMPORT_TABLE table_header;
     qlread(li, &table_header, sizeof(XEX_IMPORT_TABLE));
@@ -396,6 +400,8 @@ void xex_load_imports(linput_t* li)
     // (so we add the import to variable list when variable type is loaded, but then remove it if a thunk for that import gets loaded)
     std::map<int, ea_t> variables;
     std::map<int, ea_t> import_ea;
+
+    // Loop through table entries
     for (int j = 0; j < table_header.ImportCount; j++)
     {
       uint32 record_addr;
@@ -429,9 +435,9 @@ void xex_load_imports(linput_t* li)
         set_name(record_addr, import_name.c_str());
 
         // add comment to thunk like xorloser's loader
-        set_cmt(record_addr + 4, qstring().sprnt("%s :: %s", libname.c_str(), import_name).c_str(), 1);
+        set_cmt(record_addr + 4, qstring().sprnt("%s :: %s", libname.c_str(), import_name.c_str()).c_str(), 1);
 
-        // force IDA to recognize addr as code, so we can add it as a function
+        // force IDA to recognize addr as code, so we can add it as a library function
         auto_make_code(record_addr);
         auto_recreate_insn(record_addr);
         func_t func(record_addr, record_addr + 0x10, FUNC_LIB);
@@ -547,6 +553,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
   data_length = fsize - xex_header.SizeOfHeaders;
 
+  // Read in directory entry / optional header keyvalues
   for (int i = 0; i < xex_header.HeaderDirectoryEntryCount; i++)
   {
     IMAGE_XEX_DIRECTORY_ENTRY header;
@@ -557,6 +564,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
     directory_entries[header.Key] = header.Value;
   }
 
+  // Read in SecurityInfo
   qlseek(li, xex_header.SecurityInfo);
   read = qlread(li, &security_info, sizeof(XEX2_SECURITY_INFO));
   security_info.ImageSize = swap32(security_info.ImageSize);
@@ -564,12 +572,14 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   base_address = security_info.ImageInfo.LoadAddress = swap32(security_info.ImageInfo.LoadAddress);
   export_table_va = security_info.ImageInfo.ExportTableAddress = swap32(security_info.ImageInfo.ExportTableAddress);
 
+  // todo: should we actually be using the PE_BASE header?
   if (directory_entries.count(XEX_HEADER_PE_BASE))
     base_address = directory_entries[XEX_HEADER_PE_BASE];
 
   if (directory_entries.count(XEX_HEADER_ENTRY_POINT))
     entry_point = directory_entries[XEX_HEADER_ENTRY_POINT];
 
+  // Try decrypting with all 4 keys
   if (!xex_read_image(li, 0) && !xex_read_image(li, 1) && !xex_read_image(li, 2) && !xex_read_image(li, 3))
   {
     msg("[+] Failed to load PE image from XEX :(\n");

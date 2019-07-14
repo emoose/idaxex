@@ -3117,7 +3117,7 @@ const char* syscallNameGen(int id)
 std::string DoNameGen(const std::string& libName, int id)
 {
   std::string lib = libName;
-  auto pos = lib.find_last_of('.');
+  auto pos = lib.find_first_of('.');
   if (pos != std::string::npos)
     lib = lib.substr(0, pos);
 
