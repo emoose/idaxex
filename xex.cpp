@@ -121,11 +121,11 @@ bool pe_load(uint8* data)
     if (sec_addr + sec_size > security_info.ImageSize)
       sec_size = security_info.ImageSize - sec_addr;
 
-    if (sec_size <= 0)
-      continue;
-
     // Add section as IDA segment
     pe_add_section(section);
+
+    if (sec_size <= 0)
+      continue;
 
     // Load data into IDA
     mem2base(data + sec_addr, base_address + section.VirtualAddress, base_address + section.VirtualAddress + sec_size, -1);
