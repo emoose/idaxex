@@ -122,7 +122,7 @@ bool pe_load(uint8* data)
     pe_add_section(section);
 
     // Load data into IDA
-    mem2base(data + sec_addr, base_address + section.VirtualAddress, base_address + section.VirtualAddress + section.VirtualSize, -1);
+    mem2base(data + sec_addr, base_address + section.VirtualAddress, base_address + section.VirtualAddress + sec_size, -1);
   }
 
   if (entry_point)
