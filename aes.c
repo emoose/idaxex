@@ -243,6 +243,7 @@ int cpu_aesni_support()
 
   var_CipherFn = supports_aesni ? Cipher_AESNI : Cipher;
   var_InvCipherFn = supports_aesni ? InvCipher_AESNI : InvCipher;
+  return supports_aesni;
 }
 
 /* AESNI code from https://gist.github.com/acapola/d5b940da024080dfaf5f */
@@ -256,7 +257,7 @@ static __m128i aes_128_key_expansion(__m128i key, __m128i keygened) {
   return _mm_xor_si128(key, keygened);
 }
 
-void aesni128_load_key(uint8_t* RoundKey, int8_t *enc_key) {
+void aesni128_load_key(uint8_t* RoundKey, const int8_t *enc_key) {
   __m128i* key_schedule = (__m128i*)RoundKey;
 
   key_schedule[0] = _mm_loadu_si128((const __m128i*) enc_key);

@@ -17,8 +17,8 @@ Global
 		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida32 Debug|x64.Build.0 = ida32 Debug|x64
 		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida32 Release|x64.ActiveCfg = ida32 Release|x64
 		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida32 Release|x64.Build.0 = ida32 Release|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Debug|x64.ActiveCfg = ida32 Release|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Debug|x64.Build.0 = ida32 Release|x64
+		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Debug|x64.ActiveCfg = ida64 Debug|x64
+		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Debug|x64.Build.0 = ida64 Debug|x64
 		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Release|x64.ActiveCfg = ida64 Release|x64
 		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Release|x64.Build.0 = ida64 Release|x64
 	EndGlobalSection
