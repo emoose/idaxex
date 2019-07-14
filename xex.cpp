@@ -3,8 +3,6 @@
 // - improve speed of file load
 // - label __savegprlr_* and __restgprlr_*
 // - add more checks to things
-// - find reason why IDA refuses to analyze entire chunks of code (temp fix atm by marking code manually inside pe_add_section, seems xorloser loader doesn't need to do this though...)
-// - find why data references aren't being XREF'd (eg instead of "lis r11, unk_83BA5600@h" we get "lis r11, -0x7C46"...)
 // - test!
 
 #include "../idaldr.h"
@@ -558,12 +556,28 @@ void xex_load_exports()
 //------------------------------------------------------------------------------
 void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
 {
+  // Set processor to PPC
   set_processor_type("ppc", SETPROC_LOADER);
-  set_compiler_id(COMP_MS);
+
+  // Set PPC_LISOFF to true
+  // should help analyzer convert "lis r11, -0x7C46" to "lis r11, unk_83BA5600@h"
+  uint32 val = 1;
+  ph.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &val);
+
+  // Set compiler info
+  compiler_info_t comp;
+  comp.id = COMP_MS;
+  comp.defalign = 0;
+  comp.size_i = 4;
+  comp.size_b = 4;
+  comp.size_e = 4;
+  comp.size_s = 2;
+  comp.size_l = 4;
+  comp.size_ll = 8;
+  comp.cm = CM_N32_F48;
+  bool ret = set_compiler(comp, 0, "xbox");
 
   inf.baseaddr = 0;
-  ea_t start = to_ea(inf.baseaddr, 0);
-  ea_t end = start;
 
   int64 fsize = qlsize(li);
   qlseek(li, 0);
