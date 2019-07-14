@@ -1,7 +1,10 @@
 // TODO:
 // - XEX1 and older
-// - improve speed of decryption/decompression (AES-NI? SHA1 NEON?)
+// - improve speed of file load
+// - label __savegprlr_* and __restgprlr_*
 // - add more checks to things
+// - find reason why IDA refuses to analyze entire chunks of code (temp fix atm by marking code manually inside pe_add_section, seems xorloser loader doesn't need to do this though...)
+// - find why data references aren't being XREF'd (eg instead of "lis r11, unk_83BA5600@h" we get "lis r11, -0x7C46"...)
 // - test!
 
 #include "../idaldr.h"
@@ -72,7 +75,10 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section)
   if (section.Characteristics & IMAGE_SCN_MEM_WRITE)
     seg_perms |= SEGPERM_WRITE;
 
-  char* seg_class = (section.Characteristics & IMAGE_SCN_CNT_CODE) ? "CODE" : "DATA";
+  bool has_code = (section.Characteristics & IMAGE_SCN_CNT_CODE);
+  bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
+
+  char* seg_class = has_code ? "CODE" : "DATA";
   uint32 seg_addr = base_address + section.VirtualAddress;
 
   // Create buffer for section name so we can terminate it properly
@@ -86,6 +92,13 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section)
   segm.align = saRelPara;
   segm.perm = seg_perms;
   add_segm_ex(&segm, name, seg_class, 0);
+
+  // some reason IDA is refusing to analyze entire chunks of code
+  // so we'll mark the whole segment as code if we're sure there's no data
+  // drastic times call for drastic measures...
+  if (has_code && !has_data)
+    for (ea_t i = segm.start_ea; i < segm.end_ea; i += 4)
+      auto_make_code(i);
 }
 
 bool pe_load(uint8* data)
