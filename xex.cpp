@@ -10,6 +10,7 @@
 #include <bytes.hpp>
 #include <algorithm>
 #include <vector>
+#include <algorithm>
 #include "lzx/lzx.hpp"
 #include "aes.hpp"
 #include "sha1.hpp"
@@ -362,6 +363,20 @@ void xex_load_imports(linput_t* li)
   std::string cur_lib = "";
   for (int i = 0; i < import_desc.NameTableSize; i++)
   {
+    if(!cur_lib.length())
+    {
+      // align to 4 bytes
+      if ((i % 4) != 0)
+      {
+        int align = 4 - (i % 4);
+        align = std::min(align, (int)import_desc.NameTableSize - i); // don't let us align past end of nametable
+        i += align - 1; // minus 1 since for loop will add 1 to it too
+        qlseek(li, align, SEEK_CUR);
+
+        continue;
+      }
+    }
+
     char name_char;
     qlread(li, &name_char, 1);
 
