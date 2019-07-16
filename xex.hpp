@@ -567,3 +567,15 @@ static_assert(sizeof(IMAGE_SECTION_HEADER) == 0x28, "IMAGE_SECTION_HEADER");
 #define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
 #define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
 #define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor
+
+typedef struct _IMAGE_IMPORT_DESCRIPTOR {
+  union {
+    uint32 Characteristics; // 0 for terminating null import descriptor
+    uint32 OriginalFirstThunk; // RVA to INT
+  };
+  uint32 TimeDateStamp; // Time/Date of module, or other properties (see below)
+  uint32 ForwarderChain; // Forwarder chain ID
+  uint32 Name; // Module name
+  uint32 FirstThunk; // RVA to IAT (if bound this IAT has actual addresses)
+} IMAGE_IMPORT_DESCRIPTOR;
+typedef IMAGE_IMPORT_DESCRIPTOR *PIMAGE_IMPORT_DESCRIPTOR;

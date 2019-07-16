@@ -21,6 +21,7 @@
 #include <iomanip>
 
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
+#define FF_DWORD    0x20000000
 
 bool write_pe_to_disk = false;
 bool add_xex_sections = true;
@@ -191,6 +192,138 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section, uint8* data)
   if (has_code)
     label_regsaveloads(seg_addr, seg_addr + section.VirtualSize);
 }
+
+uint32 pe_rva_to_offset(uint8* data, uint32 rva)
+{
+  if (xex_header.Magic != MAGIC_XEX3F)
+    return rva; // all formats besides XEX3F seem to keep raw data lined up with in-memory PE?
+
+  IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
+  if (dos_header->MZSignature != EXE_MZ_SIGNATURE)
+    return 0;
+
+  IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(data + dos_header->AddressOfNewExeHeader);
+  if (nt_header->Signature != EXE_NT_SIGNATURE)
+    return 0;
+
+  IMAGE_SECTION_HEADER* sections = (IMAGE_SECTION_HEADER*)(data +
+                                                           dos_header->AddressOfNewExeHeader +
+                                                           sizeof(IMAGE_NT_HEADERS));
+
+  for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
+  {
+    auto& section = sections[i];
+    if (rva >= section.VirtualAddress && rva < section.VirtualAddress + section.VirtualSize)
+      return rva - section.VirtualAddress + section.PointerToRawData;
+  }
+
+  return 0;
+}
+
+void pe_load_imports(uint8* data)
+{
+  IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
+  if (dos_header->MZSignature != EXE_MZ_SIGNATURE)
+    return;
+
+  IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(data + dos_header->AddressOfNewExeHeader);
+  if (nt_header->Signature != EXE_NT_SIGNATURE)
+    return;
+
+  if (!nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress)
+    return;
+
+  if (!nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
+    return;
+
+  auto imports_addr = pe_rva_to_offset(data, nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+  if (!imports_addr)
+    return;
+
+  // Loop through import descriptors...
+  auto* import_desc = (IMAGE_IMPORT_DESCRIPTOR*)(data + imports_addr);
+  while (import_desc->FirstThunk)
+  {
+    auto module_name_addr = pe_rva_to_offset(data, import_desc->Name);
+    if (!module_name_addr)
+      continue;
+
+    char* libname = (char*)(data + module_name_addr);
+
+    imports_addr = pe_rva_to_offset(data, import_desc->FirstThunk);
+    if (!imports_addr)
+      continue;
+
+    // Create netcode for this module, used for populating imports window
+    netnode module_node;
+    module_node.create();
+
+    // Loop through imports...
+    uint32 import_offset = 0;
+    auto* import_data = (uint32*)(data + imports_addr);
+    while (*import_data)
+    {
+      auto import_ordinal = *import_data & 0xFFFF;
+      auto import_name = DoNameGen(libname, import_ordinal);
+
+      // Name import thunk address
+      uint32 import_thunk_rva = base_address + import_desc->FirstThunk + import_offset;
+      set_name(import_thunk_rva, ("__imp__" + import_name).c_str());
+      create_data(import_thunk_rva, FF_DWORD, 4, BADADDR);
+
+      ea_t import_addr = import_thunk_rva; // addr to use for the import inside imports window
+
+      // Search for code referencing the import thunks addr
+      uint8 search_pattern[] = {
+        0x3D, 0x60, 0x92, 0x0F, // lis r11, xxxx@ha
+        0x81, 0x6B, 0xB0, 0x04, // lwz r11, xxxx@l(r11)
+        0x7D, 0x69, 0x03, 0xA6, // mtspr CTR, r11
+        0x4E, 0x80, 0x04, 0x20
+      };
+
+      uint16 upper = swap16((uint16)((import_thunk_rva & 0xFFFF0000) >> 16) + 1); // + 1 for some reason?
+      uint16 lower = swap16(import_thunk_rva & 0xFFFF);
+      *(uint16*)(search_pattern + 2) = upper;
+      *(uint16*)(search_pattern + 6) = lower;
+
+      ea_t addr = base_address;
+      while (addr != BADADDR)
+      {
+        addr = bin_search2(addr, BADADDR, search_pattern, NULL, 16, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
+        if (addr == BADADDR)
+          break;
+        // found a func referencing the import!
+
+        import_addr = addr;
+        set_name(addr, import_name.c_str());
+        // add comment to thunk like xorloser's loader
+        set_cmt(addr + 4, qstring().sprnt("%s :: %s", libname, import_name.c_str()).c_str(), 1);
+
+        // force IDA to recognize addr as code, so we can add it as a library function
+        auto_make_code(addr);
+        auto_recreate_insn(addr);
+        func_t func(addr, addr + 0x10, FUNC_LIB);
+        add_func_ex(&func);
+
+        addr += 0x10;
+      }
+
+      // Set imports window name
+      module_node.supset_ea(import_addr, import_name.c_str());
+
+      // Set imports window ordinal
+      nodeidx_t ndx = ea2node(import_addr);
+      module_node.altset(import_ordinal, ndx);
+
+      import_data++;
+      import_offset += 4;
+    }
+
+    // Add module to imports window
+    import_module(libname, NULL, module_node, NULL, "x360");
+
+    import_desc++;
+  }
 }
 
 bool pe_load(linput_t* li, uint8* data)
@@ -270,6 +403,10 @@ bool pe_load(linput_t* li, uint8* data)
       }
     }
   }
+
+  // XEX3F uses PE headers to specify imports, so we'll try reading them if it has them...
+  if (nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
+    pe_load_imports(data);
 
   if (entry_point)
     add_entry(0, entry_point, "start", 1);
