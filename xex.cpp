@@ -2,6 +2,9 @@
 // - fix export loading so that a segment isn't required (read from linput_t instead of reading thru IDA?)
 // - improve speed of file load & analysis?
 // - add more checks to things
+// - find fix for XEX25/Crackdown alpha build (need to re-extract OS files for XEX25...)
+// - test XEX2D / XEX3F
+// - fix XEX1 exports
 // - test!
 
 #include "../idaldr.h"
@@ -132,12 +135,13 @@ void label_regsaveloads(ea_t start, ea_t end)
 
 void pe_add_section(const IMAGE_SECTION_HEADER& section, uint8* data)
 {
+  // New buffer for section name so we can null-terminate it
   char name[9];
   memset(name, 0, 9);
   memcpy(name, section.Name, 8);
 
-  // Exclude some sections from being added - not really sure why xorlosers loader seems to exclude them
-  // they don't seem important anyway, so maybe it's a good idea
+  // Exclude some sections from being added - don't know the reason, but xorlosers loader seems to
+  // they don't seem important anyway, so maybe it's a good idea?
   if (exclude_unneeded_sections)
   {
     if (!strcmp(name, ".edata"))
@@ -155,44 +159,38 @@ void pe_add_section(const IMAGE_SECTION_HEADER& section, uint8* data)
     sec_size = image_size - sec_addr;
 
   // Add section as IDA segment
-  bool has_code = false;
-  {
-    uint32 seg_perms = 0;
-    if (section.Characteristics & IMAGE_SCN_MEM_EXECUTE)
-      seg_perms |= SEGPERM_EXEC;
-    if (section.Characteristics & IMAGE_SCN_MEM_READ)
-      seg_perms |= SEGPERM_READ;
-    if (section.Characteristics & IMAGE_SCN_MEM_WRITE)
-      seg_perms |= SEGPERM_WRITE;
 
-    has_code = (section.Characteristics & IMAGE_SCN_CNT_CODE);
-    bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
+  uint32 seg_perms = 0;
+  if (section.Characteristics & IMAGE_SCN_MEM_EXECUTE)
+    seg_perms |= SEGPERM_EXEC;
+  if (section.Characteristics & IMAGE_SCN_MEM_READ)
+    seg_perms |= SEGPERM_READ;
+  if (section.Characteristics & IMAGE_SCN_MEM_WRITE)
+    seg_perms |= SEGPERM_WRITE;
 
-    char* seg_class = has_code ? "CODE" : "DATA";
-    uint32 seg_addr = base_address + section.VirtualAddress;
+  bool has_code = (section.Characteristics & IMAGE_SCN_CNT_CODE);
+  bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
 
-    // Create buffer for section name so we can terminate it properly
-    char name[9];
-    memset(name, 0, 9);
-    memcpy(name, section.Name, 8);
+  char* seg_class = has_code ? "CODE" : "DATA";
+  ea_t seg_addr = (ea_t)base_address + (ea_t)section.VirtualAddress;
 
-    segment_t segm;
-    segm.start_ea = seg_addr;
-    segm.end_ea = seg_addr + section.VirtualSize;
-    segm.align = saRelDble;
-    segm.bitness = 1;
-    segm.perm = seg_perms;
-    add_segm_ex(&segm, name, seg_class, 0);
-  }
+  segment_t segm;
+  segm.start_ea = seg_addr;
+  segm.end_ea = seg_addr + section.VirtualSize;
+  segm.align = saRelDble;
+  segm.bitness = 1;
+  segm.perm = seg_perms;
+  add_segm_ex(&segm, name, seg_class, 0);
 
   if (sec_size <= 0)
     return;
 
   // Load data into IDA
-  mem2base(data + sec_addr, base_address + section.VirtualAddress, base_address + section.VirtualAddress + sec_size, -1);
+  mem2base(data + sec_addr, seg_addr, seg_addr + sec_size, -1);
 
   if (has_code)
-    label_regsaveloads(base_address + section.VirtualAddress, base_address + section.VirtualAddress + section.VirtualSize);
+    label_regsaveloads(seg_addr, seg_addr + section.VirtualSize);
+}
 }
 
 bool pe_load(linput_t* li, uint8* data)
@@ -233,12 +231,12 @@ bool pe_load(linput_t* li, uint8* data)
   // Read in PE sections & copy section data into IDA
   IMAGE_SECTION_HEADER* sections = (IMAGE_SECTION_HEADER*)(data + 
                                                            dos_header->AddressOfNewExeHeader + 
-                                                           sizeof(IMAGE_NT_HEADERS)); // skip past data directories (for now? will we ever need them?)
+                                                           sizeof(IMAGE_NT_HEADERS));
 
   for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
     pe_add_section(sections[i], data);
 
-  // Let's map in the XEX sections too
+  // Let's map in the XEX sections too (as there's no tools for pre-XEX2 etc...)
   if(add_xex_sections && directory_entries.count(XEX_HEADER_SECTION_TABLE))
   {
     qlseek(li, directory_entries[XEX_HEADER_SECTION_TABLE]);
@@ -247,8 +245,8 @@ bool pe_load(linput_t* li, uint8* data)
     uint32 size;
     qlread(li, &size, sizeof(uint32));
     size = swap32(size);
-    uint32 num_sects = (size - 4) / sizeof(XEX_SECTION_HEADER);
 
+    uint32 num_sects = (size - 4) / sizeof(XEX_SECTION_HEADER);
     if (num_sects > 0)
     {
       for (int i = 0; i < num_sects; i++)
@@ -281,20 +279,20 @@ bool pe_load(linput_t* li, uint8* data)
 
 bool xex_read_raw(linput_t* li, bool encrypted)
 {
-  uint8* pe_data = (uint8*)malloc(std::max(data_length, (int64)image_size));
-  memset(pe_data, 0, std::max(data_length, (int64)image_size));
+  uint8* pe_data = (uint8*)calloc(1, std::max(data_length, (int64)image_size));
 
   qlseek(li, xex_header.SizeOfHeaders);
   qlread(li, pe_data, data_length);
 
-  AES_ctx aes;
-  uint8 iv[] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-  };
 
   if (encrypted)
   {
+    AES_ctx aes;
+    uint8 iv[] = {
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+
     AES_init_ctx_iv(&aes, session_key, iv);
     AES_CBC_decrypt_buffer(&aes, pe_data, data_length);
   }
@@ -380,19 +378,19 @@ bool xex_read_compressed(linput_t* li, bool encrypted)
   }
 
   // read windowsize & first block from file_data_descriptor header
-  auto* compression_info = (XEX_COMPRESSED_DATA_DESCRIPTOR*)malloc(sizeof(XEX_COMPRESSED_DATA_DESCRIPTOR));
+  XEX_COMPRESSED_DATA_DESCRIPTOR compression_info;
   qlseek(li, directory_entries[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8);
-  qlread(li, compression_info, sizeof(XEX_COMPRESSED_DATA_DESCRIPTOR));
-  compression_info->WindowSize = swap32(compression_info->WindowSize);
+  qlread(li, &compression_info, sizeof(XEX_COMPRESSED_DATA_DESCRIPTOR));
+  compression_info.WindowSize = swap32(compression_info.WindowSize);
 
-  auto* cur_block = &compression_info->FirstDescriptor;
+  auto* cur_block = &compression_info.FirstDescriptor;
   cur_block->Size = swap32(cur_block->Size);
 
   // Alloc memory for the PE
   uint8* pe_data = (uint8*)malloc(image_size);
 
   // LZX init...
-  LZXinit(compression_info->WindowSize);
+  LZXinit(compression_info.WindowSize);
   uint8* comp_buffer = (uint8*)malloc(0x9800); // 0x9800 = max comp. block size (0x8000) + MAX_GROWTH (0x1800)
 
   uint32 size_left = image_size;
@@ -465,7 +463,6 @@ end:
   if (block_data)
     free(block_data);
 
-  free(compression_info);
   free(comp_buffer);
 
   bool result = false;
@@ -498,8 +495,8 @@ bool xex_read_image(linput_t* li, int key_index)
   key_idx = key_index;
   if (key_index == 0)
   {
-    msg("[+] %s\n", (comp_format == 2) ? "Compressed" : "Uncompressed");
-    msg("[+] %s\n", (enc_flag != 0) ? "Encrypted" : "Decrypted");
+    msg("[+] %s\n", (comp_format == 2) ? "Compressed" : "Not Compressed");
+    msg("[+] %s\n", (enc_flag != 0) ? "Encrypted" : "Not Encrypted");
   }
 
   // Setup session key
@@ -609,9 +606,9 @@ void xex_load_imports(linput_t* li)
     // Loop through table entries
     for (int j = 0; j < table_header.ImportCount; j++)
     {
-      uint32 record_addr;
-      qlread(li, &record_addr, sizeof(uint32));
-      record_addr = swap32(record_addr);
+      uint32 tmp;
+      qlread(li, &tmp, sizeof(uint32));
+      ea_t record_addr = swap32(tmp);
 
       auto record_value = get_dword(record_addr);
       auto record_type = (record_value & 0xFF000000) >> 24;
@@ -702,11 +699,12 @@ void xex_load_imports(linput_t* li)
     qlread(li, &imports, sizeof(XEX_CALLCAP_IMPORTS));
     imports.BeginFunctionThunkAddress = swap32(imports.BeginFunctionThunkAddress);
     imports.EndFunctionThunkAddress = swap32(imports.EndFunctionThunkAddress);
+    ea_t end_addr = imports.EndFunctionThunkAddress;
 
     if (imports.BeginFunctionThunkAddress != 0 && imports.EndFunctionThunkAddress != 0)
     {
       msg("[+] Naming callcap imports... (0x%X - 0x%X)\n", imports.BeginFunctionThunkAddress, imports.EndFunctionThunkAddress);
-      for (ea_t i = imports.BeginFunctionThunkAddress; i < imports.EndFunctionThunkAddress + 0x10; i += 0x10)
+      for (ea_t i = imports.BeginFunctionThunkAddress; i < end_addr + 0x10; i += 0x10)
       {
         uint32 info_1 = get_dword(i);
         uint32 info_2 = get_dword(i + 4);
@@ -773,11 +771,11 @@ void xex_load_exports()
   char module_name[256];
   get_root_filename(module_name, 256);
 
-  auto ordinal_addrs_va = export_table_va + sizeof(HV_IMAGE_EXPORT_TABLE);
+  ea_t ordinal_addrs_va = (ea_t)export_table_va + sizeof(HV_IMAGE_EXPORT_TABLE);
   for (int i = 0; i < export_table.Count; i++)
   {
     auto func_ord = export_table.Base + i;
-    auto func_va = get_dword(ordinal_addrs_va + (i * 4));
+    auto func_va = get_dword(ordinal_addrs_va + (ea_t)(i * 4));
     if (!func_va)
       continue;
 
@@ -973,27 +971,22 @@ void xex_info_comment(linput_t* li)
     add_pgm_cmt(" - Timestamp: %s", ctime(&timest));
   }
 
-  add_pgm_cmt(" - Base Address: 0x%X", base_address);
-  add_pgm_cmt(" - Entrypoint: 0x%X", entry_point);
-
+  if (base_address)
+    add_pgm_cmt(" - Base Address: 0x%X", base_address);
+  if (entry_point)
+    add_pgm_cmt(" - Entrypoint: 0x%X", entry_point);
   if (export_table_va)
     add_pgm_cmt(" - Export Table Address: 0x%X", export_table_va);
-
   if (directory_entries.count(XEX_HEADER_ORIGINAL_BASE_ADDRESS))
     add_pgm_cmt(" - Original Base Address: 0x%X", directory_entries[XEX_HEADER_ORIGINAL_BASE_ADDRESS]);
-
   if (directory_entries.count(XEX_HEADER_PE_BASE))
     add_pgm_cmt(" - PE Base: 0x%X", directory_entries[XEX_HEADER_PE_BASE]);
-
   if (directory_entries.count(XEX_HEADER_STACK_SIZE))
     add_pgm_cmt(" - Stack Size: 0x%X", directory_entries[XEX_HEADER_STACK_SIZE]);
-
   if (directory_entries.count(XEX_HEADER_FSCACHE_SIZE))
     add_pgm_cmt(" - FS Cache Size: 0x%X", directory_entries[XEX_HEADER_FSCACHE_SIZE]);
-
   if (directory_entries.count(XEX_HEADER_XAPI_HEAP_SIZE))
     add_pgm_cmt(" - XAPI Heap Size: 0x%X", directory_entries[XEX_HEADER_XAPI_HEAP_SIZE]);
-
   if (directory_entries.count(XEX_HEADER_WORKSPACE_SIZE))
     add_pgm_cmt(" - Workspace Size: 0x%X", directory_entries[XEX_HEADER_WORKSPACE_SIZE]);
 
@@ -1137,7 +1130,6 @@ void xex_info_comment(linput_t* li)
 
     if (num_sects > 0)
     {
-      //add_pgm_cmt("\nXEX Sections/Resources: (%d sections):", num_sects);
       std::stringstream table;
       table << "\nXEX Sections/Resources: (" << num_sects << " sections)";
       for (int i = 0; i < num_sects; i++)
@@ -1206,6 +1198,9 @@ void xex_info_comment(linput_t* li)
 //------------------------------------------------------------------------------
 void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
 {
+  // Make sure abort_load is set to false...
+  abort_load = false;
+
   // Set processor to PPC
   set_processor_type("ppc", SETPROC_LOADER);
 
@@ -1225,7 +1220,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   comp.size_l = 4;
   comp.size_ll = 8;
   comp.cm = CM_N32_F48;
-  bool ret = set_compiler(comp, 0, "xbox");
+  set_compiler(comp, 0, "xbox");
 
   inf.baseaddr = 0;
 
@@ -1244,20 +1239,22 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
   qlread(li, &xex_header, sizeof(IMAGE_XEX_HEADER));
   xex_header.ModuleFlags = swap32(xex_header.ModuleFlags);
+  xex_header.SizeOfHeaders = swap32(xex_header.SizeOfHeaders);
   xex_header.SizeOfDiscardableHeaders = swap32(xex_header.SizeOfDiscardableHeaders);
   xex_header.SecurityInfo = swap32(xex_header.SecurityInfo);
   xex_header.HeaderDirectoryEntryCount = swap32(xex_header.HeaderDirectoryEntryCount);
-  xex_header.SizeOfHeaders = swap32(xex_header.SizeOfHeaders);
 
   data_length = fsize - xex_header.SizeOfHeaders;
 
   if (xex_magic == MAGIC_XEX3F)
   {
-    // XEX3F has some unknown data in place of the directory entry count, with the actual count being after it
+    image_size = xex_header.HeaderDirectoryEntryCount;
+    // XEX3F has some unknown data (imagesize?) in place of the directory entry count
+    // directory count comes after that data, so read it into that datas place
     qlread(li, &xex_header.HeaderDirectoryEntryCount, sizeof(uint32));
     xex_header.HeaderDirectoryEntryCount = swap32(xex_header.HeaderDirectoryEntryCount);
 
-    base_address = xex_header.SecurityInfo; // 0x3F has base address here instead of securityinfo offset!
+    base_address = xex_header.SecurityInfo; // 0x3F has base address here instead of securityinfo offset
   }
 
   if (xex_header.ModuleFlags & XEX_MODULE_FLAG_PATCH)
@@ -1431,22 +1428,22 @@ static int idaapi accept_file(
   else if (magic == MAGIC_XEX1)
   {
     valid = 1;
-    *fileformatname = "Xbox360 XEX1 File";
+    *fileformatname = "Xbox360 XEX1 File (>=1838)";
   }
   else if(magic == MAGIC_XEX25)
   {
     valid = 1;
-    *fileformatname = "Xbox360 XEX25 File";
+    *fileformatname = "Xbox360 XEX%/XEX25 File (>=1746)";
   }
   else if(magic == MAGIC_XEX2D)
   {
     valid = 1;
-    *fileformatname = "Xbox360 XEX2D File";
+    *fileformatname = "Xbox360 XEX-/XEX2D File (>=1640)";
   }
   else if (magic == MAGIC_XEX3F)
   {
     valid = 1;
-    *fileformatname = "Xbox360 XEX3F File";
+    *fileformatname = "Xbox360 XEX?/XEX3F File (>=1529)";
   }
 
   if (valid)

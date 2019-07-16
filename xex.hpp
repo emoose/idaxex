@@ -164,7 +164,7 @@ typedef struct _IMAGE_XEX3F_HEADER {
   uint32 SizeOfHeaders; // 0x8 sz:0x4
   uint32 SizeOfDiscardableHeaders; // 0xC sz:0x4
   uint32 LoadAddress; // 0x10 sz:0x4
-  uint32 Unknown14; // 0x14 sz:0x4
+  uint32 ImageSize; // not sure if name is correct, seems to increase with filesize though
   uint32 HeaderDirectoryEntryCount; // 0x18 sz:0x4
 } IMAGE_XEX3F_HEADER, *PIMAGE_XEX3F_HEADER; // size 0x1C
 static_assert(sizeof(IMAGE_XEX3F_HEADER) == 0x1C, "IMAGE_XEX3F_HEADER");
