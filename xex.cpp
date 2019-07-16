@@ -326,6 +326,55 @@ void pe_load_imports(uint8* data)
   }
 }
 
+void pe_load_exports(uint8* data)
+{
+  IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
+  if (dos_header->MZSignature != EXE_MZ_SIGNATURE)
+    return;
+
+  IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(data + dos_header->AddressOfNewExeHeader);
+  if (nt_header->Signature != EXE_NT_SIGNATURE)
+    return;
+
+  if (!nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress)
+    return;
+
+  if (!nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
+    return;
+
+  auto exports_addr = pe_rva_to_offset(data, nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+  if (!exports_addr)
+    return;
+
+  auto* exports = (IMAGE_EXPORT_DIRECTORY*)(data + exports_addr);
+
+  auto module_name_addr = pe_rva_to_offset(data, exports->Name);
+  if (!module_name_addr)
+    return;
+
+  char* libname = (char*)(data + module_name_addr);
+  uint32 exports_ptr_addr = pe_rva_to_offset(data, exports->AddressOfFunctions);
+  for (int i = 0; i < exports->NumberOfFunctions; i++)
+  {
+    auto func_ord = exports->Base + i;
+    auto func_va = *(uint32*)(data + exports_ptr_addr + (i * 4));
+    if (!func_va)
+      continue;
+
+    func_va += base_address;
+    auto func_name = DoNameGen(libname, func_ord);
+
+    // Add to exports list & mark as func if inside a code section
+    qstring func_segmclass;
+    get_segm_class(&func_segmclass, getseg(func_va));
+
+    bool func_iscode = func_segmclass == "CODE";
+    add_entry(func_ord, func_va, func_name.c_str(), func_iscode);
+    if (func_iscode)
+      add_func(func_va); // make doubly sure it gets marked as code
+  }
+}
+
 bool pe_load(linput_t* li, uint8* data)
 {
   uint32* magic = (uint32*)data;
@@ -404,9 +453,12 @@ bool pe_load(linput_t* li, uint8* data)
     }
   }
 
-  // XEX3F uses PE headers to specify imports, so we'll try reading them if it has them...
+  // XEX3F uses PE headers to specify imports & exports, so we'll try reading them if it has them...
   if (nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
     pe_load_imports(data);
+
+  if (nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size)
+    pe_load_exports(data);
 
   if (entry_point)
     add_entry(0, entry_point, "start", 1);

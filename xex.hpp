@@ -577,5 +577,19 @@ typedef struct _IMAGE_IMPORT_DESCRIPTOR {
   uint32 ForwarderChain; // Forwarder chain ID
   uint32 Name; // Module name
   uint32 FirstThunk; // RVA to IAT (if bound this IAT has actual addresses)
-} IMAGE_IMPORT_DESCRIPTOR;
-typedef IMAGE_IMPORT_DESCRIPTOR *PIMAGE_IMPORT_DESCRIPTOR;
+} IMAGE_IMPORT_DESCRIPTOR, *PIMAGE_IMPORT_DESCRIPTOR;
+
+typedef struct _IMAGE_EXPORT_DIRECTORY
+{
+  uint32 Characteristics;
+  uint32 TimeDateStamp;
+  uint16 MajorVersion;
+  uint16 MinorVersion;
+  uint32 Name;
+  uint32 Base;
+  uint32 NumberOfFunctions;
+  uint32 NumberOfNames;
+  uint32 AddressOfFunctions;
+  uint32 AddressOfNames;
+  uint32 AddressOfNameOrdinals;
+} IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
