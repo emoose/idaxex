@@ -96,6 +96,8 @@ public:
 
   bool Read(void* file);
 
+  static bool VerifyBaseFileHeader(const uint8_t* data);
+
   const xex::XexHeader& header() { return xex_header_; }
   uint32_t base_address() { return base_address_; }
   uint32_t image_size() { return image_size_; }

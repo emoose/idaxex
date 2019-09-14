@@ -39,6 +39,15 @@ const char* key_names[4] = {
   "devkit-XEX1"
 };
 
+bool XEXFile::VerifyBaseFileHeader(const uint8_t* data)
+{
+  // validate the basefiles magic, should either be a PE (with MZ signature)
+  // or an XUIZ resource file
+
+  // TODO: find out whether there's any other basefile formats?
+  return *(uint16_t*)data == EXE_MZ_SIGNATURE || *(uint32_t*)data == MAGIC_XUIZ;
+}
+
 bool XEXFile::Read(void* file)
 {
   seek(file, 0, SEEK_END);
@@ -513,9 +522,8 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
       read(pe_data_.data(), 1, 0x10, file);
       AES_ECB_decrypt(&aes, pe_data_.data());
 
-      // Check MZ signature
-      uint16 pe_sig = *(uint16*)pe_data_.data();
-      if (pe_sig != EXE_MZ_SIGNATURE)
+      // Check basefile header
+      if (!VerifyBaseFileHeader(pe_data_.data()))
       {
         pe_data_.clear();
         delete[] xex_blocks;
@@ -568,6 +576,11 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   // LZX init...
   LZXinit(compression_info.WindowSize);
   uint8* comp_buffer = (uint8*)malloc(0x9800); // 0x9800 = max comp. block size (0x8000) + MAX_GROWTH (0x1800)
+  if (!comp_buffer)
+  {
+    dbgmsg("[!] Error: failed to allocate decompression buffer!?\n");
+    return false;
+  }
 
   uint32_t size_left = image_size_;
   uint32_t size_done = 0;
@@ -639,6 +652,9 @@ end:
     free(block_data);
 
   free(comp_buffer);
+
+  if (retcode != 0)
+    dbgmsg("[!] read_basefile_decompressed error code = %d!\n", retcode);
 
   return retcode == 0;
 }
@@ -824,7 +840,7 @@ bool XEXFile::read_basefile(void* file, int key_index)
   }
 
   key_index_ = key_index;
-  if (key_index == 0)
+  if (key_index == 0) // only print this on first invocation of read_basefile
   {
     char* format = "Raw";
     if (comp_format == xex_opt::XexDataFormat::Compressed)
@@ -856,11 +872,14 @@ bool XEXFile::read_basefile(void* file, int key_index)
   else if (comp_format == xex_opt::XexDataFormat::Compressed)
     result = read_basefile_compressed(file, enc_flag);
   else
-    result = false; // TODO: alert user
+  {
+    dbgmsg("[!] Error: XEX uses invalid compression format %hd!\n", (uint16_t)comp_format);
+    result = false;
+  }
 
   // if reading was "successful", validate the basefiles magic
   if (result)
-    return *(uint16*)pe_data_.data() == EXE_MZ_SIGNATURE || *(uint32*)pe_data_.data() == MAGIC_XUIZ;
+    return VerifyBaseFileHeader(pe_data_.data());
 
   return result;
 }
