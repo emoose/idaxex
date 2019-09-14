@@ -1,0 +1,46 @@
+#pragma once
+
+// XEX header types
+#define XEX_HEADER_STRUCT(key, struct)    (((key) << 8) | (sizeof (struct) >> 2))
+#define XEX_HEADER_FIXED_SIZE(key, size)  (((key) << 8) | ((size) >> 2))
+#define XEX_HEADER_ULONG(key)             (((key) << 8) | 1)
+#define XEX_HEADER_FLAG(key)              ((key) << 8)
+#define XEX_HEADER_SIZEDSTRUCT(key)       (((key) << 8) | 0xFF)
+#define XEX_HEADER_STRING_FIELD(key)      XEX_HEADER_SIZEDSTRUCT(key)
+
+// XEX header IDs (todo: tidy up, add missing IDs?)
+#define XEX_FILE_DATA_DESCRIPTOR_HEADER   XEX_HEADER_SIZEDSTRUCT(3)
+
+#define XEX_PATCH_FILE_BASE_REFERENCE     XEX_HEADER_FIXED_SIZE(4, 20)
+
+#define XEX_HEADER_DELTA_PATCH_DESCRIPTOR XEX_HEADER_SIZEDSTRUCT(5)
+
+#define XEX_HEADER_BOUND_PATH             XEX_HEADER_STRING_FIELD(0x0080)
+
+#define XEX_HEADER_ORIGINAL_BASE_ADDRESS  XEX_HEADER_ULONG(0x0100)
+
+#define XEX_HEADER_ENTRY_POINT            XEX_HEADER_FLAG(0x0101)
+
+#define XEX_HEADER_PE_BASE                XEX_HEADER_ULONG(0x0102)
+
+#define XEX_HEADER_IMPORTS                XEX_HEADER_SIZEDSTRUCT(0x0103)
+#define XEX_BETAHEADER_IMPORTS            XEX_HEADER_SIZEDSTRUCT(0x0102)
+
+#define XEX_HEADER_BUILD_VERSIONS         XEX_HEADER_SIZEDSTRUCT(0x0200)
+
+#define XEX_HEADER_PE_MODULE_NAME         XEX_HEADER_STRING_FIELD(0x0183)
+
+#define XEX_HEADER_STACK_SIZE             XEX_HEADER_FLAG(0x0202)
+#define XEX_HEADER_FSCACHE_SIZE           XEX_HEADER_ULONG(0x203)
+#define XEX_HEADER_XAPI_HEAP_SIZE         XEX_HEADER_ULONG(0x0204)
+#define XEX_HEADER_WORKSPACE_SIZE         XEX_HEADER_ULONG(0x0402)
+
+#define XEX_HEADER_PRIVILEGES             XEX_HEADER_FLAG(0x0300)
+#define XEX_HEADER_PRIVILEGES_32          XEX_HEADER_FLAG(0x0301) // privilege IDs 32 onward
+#define XEX_HEADER_PRIVILEGES_64          XEX_HEADER_FLAG(0x0302) // privilege IDs 64 onward
+
+#define XEX_HEADER_EXECUTION_ID           XEX_HEADER_STRUCT(0x400, xex_opt::XexExecutionId)
+#define XEX_HEADER_SECTION_TABLE          XEX_HEADER_SIZEDSTRUCT(0x0002)
+#define XEX_HEADER_VITAL_STATS            XEX_HEADER_STRUCT(0x0180, xex_opt::XexVitalStats)
+
+#define XEX_HEADER_CALLCAP_IMPORTS        XEX_HEADER_STRUCT(0x0181, xex_opt::XexCallcapImports)
