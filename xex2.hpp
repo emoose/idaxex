@@ -81,9 +81,9 @@ class XEXFile
   bool read_basefile_uncompressed(void* file, bool encrypted);
   bool read_basefile_compressed(void* file, bool encrypted);
 
-  bool pe_load(uint8* data);
-  bool pe_load_imports(uint8* data);
-  bool pe_load_exports(uint8* data);
+  bool pe_load(const uint8_t* data);
+  bool pe_load_imports(const uint8_t* data);
+  bool pe_load_exports(const uint8_t* data);
   uint32_t pe_rva_to_offset(uint32_t rva);
 
 public:
