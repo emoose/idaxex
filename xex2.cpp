@@ -47,11 +47,11 @@ bool XEXFile::Read(void* file)
 
   read(&xex_header_, sizeof(xex::XexHeader), 1, file);
   *(uint32*)&xex_header_.ModuleFlags = 
-		swap32(*(uint32*)&xex_header_.ModuleFlags);
+    swap32(*(uint32*)&xex_header_.ModuleFlags);
 
   if (xex_header_.Magic != MAGIC_XEX2 && xex_header_.Magic != MAGIC_XEX1 && 
-		xex_header_.Magic != MAGIC_XEX25 && xex_header_.Magic != MAGIC_XEX2D && 
-		xex_header_.Magic != MAGIC_XEX3F)
+    xex_header_.Magic != MAGIC_XEX25 && xex_header_.Magic != MAGIC_XEX2D && 
+    xex_header_.Magic != MAGIC_XEX3F)
     return false;
 
   // Read in XEX header section
@@ -70,7 +70,7 @@ bool XEXFile::Read(void* file)
     image_size_ = xex_header_.HeaderDirectoryEntryCount;
     read(&xex_header_.HeaderDirectoryEntryCount, sizeof(uint32), 1, file);
 
-		// XEX3F has base address here instead of securityinfo offset
+    // XEX3F has base address here instead of securityinfo offset
     base_address_ = xex_header_.SecurityInfo;
   }
 
@@ -122,7 +122,7 @@ bool XEXFile::Read(void* file)
   if (!read_basefile(file, 0) && !read_basefile(file, 1) && !read_basefile(file, 2) && !read_basefile(file, 3))
     return false;
 
-	// Basefile seems to have read fine, try reading the PE headers
+  // Basefile seems to have read fine, try reading the PE headers
   if (!pe_load(pe_data_.data()))
     return false;
 
