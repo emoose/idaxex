@@ -15,6 +15,9 @@
 typedef size_t(*read_fn)(void* buffer, size_t element_size, size_t element_count, void* file);
 typedef int(*seek_fn)(void* file, long long offset, int origin);
 typedef long long(*tell_fn)(void* file);
+typedef int(*dbgmsg_fn)(const char* format, ...);
+
+int stdio_msg(const char* format, ...); // xex2.cpp
 
 struct XEXFunction
 {
@@ -28,6 +31,7 @@ class XEXFile
   read_fn read;
   seek_fn seek;
   tell_fn tell;
+  dbgmsg_fn dbgmsg;
 
   uint32_t data_length_; // length of file data (filesize - headersize)
 
@@ -85,7 +89,7 @@ class XEXFile
 public:
   XEXFile() { 
 #if fread != dont_use_fread
-    read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64;
+    read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64; dbgmsg = stdio_msg;
 #endif
   }
   void use_ida_io();

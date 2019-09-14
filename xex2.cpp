@@ -258,7 +258,7 @@ bool XEXFile::read_imports(void* file)
         *(uint32*)(pe_data() + record_offset + 4) = swap32(0x38800000 | ordinal);
       }
       else // todo: fix this
-        msg("[+] %s import %d (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, record_addr, record_type);
+        dbgmsg("[+] %s import %d (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, record_addr, record_type);
 
       imports_[libname][ordinal] = imp;
     }
@@ -277,7 +277,7 @@ bool XEXFile::read_imports(void* file)
     if (!callcap.BeginFunctionThunkAddress || !callcap.EndFunctionThunkAddress)
       return true;
 
-    msg("[+] Naming callcap imports... (0x%X - 0x%X)\n", callcap.BeginFunctionThunkAddress, callcap.EndFunctionThunkAddress);
+    dbgmsg("[+] Naming callcap imports... (0x%X - 0x%X)\n", callcap.BeginFunctionThunkAddress, callcap.EndFunctionThunkAddress);
     for (uint32_t i = callcap.BeginFunctionThunkAddress; i < callcap.EndFunctionThunkAddress + 0x10; i += 0x10)
     {
       uint32_t import_offset = pe_rva_to_offset(i);
@@ -295,7 +295,7 @@ bool XEXFile::read_imports(void* file)
       // Sanity check the callcap info, values from first dword should match values in second
       if (ordinal_1 != ordinal_2 || moduleidx_1 != moduleidx_2)
       {
-        msg("[!] Invalid callcap at 0x%X ?", i);
+        dbgmsg("[!] Invalid callcap at 0x%X ?", i);
         continue;
       }
 
@@ -337,11 +337,11 @@ bool XEXFile::read_exports(void* file)
     export_table.Magic[1] != XEX_EXPORT_MAGIC_1 ||
     export_table.Magic[2] != XEX_EXPORT_MAGIC_2)
   {
-    msg("[+] Export table magic is invalid! (0x%X 0x%X 0x%X)\n", export_table.Magic[0], export_table.Magic[1], export_table.Magic[2]);
+    dbgmsg("[+] Export table magic is invalid! (0x%X 0x%X 0x%X)\n", export_table.Magic[0], export_table.Magic[1], export_table.Magic[2]);
     return false;
   }
 
-  msg("[+] Loading module exports...\n");
+  dbgmsg("[+] Loading module exports...\n");
   char module_name[256];
   get_root_filename(module_name, 256);
 
@@ -834,14 +834,14 @@ bool XEXFile::read_basefile(void* file, int key_index)
     else if (comp_format == xex_opt::XexDataFormat::Raw)
       format = "Not Compressed";
 
-    msg("[+] %s\n", format);
-    msg("[+] %s\n", (enc_flag != 0) ? "Encrypted" : "Not Encrypted");
+    dbgmsg("[+] %s\n", format);
+    dbgmsg("[+] %s\n", (enc_flag != 0) ? "Encrypted" : "Not Encrypted");
   }
 
   // Setup session key
   if (enc_flag)
   {
-    msg("[+] Attempting decrypt with %s key...\n", key_names[key_index]);
+    dbgmsg("[+] Attempting decrypt with %s key...\n", key_names[key_index]);
     memcpy(session_key_, image_key_, 0x10);
     AES_ctx key_ctx;
     AES_init_ctx(&key_ctx, key_bytes[key_index]);
@@ -870,9 +870,24 @@ size_t idaread(void* buffer, size_t element_size, size_t element_count, void* fi
   return qlread((linput_t*)file, buffer, element_size * element_count);
 }
 
+int stdio_msg(const char* format, ...)
+{
+  va_list argp;
+  va_start(argp, format);
+
+  int retval = vprintf(format, argp);
+
+  va_end(argp);
+
+  return retval;
+}
+
 void XEXFile::use_ida_io()
 {
+#if fread == dont_use_fread
   read = idaread;
   seek = (seek_fn)qlseek;
   tell = (tell_fn)qltell;
+  dbgmsg = msg;
+#endif
 }
