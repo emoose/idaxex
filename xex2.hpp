@@ -30,39 +30,39 @@ struct XEXFunction
 class XEXFile
 {
   // IO function pointers
-  read_fn read;
-  seek_fn seek;
-  tell_fn tell;
-  dbgmsg_fn dbgmsg;
+  read_fn read = nullptr;
+  seek_fn seek = nullptr;
+  tell_fn tell = nullptr;
+  dbgmsg_fn dbgmsg = nullptr;
 
-  uint32_t data_length_; // length of file data (filesize - headersize)
+  uint32_t data_length_ = 0; // length of file data (filesize - headersize)
 
   xex::XexHeader xex_header_;
   std::map<uint32_t, uint32_t> directory_entries_;
 
-  int key_index_;
+  int key_index_ = -1;
   uint8_t session_key_[0x10];
 
   std::vector<uint8_t> xex_headers_;
   std::vector<uint8_t> pe_data_;
 
   // Values from SecurityInfo
-  xe::be<uint32_t> image_size_;
+  xe::be<uint32_t> image_size_ = 0;
   uint8_t image_key_[0x10];
   xe::be<xex::GameRegion> game_regions_;
   xex::ImageFlags image_flags_;
   xex::AllowedMediaTypes media_types_;
-  xe::be<uint32_t> base_address_;
-  xe::be<uint32_t> export_table_va_;
+  xe::be<uint32_t> base_address_ = 0;
+  xe::be<uint32_t> export_table_va_ = 0;
 
   // Values of various optional headers
-  xe::be<uint32_t> entry_point_;
-  xex_opt::XexFileDataDescriptor* data_descriptor_;
+  xe::be<uint32_t> entry_point_ = 0;
+  xex_opt::XexFileDataDescriptor* data_descriptor_ = nullptr;
   xex_opt::XexPrivileges privileges_;
   xex_opt::XexPrivileges32 privileges32_;
-  xex_opt::XexExecutionId* execution_id_;
-  xex_opt::XexVitalStats* vital_stats_;
-  xex_opt::XexTlsData* tls_data_;
+  xex_opt::XexExecutionId* execution_id_ = nullptr;
+  xex_opt::XexVitalStats* vital_stats_ = nullptr;
+  xex_opt::XexTlsData* tls_data_ = nullptr;
 
   // Imports & Exports
   std::vector<xex_opt::XexImageLibraryVersion> libraries_;
@@ -77,6 +77,7 @@ class XEXFile
   // Sections from PE headers (includes XEX sections above)
   std::vector<IMAGE_SECTION_HEADER> sections_;
 
+  // Note: "void* file" below is a pointer to a FILE object, not to raw file data!
   bool read_imports(void* file);
   bool read_exports(void* file);
 
@@ -93,6 +94,7 @@ class XEXFile
   uint32_t pe_rva_to_offset(uint32_t rva);
 
 public:
+  // Verifies if the basefile is a valid, supported kind of basefile format
   static bool VerifyBaseFileHeader(const uint8_t* data);
 
   XEXFile() { 
@@ -100,9 +102,12 @@ public:
     read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64; dbgmsg = stdio_msg;
 #endif
   }
+
+  // Sets our IO function pointers to use IDA's IO functions
   void use_ida_io();
 
-  bool Read(void* file);
+  // Loads in the XEX - note that "file" should be a FILE object, not a pointer to raw data!
+  bool load(void* file);
 
   const xex::XexHeader& header() { return xex_header_; }
   uint32_t base_address() { return base_address_; }
@@ -121,6 +126,9 @@ public:
   std::map<std::string, xex_opt::XexImportTable>& import_tables() { return import_tables_; }
   const std::string& exports_libname() { return exports_libname_; }
 
+  // Returns value of an optional header, if exists
   uint32_t opt_header(uint32_t id);
+
+  // Returns pointer to an optional headers value, if exists
   void* opt_header_ptr(uint32_t id);
 };

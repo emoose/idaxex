@@ -169,7 +169,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
   XEXFile file;
   file.use_ida_io();
-  bool result = file.Read(li);
+  bool result = file.load(li);
   if (result)
   {
     pe_add_sections(file);

@@ -43,7 +43,6 @@ const char* key_names[4] = {
   "devkit-XEX1"
 };
 
-// Verifies if the basefile is a valid, supported kind of basefile format
 bool XEXFile::VerifyBaseFileHeader(const uint8_t* data)
 {
   // validate the basefiles magic, should either be a PE (with MZ signature)
@@ -53,8 +52,7 @@ bool XEXFile::VerifyBaseFileHeader(const uint8_t* data)
   return *(uint16_t*)data == EXE_MZ_SIGNATURE || *(uint32_t*)data == MAGIC_XUIZ;
 }
 
-// Tries reading the entire XEX file into memory, including the decrypted/decompressed basefile & import/export information
-bool XEXFile::Read(void* file)
+bool XEXFile::load(void* file)
 {
   seek(file, 0, SEEK_END);
   auto fsize = tell(file);
@@ -829,7 +827,6 @@ uint32_t XEXFile::pe_rva_to_offset(uint32_t rva)
   return 0;
 }
 
-// Retrieves the value of the given optional header ID
 uint32_t XEXFile::opt_header(uint32_t id)
 {
   if (!directory_entries_.count(id))
@@ -838,7 +835,6 @@ uint32_t XEXFile::opt_header(uint32_t id)
   return directory_entries_[id];
 }
 
-// Retrieves the value of the given optional header ID, as a pointer to the value
 void* XEXFile::opt_header_ptr(uint32_t id)
 {
   auto val = opt_header(id);
@@ -928,7 +924,6 @@ int stdio_msg(const char* format, ...)
   return retval;
 }
 
-// Sets our IO function pointers to use IDA's IO functions
 void XEXFile::use_ida_io()
 {
 #if fread == dont_use_fread
