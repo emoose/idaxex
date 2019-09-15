@@ -123,6 +123,9 @@ bool XEXFile::Read(void* file)
     *(uint32_t*)&execution_id_->Version = swap32(*(uint32_t*)&execution_id_->Version);
   }
 
+  vital_stats_ = reinterpret_cast<xex_opt::XexVitalStats*>(opt_header_ptr(XEX_HEADER_VITAL_STATS));
+  tls_data_ = reinterpret_cast<xex_opt::XexTlsData*>(opt_header_ptr(XEX_HEADER_TLS_DATA));
+
   data_descriptor_ = reinterpret_cast<xex_opt::XexFileDataDescriptor*>(opt_header_ptr(XEX_FILE_DATA_DESCRIPTOR_HEADER));
 
   auto libs = reinterpret_cast<xex_opt::XexImageLibraryVersions*>(opt_header_ptr(XEX_HEADER_BUILD_VERSIONS));
