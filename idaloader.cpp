@@ -213,12 +213,13 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       auto exp_name = DoNameGen(exports_libname, exp.first);
       auto exp_addr = exp.second.FuncAddr;
 
-      // Add to exports list & mark as func if inside a code section
+      // Mark as func export if inside a code section
       qstring func_segmclass;
       get_segm_class(&func_segmclass, getseg(exp_addr));
 
       bool func_iscode = func_segmclass == "CODE";
       add_entry(exp.first, exp_addr, exp_name.c_str(), func_iscode);
+
       if (func_iscode)
         add_func(exp_addr); // make doubly sure it gets marked as code
     }
