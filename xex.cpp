@@ -2,7 +2,6 @@
 #include "xex.hpp"
 #include "xex_headerids.hpp"
 #include <cstdio>
-#include <algorithm>
 
 #include "aes.hpp"
 #include "lzx/lzx.hpp"
@@ -80,11 +79,11 @@ bool XEXFile::load(void* file)
   {
     // XEX3F has some unknown data (imagesize?) in place of the directory entry count
     // directory count comes after that data, so read it into that datas place
-    image_size_ = xex_header_.HeaderDirectoryEntryCount;
+    security_info_.ImageSize = xex_header_.HeaderDirectoryEntryCount;
     read(&xex_header_.HeaderDirectoryEntryCount, sizeof(uint32_t), 1, file);
 
     // XEX3F has base address here instead of securityinfo offset
-    base_address_ = xex_header_.SecurityInfo;
+    security_info_.ImageInfo.LoadAddress = xex_header_.SecurityInfo;
   }
 
   // Read in directory entry / optional header keyvalues
@@ -106,7 +105,7 @@ bool XEXFile::load(void* file)
 
   // Read various optional headers
   if (directory_entries_.count(XEX_HEADER_PE_BASE))
-    base_address_ = directory_entries_[XEX_HEADER_PE_BASE];
+    opt_base_address_ = directory_entries_[XEX_HEADER_PE_BASE];
 
   if (directory_entries_.count(XEX_HEADER_ENTRY_POINT))
     entry_point_ = directory_entries_[XEX_HEADER_ENTRY_POINT];
@@ -169,7 +168,7 @@ bool XEXFile::load(void* file)
 
       IMAGE_SECTION_HEADER pe_sec;
       pe_sec.Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ;
-      pe_sec.VirtualAddress = section.VirtualAddress - base_address_;
+      pe_sec.VirtualAddress = section.VirtualAddress - base_address();
       pe_sec.VirtualSize = section.VirtualSize;
       pe_sec.SizeOfRawData = section.VirtualSize;
       memcpy(pe_sec.Name, section.SectionName, 8);
@@ -360,10 +359,10 @@ bool XEXFile::read_imports(void* file)
 // Reads function info defined inside XEX export table
 bool XEXFile::read_exports(void* file)
 {
-  if (!export_table_va_)
+  if (!security_info_.ImageInfo.ExportTableAddress)
     return false;
 
-  auto export_table_offset = pe_rva_to_offset(export_table_va_);
+  auto export_table_offset = pe_rva_to_offset(security_info_.ImageInfo.ExportTableAddress);
   xex_opt::HvImageExportTable export_table;
   memcpy(&export_table, pe_data() + export_table_offset, sizeof(xex_opt::HvImageExportTable));
 
@@ -379,7 +378,7 @@ bool XEXFile::read_exports(void* file)
   char module_name[256];
   get_root_filename(module_name, 256);
 
-  auto ordinal_addrs_va = export_table_va_ + sizeof(xex_opt::HvImageExportTable);
+  auto ordinal_addrs_va = security_info_.ImageInfo.ExportTableAddress + sizeof(xex_opt::HvImageExportTable);
   auto ordinal_addrs_offset = export_table_offset + sizeof(xex_opt::HvImageExportTable);
   for (int i = 0; i < export_table.Count; i++)
   {
@@ -403,91 +402,82 @@ bool XEXFile::read_exports(void* file)
   return true;
 }
 
-// Reads in fields we care about from the various SecurityInfo versions
+// Reads in the different XEX formats SecurityInfo into the XEX2 SecurityInfo struct
 bool XEXFile::read_secinfo(void* file)
 {
-  if (xex_header_.Magic == MAGIC_XEX3F)
+  auto magic = xex_header_.Magic;
+
+  if (magic == MAGIC_XEX3F)
     return false; // XEX3F doesn't have securityinfo header!
 
-  // ImageSize - always at SecurityInfo[0x4]
-  seek(file, xex_header_.SecurityInfo + 4, 0);
-  read(&image_size_, sizeof(uint32_t), 1, file);
-
-  // ImageKey
-  if (xex_header_.Magic != MAGIC_XEX2D)
+  if (magic == MAGIC_XEX2)
   {
-    std::map<uint32_t, size_t> offs_ImageKey = {
-      {MAGIC_XEX2, offsetof(xex2::SecurityInfo, ImageInfo.ImageKey)},
+    seek(file, xex_header_.SecurityInfo, 0);
+    read(&security_info_, sizeof(xex2::SecurityInfo), 1, file);
+    return true;
+  }
+
+  // Not an XEX2 - have to "convert" them into XEX2's securityinfo format
+
+  // SecurityInfo.Size - always at SecurityInfo[0]
+  seek(file, xex_header_.SecurityInfo, 0);
+  read(&security_info_.Size, sizeof(uint32_t), 1, file);
+
+  // SecurityInfo.ImageSize - mostly at SecurityInfo[4]
+  if (magic != MAGIC_XEX2D)
+  {
+    seek(file, xex_header_.SecurityInfo + 4, 0);
+    read(&security_info_.ImageSize, sizeof(uint32_t), 1, file);
+  }
+
+  // Read fields common to all XEX versions
+  // TODO: find some nicer way to handle all this!
+  std::map<uint32_t, size_t> offsets;
+
+  {
+#define READ_FIELD(n, sz) offsets = { \
+    {MAGIC_XEX1, offsetof(xex1::SecurityInfo, n)}, \
+    {MAGIC_XEX25, offsetof(xex25::SecurityInfo, n)}, \
+    {MAGIC_XEX2D, offsetof(xex2d::SecurityInfo, n)}, \
+  }; \
+  seek(file, xex_header_.SecurityInfo + offsets[magic], 0); \
+  read(&security_info_.##n, sz, 1, file);
+    READ_FIELD(ImageInfo.Signature, 0x100);
+    READ_FIELD(ImageInfo.ImageFlags, sizeof(uint32_t));
+    READ_FIELD(ImageInfo.LoadAddress, sizeof(uint32_t));
+    READ_FIELD(ImageInfo.ImageHash, 0x14);
+    READ_FIELD(ImageInfo.ImportDigest, 0x14);
+    READ_FIELD(ImageInfo.ExportTableAddress, sizeof(uint32_t));
+
+    READ_FIELD(AllowedMediaTypes, sizeof(xex::AllowedMediaTypes));
+    READ_FIELD(PageDescriptorCount, sizeof(uint32_t));
+#undef READ_FIELD
+  }
+
+  // Read ImageInfo.ImageKey - special case as XEX2D doesn't include this field
+  if (magic == MAGIC_XEX2D)
+    memset(security_info_.ImageInfo.ImageKey, 0, 0x10);
+  else
+  {
+    offsets = {
       {MAGIC_XEX1, offsetof(xex1::SecurityInfo, ImageInfo.ImageKey)},
-      {MAGIC_XEX25, offsetof(xex25::SecurityInfo, ImageInfo.ImageKey)}
+      {MAGIC_XEX25, offsetof(xex25::SecurityInfo, ImageInfo.ImageKey)},
     };
-
-    seek(file, xex_header_.SecurityInfo + offs_ImageKey[xex_header_.Magic], 0);
-    read(image_key_, 1, 0x10, file);
+    seek(file, xex_header_.SecurityInfo + offsets[magic], 0);
+    read(&security_info_.ImageInfo.ImageKey, 1, 0x10, file);
   }
 
-  // LoadAddress
-  std::map<uint32_t, size_t> offs_LoadAddress = {
-    {MAGIC_XEX2, offsetof(xex2::SecurityInfo, ImageInfo.LoadAddress)},
-    {MAGIC_XEX1, offsetof(xex1::SecurityInfo, ImageInfo.LoadAddress)},
-    {MAGIC_XEX25, offsetof(xex25::SecurityInfo, ImageInfo.LoadAddress)},
-    {MAGIC_XEX2D, offsetof(xex2d::SecurityInfo, ImageInfo.LoadAddress)}
-  };
-
-  seek(file, xex_header_.SecurityInfo + offs_LoadAddress[xex_header_.Magic], 0);
-  read(&base_address_, sizeof(uint32_t), 1, file);
-
-  // ExportTableAddress
-  std::map<uint32_t, size_t> offs_ExportTableAddress = {
-    {MAGIC_XEX2, offsetof(xex2::SecurityInfo, ImageInfo.ExportTableAddress)},
-    {MAGIC_XEX1, offsetof(xex1::SecurityInfo, ImageInfo.ExportTableAddress)},
-    {MAGIC_XEX25, offsetof(xex25::SecurityInfo, ImageInfo.ExportTableAddress)},
-    {MAGIC_XEX2D, offsetof(xex2d::SecurityInfo, ImageInfo.ExportTableAddress)}
-  };
-
-  seek(file, xex_header_.SecurityInfo + offs_ExportTableAddress[xex_header_.Magic], 0);
-  read(&export_table_va_, sizeof(uint32_t), 1, file);
-
-  // ImageFlags
-  std::map<uint32_t, size_t> offs_ImageFlags = {
-    {MAGIC_XEX2, offsetof(xex2::SecurityInfo, ImageInfo.ImageFlags)},
-    {MAGIC_XEX1, offsetof(xex1::SecurityInfo, ImageInfo.ImageFlags)},
-    {MAGIC_XEX25, offsetof(xex25::SecurityInfo, ImageInfo.ImageFlags)},
-    {MAGIC_XEX2D, offsetof(xex2d::SecurityInfo, ImageInfo.ImageFlags)}
-  };
-
-  seek(file, xex_header_.SecurityInfo + offs_ImageFlags[xex_header_.Magic], 0);
-  read(&image_flags_, sizeof(uint32_t), 1, file);
-  *(uint32_t*)&image_flags_ = swap32(*(uint32_t*)&image_flags_);
-
-  // GameRegion
-  std::map<uint32_t, size_t> offs_GameRegion = {
-    {MAGIC_XEX2, offsetof(xex2::SecurityInfo, ImageInfo.GameRegion)},
-    {MAGIC_XEX1, offsetof(xex1::SecurityInfo, ImageInfo.GameRegion)},
-    {MAGIC_XEX25, 0},
-    {MAGIC_XEX2D, 0}
-  };
-
-  uint32_t tmp = 0;
-  if (offs_GameRegion[xex_header_.Magic])
+  // Read fields only shared between XEX1 & XEX2
+  if (magic == MAGIC_XEX1)
   {
-    seek(file, xex_header_.SecurityInfo + offs_GameRegion[xex_header_.Magic], 0);
-    read(&tmp, sizeof(uint32_t), 1, file);
-    tmp = swap32(tmp);
+    auto offset_mediaId = offsetof(xex1::SecurityInfo, ImageInfo.MediaID);
+    seek(file, xex_header_.SecurityInfo + offset_mediaId, 0);
+    read(&security_info_.ImageInfo.MediaID, 0x10, 1, file);
+
+    auto offset_gameRegion = offsetof(xex1::SecurityInfo, ImageInfo.GameRegion);
+    seek(file, xex_header_.SecurityInfo + offset_gameRegion, 0);
+    read(&security_info_.ImageInfo.GameRegion, sizeof(xex::GameRegion), 1, file);
   }
-  *(uint32_t*)&game_regions_ = tmp;
-
-  // AllowedMediaTypes
-  std::map<uint32_t, size_t> offs_AllowedMediaTypes = {
-    {MAGIC_XEX2, offsetof(xex2::SecurityInfo, AllowedMediaTypes)},
-    {MAGIC_XEX1, offsetof(xex1::SecurityInfo, AllowedMediaTypes)},
-    {MAGIC_XEX25, offsetof(xex25::SecurityInfo, AllowedMediaTypes)},
-    {MAGIC_XEX2D, offsetof(xex2d::SecurityInfo, AllowedMediaTypes)}
-  };
-
-  seek(file, xex_header_.SecurityInfo + offs_AllowedMediaTypes[xex_header_.Magic], 0);
-  read(&media_types_, sizeof(uint32_t), 1, file);
-  *(uint32_t*)&media_types_ = swap32(*(uint32_t*)&media_types_);
 
   return true;
 }
@@ -495,7 +485,7 @@ bool XEXFile::read_secinfo(void* file)
 // Reads (and optionally decrypts) the basefile from the XEX in "raw" format
 bool XEXFile::read_basefile_raw(void* file, bool encrypted)
 {
-  pe_data_.resize(std::max(data_length_, swap32(image_size_.value)));
+  pe_data_.resize(image_size());
 
   seek(file, xex_header_.SizeOfHeaders, 0);
   read(pe_data_.data(), 1, data_length_, file);
@@ -536,7 +526,7 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
   if (encrypted)
     AES_init_ctx_iv(&aes, session_key_, iv);
 
-  pe_data_.resize(image_size_);
+  pe_data_.resize(image_size());
   uint32_t position = 0;
   seek(file, xex_header_.SizeOfHeaders, 0);
   for (int i = 0; i < num_blocks; i++)
@@ -600,7 +590,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   auto* cur_block = &compression_info.FirstDescriptor;
 
   // Alloc memory for the PE
-  pe_data_.resize(image_size_);
+  pe_data_.resize(image_size());
 
   // LZX init...
   LZXinit(compression_info.WindowSize);
@@ -611,7 +601,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
     return false;
   }
 
-  uint32_t size_left = image_size_;
+  uint32_t size_left = image_size();
   uint32_t size_done = 0;
   int retcode = 0;
 
@@ -731,7 +721,7 @@ bool XEXFile::pe_load_imports(const uint8_t* data)
       if (imports_[libname].count(ordinal))
         imp = imports_[libname][ordinal];
 
-      imp.ThunkAddr = base_address_ + import_desc->FirstThunk + import_offset;
+      imp.ThunkAddr = base_address() + import_desc->FirstThunk + import_offset;
 
       imports_[libname][ordinal] = imp;
       import_offset += 4;
@@ -775,12 +765,12 @@ bool XEXFile::pe_load_exports(const uint8_t* data)
     if (exports_.count(ordinal))
       exp = exports_[ordinal];
 
-    exp.ThunkAddr = base_address_ + exports_desc->AddressOfFunctions + (i * 4);
+    exp.ThunkAddr = base_address() + exports_desc->AddressOfFunctions + (i * 4);
     exp.FuncAddr = *(uint32*)(data + exports_ptr_addr + (i * 4));
     if (!exp.FuncAddr)
       continue;
 
-    exp.FuncAddr += base_address_;
+    exp.FuncAddr += base_address();
 
     exports_[ordinal] = exp;
   }
@@ -800,11 +790,11 @@ bool XEXFile::pe_load(const uint8_t* data)
     return false;
 
   // Get base address/entrypoint from optionalheader if we don't already have them
-  if (!base_address_)
-    base_address_ = nt_header->OptionalHeader.ImageBase;
+  if (!base_address())
+    opt_base_address_ = nt_header->OptionalHeader.ImageBase;
 
   if (!entry_point_)
-    entry_point_ = base_address_ + nt_header->OptionalHeader.AddressOfEntryPoint;
+    entry_point_ = base_address() + nt_header->OptionalHeader.AddressOfEntryPoint;
 
   // Read in PE sections
   IMAGE_SECTION_HEADER* sects = (IMAGE_SECTION_HEADER*)(data +
@@ -829,8 +819,8 @@ bool XEXFile::pe_load(const uint8_t* data)
 // Converts an RVA into a file offset
 uint32_t XEXFile::pe_rva_to_offset(uint32_t rva)
 {
-  if (rva > base_address_)
-    rva -= base_address_;
+  if (rva > base_address())
+    rva -= base_address();
   if (xex_header_.Magic != MAGIC_XEX3F)
     return rva; // all formats besides XEX3F seem to keep raw data lined up with in-memory PE?
 
@@ -895,7 +885,7 @@ bool XEXFile::read_basefile(void* file, int key_index)
   if (enc_flag)
   {
     dbgmsg("[+] Attempting decrypt with %s key...\n", key_names[key_index]);
-    memcpy(session_key_, image_key_, 0x10);
+    memcpy(session_key_, security_info_.ImageInfo.ImageKey, 0x10);
     AES_ctx key_ctx;
     AES_init_ctx(&key_ctx, key_bytes[key_index]);
     AES_ECB_decrypt(&key_ctx, session_key_);

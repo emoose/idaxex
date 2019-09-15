@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include <algorithm>
+
 #include "xex_optheaders.hpp"
 #include "pe_structs.hpp"
 
@@ -39,6 +41,7 @@ class XEXFile
 
   xex::XexHeader xex_header_;
   std::map<uint32_t, uint32_t> directory_entries_;
+  xex2::SecurityInfo security_info_;
 
   int key_index_ = -1;
   uint8_t session_key_[0x10];
@@ -46,16 +49,8 @@ class XEXFile
   std::vector<uint8_t> xex_headers_;
   std::vector<uint8_t> pe_data_;
 
-  // Values from SecurityInfo
-  xe::be<uint32_t> image_size_ = 0;
-  uint8_t image_key_[0x10];
-  xe::be<xex::GameRegion> game_regions_;
-  xex::ImageFlags image_flags_;
-  xex::AllowedMediaTypes media_types_;
-  xe::be<uint32_t> base_address_ = 0;
-  xe::be<uint32_t> export_table_va_ = 0;
-
   // Values of various optional headers
+  xe::be<uint32_t> opt_base_address_ = 0;
   xe::be<uint32_t> entry_point_ = 0;
   xex_opt::XexFileDataDescriptor* data_descriptor_ = nullptr;
   xex_opt::XexPrivileges privileges_;
@@ -111,8 +106,14 @@ public:
   bool load(void* file);
 
   const xex::XexHeader& header() { return xex_header_; }
-  uint32_t base_address() { return base_address_; }
-  uint32_t image_size() { return image_size_; }
+  const xex2::SecurityInfo& security_info() { return security_info_; }
+
+  uint32_t image_size() {
+    return std::max(data_length_, (uint32_t)security_info_.ImageSize);
+  }
+
+  uint32_t base_address() { return opt_base_address_ ? opt_base_address_ : security_info_.ImageInfo.LoadAddress; }
+  uint32_t opt_base_address() { return opt_base_address_; }
   uint32_t entry_point() { return entry_point_; }
 
   const uint8_t* xex_headers() { return xex_headers_.data(); }
