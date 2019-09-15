@@ -180,6 +180,24 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
     if (file.entry_point())
       add_entry(0, file.entry_point(), "start", 1);
 
+    auto pe_module_name = file.pe_module_name();
+    if (!pe_module_name.empty())
+      add_pgm_cmt("PE module name: %s", pe_module_name.c_str());
+
+    auto vital_stats = file.vital_stats();
+    if (vital_stats)
+    {
+      time_t timestamp = vital_stats->Timestamp;
+      char* timestamp_string = asctime(localtime(&timestamp));
+      if (timestamp_string)
+      {
+        timestamp_string[strlen(timestamp_string) - 1] = 0; // remove newline from timestamp_string
+        add_pgm_cmt("XEX timestamp: %s", timestamp_string);
+      }
+
+      add_pgm_cmt("XEX checksum: %x", vital_stats->Checksum);
+    }
+
     auto exports_libname = file.exports_libname();
     if (exports_libname.empty())
     {

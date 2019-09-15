@@ -64,6 +64,7 @@ class XEXFile
   xex_opt::XexVitalStats* vital_stats_ = nullptr;
   xex_opt::XexTlsData* tls_data_ = nullptr;
   std::vector<xex_opt::XexImageLibraryVersion> libraries_; // Versions of libraries this was linked against
+  std::string pe_module_name_ = "";
 
   // Imports & Exports
   std::map<std::string, std::map<uint32_t, XEXFunction>> imports_;
@@ -131,4 +132,7 @@ public:
 
   // Returns pointer to an optional headers value, if exists
   void* opt_header_ptr(uint32_t id);
+
+  const xex_opt::XexVitalStats* vital_stats() { return vital_stats_; }
+  const std::string& pe_module_name() { return pe_module_name_; }
 };

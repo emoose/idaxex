@@ -172,7 +172,7 @@ namespace xex_opt {
 
   struct XexVitalStats {
     xe::be<uint32_t> Checksum;
-    xe::be<__time32_t> Timestamp;
+    xe::be<uint32_t> Timestamp; // UNIX timestamp
   };
   static_assert(sizeof(XexVitalStats) == 8, "xex_opt::XexVitalStats");
 
@@ -253,4 +253,12 @@ namespace xex_opt {
     uint8_t Ratings[0x40];
   };
   static_assert(sizeof(XexGameRatings) == 0x40, "xex_opt::XexGameRatings");
+
+#pragma pack(push, 1)
+  struct XexStringHeader {
+    xe::be<uint32_t> Size;
+    char Data[1]; // should be null terminated hopefully
+  };
+  static_assert(sizeof(XexStringHeader) == 5, "xex_opt::XexStringHeader");
+#pragma pack(pop)
 };

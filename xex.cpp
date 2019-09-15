@@ -134,6 +134,22 @@ bool XEXFile::load(void* file)
       libraries_.push_back(libs->Libraries[i]);
   }
 
+  if (directory_entries_.count(XEX_HEADER_PE_MODULE_NAME))
+  {
+    auto* header = (xex_opt::XexStringHeader*)opt_header_ptr(XEX_HEADER_PE_MODULE_NAME);
+    if (header)
+    {
+      // Copy string and null terminate it ourselves, just in case
+      auto str = new char[header->Size + 1];
+      memcpy(str, header->Data, header->Size);
+      str[header->Size] = '\0';
+
+      pe_module_name_ = str;
+
+      delete[] str;
+    }
+  }
+
   // Try decrypting/decompressing the basefile
   if (!read_basefile(file, 0) && !read_basefile(file, 1) && !read_basefile(file, 2) && !read_basefile(file, 3))
     return false;
