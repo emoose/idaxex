@@ -99,9 +99,12 @@ void pe_add_sections(XEXFile& file)
         return; // no .XBLD
     }
 
-    uint32 sec_addr = file.header().Magic == 0x5845583F ? section.PointerToRawData : section.VirtualAddress;
+    uint32 sec_addr = file.header().Magic == MAGIC_XEX3F ? 
+      section.PointerToRawData : section.VirtualAddress;
+
     int sec_size = std::min(section.VirtualSize, section.SizeOfRawData);
 
+    // Size could be beyond file bounds, if so fix the size to what we can fit
     if (sec_addr + sec_size > file.image_size())
       sec_size = file.image_size() - sec_addr;
 

@@ -63,9 +63,9 @@ class XEXFile
   xex_opt::XexExecutionId* execution_id_ = nullptr;
   xex_opt::XexVitalStats* vital_stats_ = nullptr;
   xex_opt::XexTlsData* tls_data_ = nullptr;
+  std::vector<xex_opt::XexImageLibraryVersion> libraries_; // Versions of libraries this was linked against
 
   // Imports & Exports
-  std::vector<xex_opt::XexImageLibraryVersion> libraries_;
   std::map<std::string, std::map<uint32_t, XEXFunction>> imports_;
   std::map<uint32_t, XEXFunction> exports_;
   std::map<std::string, xex_opt::XexImportTable> import_tables_;
