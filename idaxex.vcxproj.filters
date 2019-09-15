@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="xex.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="lzx\lzx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -35,9 +32,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="xex.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="lzx\lzx.h">
       <Filter>Header Files</Filter>
     </ClInclude>

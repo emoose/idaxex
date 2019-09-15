@@ -110,7 +110,6 @@
     <ClCompile Include="lzx\lzx.c" />
     <ClCompile Include="namegen.cpp" />
     <ClCompile Include="sha1.c" />
-    <ClCompile Include="xex.cpp" />
     <ClCompile Include="xex2.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -123,7 +122,6 @@
     <ClInclude Include="pe_structs.hpp" />
     <ClInclude Include="sha1.h" />
     <ClInclude Include="sha1.hpp" />
-    <ClInclude Include="xex.hpp" />
     <ClInclude Include="xex2.hpp" />
     <ClInclude Include="xex_headerids.hpp" />
     <ClInclude Include="xex_optheaders.hpp" />
