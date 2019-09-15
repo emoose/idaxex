@@ -8,6 +8,9 @@
 #include "lzx/lzx.hpp"
 #include "sha1.hpp"
 
+// Various encryption keys used to decrypt XEX image key
+// There's no indication inside the XEX which key is used though :(
+// Only way to know is to try decrypting and check if the resulting data is valid
 const uint8_t retail_key[16] = {
   0x20, 0xB1, 0x85, 0xA5, 0x9D, 0x28, 0xFD, 0xC3,
   0x40, 0x58, 0x3F, 0xBB, 0x08, 0x96, 0xBF, 0x91
@@ -16,6 +19,7 @@ const uint8_t devkit_key[16] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
+
 // unsure if any of the xex1 keys get used, we'll still try them as last resort anyway
 const uint8_t retail_key_xex1[16] = {
   0xA2, 0x6C, 0x10, 0xF7, 0x1F, 0xD9, 0x35, 0xE9,
@@ -39,6 +43,7 @@ const char* key_names[4] = {
   "devkit-XEX1"
 };
 
+// Verifies if the basefile is a valid, supported kind of basefile format
 bool XEXFile::VerifyBaseFileHeader(const uint8_t* data)
 {
   // validate the basefiles magic, should either be a PE (with MZ signature)
@@ -48,6 +53,7 @@ bool XEXFile::VerifyBaseFileHeader(const uint8_t* data)
   return *(uint16_t*)data == EXE_MZ_SIGNATURE || *(uint32_t*)data == MAGIC_XUIZ;
 }
 
+// Tries reading the entire XEX file into memory, including the decrypted/decompressed basefile & import/export information
 bool XEXFile::Read(void* file)
 {
   seek(file, 0, SEEK_END);
@@ -162,6 +168,7 @@ bool XEXFile::Read(void* file)
   return true;
 }
 
+// Reads import libraries & function info from XEX import table
 bool XEXFile::read_imports(void* file)
 {
   if (!directory_entries_.count(XEX_HEADER_IMPORTS))
@@ -333,6 +340,7 @@ bool XEXFile::read_imports(void* file)
   return true;
 }
 
+// Reads function info defined inside XEX export table
 bool XEXFile::read_exports(void* file)
 {
   if (!export_table_va_)
@@ -378,6 +386,7 @@ bool XEXFile::read_exports(void* file)
   return true;
 }
 
+// Reads in fields we care about from the various SecurityInfo versions
 bool XEXFile::read_secinfo(void* file)
 {
   if (xex_header_.Magic == MAGIC_XEX3F)
@@ -466,6 +475,7 @@ bool XEXFile::read_secinfo(void* file)
   return true;
 }
 
+// Reads (and optionally decrypts) the basefile from the XEX in "raw" format
 bool XEXFile::read_basefile_raw(void* file, bool encrypted)
 {
   pe_data_.resize(std::max(data_length_, swap32(image_size_.value)));
@@ -488,6 +498,7 @@ bool XEXFile::read_basefile_raw(void* file, bool encrypted)
   return true;
 }
 
+// Reads (and optionally decrypts) the basefile from the XEX in uncompressed format
 bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
 {
   if (!data_descriptor_)
@@ -551,6 +562,7 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
   return true;
 }
 
+// Reads (and optionally decrypts) the basefile from the XEX in LZX-compressed format
 bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
 {
   AES_ctx aes;
@@ -659,6 +671,7 @@ end:
   return retcode == 0;
 }
 
+// Reads import libraries & function info from PE headers
 bool XEXFile::pe_load_imports(const uint8_t* data)
 {
   IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
@@ -715,6 +728,7 @@ bool XEXFile::pe_load_imports(const uint8_t* data)
   return true;
 }
 
+// Reads function info defined inside PE headers
 bool XEXFile::pe_load_exports(const uint8_t* data)
 {
   IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
@@ -757,6 +771,7 @@ bool XEXFile::pe_load_exports(const uint8_t* data)
   return true;
 }
 
+// Reads information from PE headers (section info, entrypoint, base addr...)
 bool XEXFile::pe_load(const uint8_t* data)
 {
   IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
@@ -794,6 +809,7 @@ bool XEXFile::pe_load(const uint8_t* data)
   return true;
 }
 
+// Converts an RVA into a file offset
 uint32_t XEXFile::pe_rva_to_offset(uint32_t rva)
 {
   if (rva > base_address_)
@@ -810,6 +826,7 @@ uint32_t XEXFile::pe_rva_to_offset(uint32_t rva)
   return 0;
 }
 
+// Retrieves the value of the given optional header ID
 uint32_t XEXFile::opt_header(uint32_t id)
 {
   if (!directory_entries_.count(id))
@@ -818,15 +835,20 @@ uint32_t XEXFile::opt_header(uint32_t id)
   return directory_entries_[id];
 }
 
+// Retrieves the value of the given optional header ID, as a pointer to the value
 void* XEXFile::opt_header_ptr(uint32_t id)
 {
   auto val = opt_header(id);
   if (!val)
     return 0;
 
+  // TODO: check if the value is stored in the directory_entries_ section
+  // and return pointer to it if so?
+
   return xex_headers_.data() + val;
 }
 
+// Reads in, decrypts, decompresses & verifies the basefile from the XEX image
 bool XEXFile::read_basefile(void* file, int key_index)
 {
   xex_opt::XexDataFormat comp_format = xex_opt::XexDataFormat::None;
@@ -884,11 +906,13 @@ bool XEXFile::read_basefile(void* file, int key_index)
   return result;
 }
 
+// Shim function to allow using IDA's qlread function
 size_t idaread(void* buffer, size_t element_size, size_t element_count, void* file)
 {
   return qlread((linput_t*)file, buffer, element_size * element_count);
 }
 
+// Shim function to allow using vprintf cstdio function
 int stdio_msg(const char* format, ...)
 {
   va_list argp;
@@ -901,6 +925,7 @@ int stdio_msg(const char* format, ...)
   return retval;
 }
 
+// Sets our IO function pointers to use IDA's IO functions
 void XEXFile::use_ida_io()
 {
 #if fread == dont_use_fread

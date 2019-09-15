@@ -4,19 +4,21 @@
 #include "xex_optheaders.hpp"
 #include "pe_structs.hpp"
 
-#define MAGIC_XEX1 0x58455831
-#define MAGIC_XEX2 0x58455832
-#define MAGIC_XEX2D 0x5845582D
-#define MAGIC_XEX25 0x58455825
-#define MAGIC_XEX3F 0x5845583F
+// XEX header magic values
+#define MAGIC_XEX1 0x58455831  // 'XEX1'
+#define MAGIC_XEX2 0x58455832  // 'XEX2'
+#define MAGIC_XEX2D 0x5845582D // 'XEX-'
+#define MAGIC_XEX25 0x58455825 // 'XEX%'
+#define MAGIC_XEX3F 0x5845583F // 'XEX?'
 
-#define MAGIC_XUIZ 0x5A495558
+// Basefile magic values
+#define MAGIC_XUIZ 0x5A495558  // 'ZIUX'
 
+// Function pointer types, these let us support both IDA's IO functions & regular C's IO
 typedef size_t(*read_fn)(void* buffer, size_t element_size, size_t element_count, void* file);
 typedef int(*seek_fn)(void* file, long long offset, int origin);
 typedef long long(*tell_fn)(void* file);
 typedef int(*dbgmsg_fn)(const char* format, ...);
-
 int stdio_msg(const char* format, ...); // xex2.cpp
 
 struct XEXFunction
@@ -27,7 +29,7 @@ struct XEXFunction
 
 class XEXFile
 {
-  /* IO */
+  // IO function pointers
   read_fn read;
   seek_fn seek;
   tell_fn tell;
@@ -44,7 +46,7 @@ class XEXFile
   std::vector<uint8_t> xex_headers_;
   std::vector<uint8_t> pe_data_;
 
-  /* values from securityinfo */
+  // Values from SecurityInfo
   xe::be<uint32_t> image_size_;
   uint8_t image_key_[0x10];
   xe::be<xex::GameRegion> game_regions_;
@@ -53,7 +55,7 @@ class XEXFile
   xe::be<uint32_t> base_address_;
   xe::be<uint32_t> export_table_va_;
 
-  /* values of various optional headers*/
+  // Values of various optional headers
   xe::be<uint32_t> entry_point_;
   xex_opt::XexFileDataDescriptor* data_descriptor_;
   xex_opt::XexPrivileges privileges_;
@@ -66,9 +68,10 @@ class XEXFile
   std::map<std::string, xex_opt::XexImportTable> import_tables_;
   std::string exports_libname_ = "";
 
+  // Sections from XEX headers
   std::vector<IMAGE_SECTION_HEADER> xex_sections_;
 
-  /* data from PE headers */
+  // Sections from PE headers (includes XEX sections above)
   std::vector<IMAGE_SECTION_HEADER> sections_;
 
   bool read_imports(void* file);
@@ -87,6 +90,8 @@ class XEXFile
   uint32_t pe_rva_to_offset(uint32_t rva);
 
 public:
+  static bool VerifyBaseFileHeader(const uint8_t* data);
+
   XEXFile() { 
 #if fread != dont_use_fread
     read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64; dbgmsg = stdio_msg;
@@ -95,8 +100,6 @@ public:
   void use_ida_io();
 
   bool Read(void* file);
-
-  static bool VerifyBaseFileHeader(const uint8_t* data);
 
   const xex::XexHeader& header() { return xex_header_; }
   uint32_t base_address() { return base_address_; }

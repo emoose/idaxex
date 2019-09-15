@@ -2,6 +2,9 @@
 #include <sstream>
 #include <iomanip>
 
+// TODO: allow using namegen from an external file instead?
+// eg. x360_imports.idc ala xorlosers loader?
+
 const char* connectxNameGen(int id)
 {
   if (id == 0x00000001) return "CxGetVersion";
