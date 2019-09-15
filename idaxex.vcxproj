@@ -107,10 +107,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="aes.c" />
+    <ClCompile Include="idaloader.cpp" />
     <ClCompile Include="lzx\lzx.c" />
     <ClCompile Include="namegen.cpp" />
     <ClCompile Include="sha1.c" />
-    <ClCompile Include="xex2.cpp" />
+    <ClCompile Include="xex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="aes.h" />
@@ -122,7 +123,7 @@
     <ClInclude Include="pe_structs.hpp" />
     <ClInclude Include="sha1.h" />
     <ClInclude Include="sha1.hpp" />
-    <ClInclude Include="xex2.hpp" />
+    <ClInclude Include="xex.hpp" />
     <ClInclude Include="xex_headerids.hpp" />
     <ClInclude Include="xex_optheaders.hpp" />
     <ClInclude Include="xex_structs.hpp" />

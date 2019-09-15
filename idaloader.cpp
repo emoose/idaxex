@@ -8,7 +8,7 @@
 // - test!
 
 #include "../idaldr.h"
-#include "xex2.hpp"
+#include "xex.hpp"
 #include <typeinf.hpp>
 #include <bytes.hpp>
 #include <algorithm>
