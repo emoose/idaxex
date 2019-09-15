@@ -16,7 +16,7 @@ This should hopefully have the same features as xorloser's great Xex Loader (for
 - Hardware-accelerated AES-NI support, should allow loading encrypted XEXs pretty fast!
 
 ## Install
-To install the loader simply extract the release zip into your IDA\loader\ directory, eg. "C:\Program Files\IDA 7.0\loaders\idaxex64.dll"
+To install the loader simply extract the release zip into your IDA\loaders\ directory, eg. "C:\Program Files\IDA 7.0\loaders\idaxex64.dll"
 
 I recommend pairing this loader with the PPCAltivec plugin, an updated version for IDA 7 is available at yui-konnu's repo here: https://github.com/yui-konnu/PPC-Altivec-IDA
 

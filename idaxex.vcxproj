@@ -106,23 +106,23 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="aes.c" />
+    <ClCompile Include="3rdparty\aes.c" />
     <ClCompile Include="idaloader.cpp" />
-    <ClCompile Include="lzx\lzx.c" />
+    <ClCompile Include="3rdparty\lzx.c" />
     <ClCompile Include="namegen.cpp" />
-    <ClCompile Include="sha1.c" />
+    <ClCompile Include="3rdparty\sha1.c" />
     <ClCompile Include="xex.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="aes.h" />
-    <ClInclude Include="aes.hpp" />
-    <ClInclude Include="byte_order.hpp" />
-    <ClInclude Include="lzx\lzx.h" />
-    <ClInclude Include="lzx\lzx.hpp" />
-    <ClInclude Include="lzx\lzx_int.h" />
+    <ClInclude Include="3rdparty\aes.h" />
+    <ClInclude Include="3rdparty\aes.hpp" />
+    <ClInclude Include="3rdparty\byte_order.hpp" />
+    <ClInclude Include="3rdparty\lzx.h" />
+    <ClInclude Include="3rdparty\lzx.hpp" />
+    <ClInclude Include="3rdparty\lzx_int.h" />
     <ClInclude Include="pe_structs.hpp" />
-    <ClInclude Include="sha1.h" />
-    <ClInclude Include="sha1.hpp" />
+    <ClInclude Include="3rdparty\sha1.h" />
+    <ClInclude Include="3rdparty\sha1.hpp" />
     <ClInclude Include="xex.hpp" />
     <ClInclude Include="xex_headerids.hpp" />
     <ClInclude Include="xex_optheaders.hpp" />

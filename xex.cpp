@@ -3,9 +3,9 @@
 #include "xex_headerids.hpp"
 #include <cstdio>
 
-#include "aes.hpp"
-#include "lzx/lzx.hpp"
-#include "sha1.hpp"
+#include "3rdparty/aes.hpp"
+#include "3rdparty/lzx.hpp"
+#include "3rdparty/sha1.hpp"
 
 // Various encryption keys used to decrypt XEX image key
 // There's no indication inside the XEX which key is used though :(

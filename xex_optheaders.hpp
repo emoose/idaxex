@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cassert>
-#include "byte_order.hpp"
+#include "3rdparty/byte_order.hpp"
 #include "xex_structs.hpp"
 
 namespace xex_opt {

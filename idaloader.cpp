@@ -11,14 +11,6 @@
 #include "xex.hpp"
 #include <typeinf.hpp>
 #include <bytes.hpp>
-#include <algorithm>
-#include <vector>
-#include <algorithm>
-#include "lzx/lzx.hpp"
-#include "aes.hpp"
-#include "sha1.hpp"
-#include <sstream>
-#include <iomanip>
 
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
 #define FF_DWORD    0x20000000
