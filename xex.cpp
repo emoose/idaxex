@@ -1,23 +1,21 @@
+#ifdef IDALDR
 #include "../idaldr.h"
+#else
+#include <cstdarg>
+#endif
 #include "xex.hpp"
 #include "xex_headerids.hpp"
 #include "xex_keys.hpp"
 
 #include <cstdio>
 #include <memory>
+#include <cstdlib>
 
 #include "3rdparty/aes.hpp"
 #include "3rdparty/lzx.hpp"
 #include "3rdparty/sha1.hpp"
 
-bool XEXFile::VerifyBaseFileHeader(const uint8_t* data)
-{
-  // validate the basefiles magic, should either be a PE (with MZ signature)
-  // or an XUIZ resource file
-
-  // TODO: find out whether there's any other basefile formats?
-  return *(uint16_t*)data == EXE_MZ_SIGNATURE || *(uint32_t*)data == MAGIC_XUIZ;
-}
+bool xex_log_verbose = true;
 
 bool XEXFile::load(void* file)
 {
@@ -27,7 +25,7 @@ bool XEXFile::load(void* file)
 
   read(&xex_header_, sizeof(xex::XexHeader), 1, file);
   *(uint32_t*)&xex_header_.ModuleFlags =
-    swap32(*(uint32_t*)&xex_header_.ModuleFlags);
+    _byteswap_ulong(*(uint32_t*)&xex_header_.ModuleFlags);
 
   if (xex_header_.Magic != MAGIC_XEX2 && xex_header_.Magic != MAGIC_XEX1 && 
     xex_header_.Magic != MAGIC_XEX25 && xex_header_.Magic != MAGIC_XEX2D && 
@@ -55,7 +53,7 @@ bool XEXFile::load(void* file)
   }
 
   // Read in directory entry / optional header keyvalues
-  for (int i = 0; i < xex_header_.HeaderDirectoryEntryCount; i++)
+  for (uint32_t i = 0; i < xex_header_.HeaderDirectoryEntryCount; i++)
   {
     xex::XexDirectoryEntry header;
     read(&header, sizeof(xex::XexDirectoryEntry), 1, file);
@@ -70,6 +68,22 @@ bool XEXFile::load(void* file)
 
   // Read security info
   bool has_secinfo = read_secinfo(file);
+  if (has_secinfo) {
+    // Kinda hacky way to get the security info size...
+    // Maybe should save this somewhere when reading instead?
+    auto page_desc_size = security_info_.PageDescriptorCount * sizeof(xex::HvPageInfo);
+    auto secinfo_size = security_info_.Size - page_desc_size;
+
+    seek(file, xex_header_.SecurityInfo + secinfo_size, 0);
+    for (uint32_t i = 0; i < security_info_.PageDescriptorCount; i++) {
+      xex::HvPageInfo page_desc;
+      read(&page_desc, sizeof(xex::HvPageInfo), 1, file);
+
+      // bitfields, ugh, endianswap manually
+      page_desc.SizeInfo = _byteswap_ulong(page_desc.SizeInfo);
+      page_descriptors_.push_back(page_desc);
+    }
+  }
 
   // Read various optional headers
   if (directory_entries_.count(XEX_HEADER_PE_BASE))
@@ -84,8 +98,8 @@ bool XEXFile::load(void* file)
   execution_id_ = reinterpret_cast<xex_opt::XexExecutionId*>(opt_header_ptr(XEX_HEADER_EXECUTION_ID));
   if (execution_id_)
   {
-    *(uint32_t*)&execution_id_->BaseVersion = swap32(*(uint32_t*)&execution_id_->BaseVersion);
-    *(uint32_t*)&execution_id_->Version = swap32(*(uint32_t*)&execution_id_->Version);
+    *(uint32_t*)&execution_id_->BaseVersion = _byteswap_ulong(*(uint32_t*)&execution_id_->BaseVersion);
+    *(uint32_t*)&execution_id_->Version = _byteswap_ulong(*(uint32_t*)&execution_id_->Version);
   }
 
   vital_stats_ = reinterpret_cast<xex_opt::XexVitalStats*>(opt_header_ptr(XEX_HEADER_VITAL_STATS));
@@ -105,14 +119,7 @@ bool XEXFile::load(void* file)
   {
     auto* header = (xex_opt::XexStringHeader*)opt_header_ptr(XEX_HEADER_PE_MODULE_NAME);
     if (header)
-    {
-      // Copy string and null terminate it ourselves, just in case
-      auto str = std::make_unique<char[]>(header->Size + 1);
-      memcpy(str.get(), header->Data, header->Size);
-      str.get()[header->Size] = '\0';
-
-      pe_module_name_ = str.get();
-    }
+      pe_module_name_ = std::string(header->Data, (uint32_t)header->Size);
   }
 
   // Try decrypting/decompressing the basefile
@@ -167,15 +174,15 @@ bool XEXFile::read_imports(void* file)
   // Seperate the library names in the name table
   std::vector<std::string> import_libs;
   std::string cur_lib = "";
-  for (int i = 0; i < import_desc.NameTableSize; i++)
+  for (uint32_t i = 0; i < import_desc.NameTableSize; i++)
   {
     if (!cur_lib.length())
     {
       // align to 4 bytes
       if ((i % 4) != 0)
       {
-        int align = 4 - (i % 4);
-        align = std::min(align, (int)import_desc.NameTableSize - i); // don't let us align past end of nametable
+        uint32_t align = 4 - (i % 4);
+        align = std::min(align, import_desc.NameTableSize - i); // don't let us align past end of nametable
         i += align - 1; // minus 1 since for loop will add 1 to it too
         seek(file, align, SEEK_CUR);
 
@@ -206,8 +213,8 @@ bool XEXFile::read_imports(void* file)
     // Read in import table header
     xex_opt::XexImportTable table_header;
     read(&table_header, sizeof(xex_opt::XexImportTable), 1, file);
-    *(uint32_t*)&table_header.Version = swap32(*(uint32_t*)&table_header.Version);
-    *(uint32_t*)&table_header.VersionMin = swap32(*(uint32_t*)&table_header.VersionMin);
+    *(uint32_t*)&table_header.Version = _byteswap_ulong(*(uint32_t*)&table_header.Version);
+    *(uint32_t*)&table_header.VersionMin = _byteswap_ulong(*(uint32_t*)&table_header.VersionMin);
 
     auto& libname = import_libs.at(table_header.ModuleIndex);
 
@@ -228,7 +235,7 @@ bool XEXFile::read_imports(void* file)
       auto record_offset = pe_rva_to_offset(record_addr);
 
       auto record_value = *(uint32_t*)(pe_data() + record_offset);
-      record_value = swap32(record_value);
+      record_value = _byteswap_ulong(record_value);
 
       auto record_type = (record_value & 0xFF000000) >> 24;
       auto ordinal = record_value & 0xFFFF;
@@ -252,8 +259,8 @@ bool XEXFile::read_imports(void* file)
         // r4 = ordinal
         // important to note that basefiles extracted via xextool have this rewrite done already, but raw basefile from XEX doesn't!
         // todo: find out how to add to imports window like xorloser loader...
-        *(uint32_t*)(pe_data() + record_offset + 0) = swap32(0x38600000 | table_header.ModuleIndex);
-        *(uint32_t*)(pe_data() + record_offset + 4) = swap32(0x38800000 | ordinal);
+        *(uint32_t*)(pe_data() + record_offset + 0) = _byteswap_ulong(0x38600000 | table_header.ModuleIndex);
+        *(uint32_t*)(pe_data() + record_offset + 4) = _byteswap_ulong(0x38800000 | ordinal);
       }
       else // todo: fix this
         dbgmsg("[+] %s import %d (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, record_addr, record_type);
@@ -282,8 +289,8 @@ bool XEXFile::read_imports(void* file)
 
       uint32_t info_1 = *(uint32_t*)(pe_data() + import_offset);
       uint32_t info_2 = *(uint32_t*)(pe_data() + import_offset + 4);
-      info_1 = swap32(info_1);
-      info_2 = swap32(info_2);
+      info_1 = _byteswap_ulong(info_1);
+      info_2 = _byteswap_ulong(info_2);
 
       auto ordinal_1 = info_1 & 0xFFFF;
       auto ordinal_2 = info_2 & 0xFFFF;
@@ -312,8 +319,8 @@ bool XEXFile::read_imports(void* file)
       imp.ThunkAddr = i;
       imp.FuncAddr = i;
 
-      *(uint32_t*)(pe_data() + import_offset + 0) = swap32(0x38600000 | moduleidx_1);
-      *(uint32_t*)(pe_data() + import_offset + 4) = swap32(0x38800000 | ordinal_1);
+      *(uint32_t*)(pe_data() + import_offset + 0) = _byteswap_ulong(0x38600000 | moduleidx_1);
+      *(uint32_t*)(pe_data() + import_offset + 4) = _byteswap_ulong(0x38800000 | ordinal_1);
 
       imports_[libname][ordinal_1] = imp;
     }
@@ -341,12 +348,14 @@ bool XEXFile::read_exports(void* file)
   }
 
   dbgmsg("[+] Loading module exports...\n");
+#ifdef IDALDR
   char module_name[256];
   get_root_filename(module_name, 256);
+#endif
 
   auto ordinal_addrs_va = security_info_.ImageInfo.ExportTableAddress + sizeof(xex_opt::HvImageExportTable);
   auto ordinal_addrs_offset = export_table_offset + sizeof(xex_opt::HvImageExportTable);
-  for (int i = 0; i < export_table.Count; i++)
+  for (uint32_t i = 0; i < export_table.Count; i++)
   {
     auto ordinal = export_table.Base + i;
 
@@ -354,9 +363,9 @@ bool XEXFile::read_exports(void* file)
     if (exports_.count(ordinal))
       exp = exports_[ordinal];
 
-    exp.ThunkAddr = ordinal_addrs_va + (i * 4);
+    exp.ThunkAddr = (uint32_t)(ordinal_addrs_va + (i * 4));
     exp.FuncAddr = *(uint32_t*)(pe_data() + ordinal_addrs_offset + (i * 4));
-    exp.FuncAddr = swap32(exp.FuncAddr);
+    exp.FuncAddr = _byteswap_ulong(exp.FuncAddr);
     if (!exp.FuncAddr)
       continue;
 
@@ -380,6 +389,8 @@ bool XEXFile::read_secinfo(void* file)
   {
     seek(file, xex_header_.SecurityInfo, 0);
     read(&security_info_, sizeof(xex2::SecurityInfo), 1, file);
+    *(uint32_t*)&security_info_.ImageInfo.ImageFlags = _byteswap_ulong(*(uint32_t*)&security_info_.ImageInfo.ImageFlags);
+    *(uint32_t*)&security_info_.AllowedMediaTypes = _byteswap_ulong(*(uint32_t*)&security_info_.AllowedMediaTypes);
     return true;
   }
 
@@ -417,6 +428,8 @@ bool XEXFile::read_secinfo(void* file)
 
     READ_FIELD(AllowedMediaTypes, sizeof(xex::AllowedMediaTypes));
     READ_FIELD(PageDescriptorCount, sizeof(uint32_t));
+    *(uint32_t*)&security_info_.ImageInfo.ImageFlags = _byteswap_ulong(*(uint32_t*)&security_info_.ImageInfo.ImageFlags);
+    *(uint32_t*)&security_info_.AllowedMediaTypes = _byteswap_ulong(*(uint32_t*)&security_info_.AllowedMediaTypes);
 #undef READ_FIELD
   }
 
@@ -507,7 +520,7 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
       AES_ECB_decrypt(&aes, pe_data_.data());
 
       // Check basefile header
-      if (!VerifyBaseFileHeader(pe_data_.data()))
+      if (!basefile_is_valid())
       {
         pe_data_.clear();
         return false;
@@ -602,7 +615,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
       if (!comp_size)
         break;
 
-      comp_size = swap16(comp_size);
+      comp_size = _byteswap_ushort(comp_size);
       if (comp_size > 0x9800) // sanity check: shouldn't be above 0x9800
       {
         retcode = 1;
@@ -721,7 +734,7 @@ bool XEXFile::pe_load_exports(const uint8_t* data)
 
   exports_libname_ = (char*)(data + module_name_addr);
   auto exports_ptr_addr = pe_rva_to_offset(exports_desc->AddressOfFunctions);
-  for (int i = 0; i < exports_desc->NumberOfFunctions; i++)
+  for (uint32_t i = 0; i < exports_desc->NumberOfFunctions; i++)
   {
     auto ordinal = exports_desc->Base + i;
     XEXFunction exp;
@@ -729,7 +742,7 @@ bool XEXFile::pe_load_exports(const uint8_t* data)
       exp = exports_[ordinal];
 
     exp.ThunkAddr = base_address() + exports_desc->AddressOfFunctions + (i * 4);
-    exp.FuncAddr = *(uint32*)(data + exports_ptr_addr + (i * 4));
+    exp.FuncAddr = *(uint32_t*)(data + exports_ptr_addr + (i * 4));
     if (!exp.FuncAddr)
       continue;
 
@@ -796,6 +809,11 @@ uint32_t XEXFile::pe_rva_to_offset(uint32_t rva)
   return 0;
 }
 
+bool XEXFile::has_header(uint32_t id)
+{
+  return directory_entries_.count(id) > 0;
+}
+
 uint32_t XEXFile::opt_header(uint32_t id)
 {
   if (!directory_entries_.count(id))
@@ -832,7 +850,7 @@ bool XEXFile::read_basefile(void* file, int key_index)
   key_index_ = key_index;
   if (key_index == 0) // only print this on first invocation of read_basefile
   {
-    char* format = "Raw";
+    const char* format = "Raw";
     if (comp_format == xex_opt::XexDataFormat::Compressed)
       format = "Compressed";
     else if (comp_format == xex_opt::XexDataFormat::DeltaCompressed)
@@ -869,20 +887,17 @@ bool XEXFile::read_basefile(void* file, int key_index)
 
   // if reading was "successful", validate the basefiles magic
   if (result)
-    return VerifyBaseFileHeader(pe_data_.data());
+    return basefile_is_valid();
 
   return result;
-}
-
-// Shim function to allow using IDA's qlread function
-size_t idaread(void* buffer, size_t element_size, size_t element_count, void* file)
-{
-  return qlread((linput_t*)file, buffer, element_size * element_count);
 }
 
 // Shim function to allow using vprintf cstdio function
 int stdio_msg(const char* format, ...)
 {
+  if (!xex_log_verbose)
+    return 0;
+
   va_list argp;
   va_start(argp, format);
 
@@ -893,12 +908,18 @@ int stdio_msg(const char* format, ...)
   return retval;
 }
 
+#ifdef IDALDR
+// Shim function to allow using IDA's qlread function
+size_t idaread(void* buffer, size_t element_size, size_t element_count, void* file)
+{
+  return qlread((linput_t*)file, buffer, element_size * element_count);
+}
+
 void XEXFile::use_ida_io()
 {
-#if fread == dont_use_fread
   read = idaread;
   seek = (seek_fn)qlseek;
   tell = (tell_fn)qltell;
   dbgmsg = msg;
-#endif
 }
+#endif

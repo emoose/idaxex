@@ -2,7 +2,7 @@
 
 idaxex is a native loader plugin for IDA Pro, adding support for loading in Xbox360 XEX executables.
 
-Originally started as an [IDAPython loader](https://github.com/emoose/reversing/blob/master/xbox360.py), work was continued as a native DLL to solve the shortcomings of the python loader.
+Originally started as an [IDAPython loader](https://github.com/emoose/reversing/blob/master/xbox360.py), work was continued as a native DLL to solve the shortcomings of it.
 
 This should hopefully have the same features as xorloser's great Xex Loader (for IDA 6 and older), along with additional support for some early non-XEX2 formats, such as XEX1 used on beta-kits.
 
@@ -35,11 +35,17 @@ I've been using this loader for a few months now and it's worked pretty well, bu
 
 - .pdata support will be added soon, wasn't aware this section could be used for storing exports, but zeroKilo's [XEXLoaderWV for Ghidra](https://github.com/zeroKilo/XEXLoaderWV) gives a great look at how this section should be handled - will add support for loading in this section soon.
 
-- It might be worthwhile to split the main XEX code away from the IDA loader, maybe the code could be used to make an open-source equivalent of xorloser's xextool? It'd be nice to finally have a public description of how everything there should work.
-
 - Right now known-import-names are hardcoded inside the loader, it'd be nice if we can make them external somehow... xorloser's loader seems to call into a DoNameGen function inside x360_imports.idc for this - maybe we can do the same?
 
 ## Credits
 idaxex is based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name!
 
 Thanks to everyone involved in the Xbox 360 modding/reverse-engineering community!
+
+# xex1tool
+Also included is an attempt at recreating xorloser's XexTool, with additions from idaxex such as support for XEX1 and older.  
+(The name is only to differentiate it from the original XexTool - it'll still support XEX2 files fine)
+
+So far it can print info on the various XEX headers (via -l), and extract the basefile (PE/XUIZ) from inside the XEX.
+
+Support for other XexTool features will slowly be added over time (of course any help is appreciated!)

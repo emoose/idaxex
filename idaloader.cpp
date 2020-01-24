@@ -269,13 +269,14 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       if (lowest_addr != BADADDR)
       {
         auto& tables = file.import_tables();
-        xex_opt::XexImportTable table_header = { 0 };
         if (tables.count(libname))
-          table_header = tables[libname];
+        {
+          auto& table_header = tables.at(libname);
 
-        add_extra_line(lowest_addr, true, "\n\nImports from %s v%d.%d.%d.%d (minimum v%d.%d.%d.%d)\n", libname.c_str(),
-          table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
-          table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE);
+          add_extra_line(lowest_addr, true, "\n\nImports from %s v%d.%d.%d.%d (minimum v%d.%d.%d.%d)\n", libname.c_str(),
+            table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
+            table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE);
+        }
       }
 
       if (lib.second.size())

@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <vector>
 #include <algorithm>
+#include <map>
+#include <string>
 
 #include "xex_optheaders.hpp"
 #include "pe_structs.hpp"
@@ -39,9 +41,10 @@ class XEXFile
 
   uint32_t data_length_ = 0; // length of file data (filesize - headersize)
 
-  xex::XexHeader xex_header_;
+  xex::XexHeader xex_header_ = {};
   std::map<uint32_t, uint32_t> directory_entries_;
-  xex2::SecurityInfo security_info_;
+  xex2::SecurityInfo security_info_ = {};
+  std::vector<xex::HvPageInfo> page_descriptors_;
 
   int key_index_ = -1;
   uint8_t session_key_[0x10];
@@ -53,8 +56,8 @@ class XEXFile
   xe::be<uint32_t> opt_base_address_ = 0;
   xe::be<uint32_t> entry_point_ = 0;
   xex_opt::XexFileDataDescriptor* data_descriptor_ = nullptr;
-  xex_opt::XexPrivileges privileges_;
-  xex_opt::XexPrivileges32 privileges32_;
+  xex_opt::XexPrivileges privileges_ = {};
+  xex_opt::XexPrivileges32 privileges32_ = {};
   xex_opt::XexExecutionId* execution_id_ = nullptr;
   xex_opt::XexVitalStats* vital_stats_ = nullptr;
   xex_opt::XexTlsData* tls_data_ = nullptr;
@@ -87,14 +90,10 @@ class XEXFile
   bool pe_load(const uint8_t* data);
   bool pe_load_imports(const uint8_t* data);
   bool pe_load_exports(const uint8_t* data);
-  uint32_t pe_rva_to_offset(uint32_t rva);
 
 public:
-  // Verifies if the basefile is a valid, supported kind of basefile format
-  static bool VerifyBaseFileHeader(const uint8_t* data);
-
   XEXFile() { 
-#if fread != dont_use_fread
+#ifndef IDALDR
     read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64; dbgmsg = stdio_msg;
 #endif
   }
@@ -107,7 +106,54 @@ public:
 
   const xex::XexHeader& header() { return xex_header_; }
   const xex2::SecurityInfo& security_info() { return security_info_; }
+  const std::vector<xex::HvPageInfo>& page_descriptors() { return page_descriptors_; }
 
+  const uint8_t* xex_headers() { return xex_headers_.data(); }
+  const uint8_t* pe_data() { return pe_data_.data(); }
+
+  uint32_t pe_rva_to_offset(uint32_t rva);
+
+  // Length of the pe_data member, not the same as image_size!
+  uint32_t pe_data_length() { return pe_data_.size(); }
+
+  bool basefile_is_pe() {
+    return pe_data_length() > 4 && *(uint16_t*)pe_data() == EXE_MZ_SIGNATURE;
+  }
+
+  bool basefile_is_xuiz() {
+    return pe_data_length() > 4 && *(uint32_t*)pe_data() == MAGIC_XUIZ;
+  }
+
+  bool basefile_is_valid() {
+    return basefile_is_pe() || basefile_is_xuiz();
+  }
+
+  const std::vector<IMAGE_SECTION_HEADER>& sections() { return sections_; }
+  const std::vector<IMAGE_SECTION_HEADER>& xex_sections() { return xex_sections_; }
+
+  const std::map<std::string, std::map<uint32_t, XEXFunction>>& imports() { return imports_; }
+  const std::map<uint32_t, XEXFunction>& exports() { return exports_; }
+
+  const std::map<std::string, xex_opt::XexImportTable>& import_tables() { return import_tables_; }
+  const std::string& exports_libname() { return exports_libname_; }
+
+  bool has_header(uint32_t id);
+
+  // Returns value of an optional header, if exists
+  uint32_t opt_header(uint32_t id);
+
+  // Returns pointer to an optional headers value, if exists
+  void* opt_header_ptr(uint32_t id);
+
+  template<typename T>
+  T* opt_header_ptr(uint32_t id) {
+    return (T*)opt_header_ptr(id);
+  }
+
+  uint32_t encryption_key_index() { return key_index_; }
+  uint8_t* session_key() { return session_key_; }
+
+  // Optional headers
   uint32_t image_size() {
     return std::max(data_length_, (uint32_t)security_info_.ImageSize);
   }
@@ -116,24 +162,7 @@ public:
   uint32_t opt_base_address() { return opt_base_address_; }
   uint32_t entry_point() { return entry_point_; }
 
-  const uint8_t* xex_headers() { return xex_headers_.data(); }
-  const uint8_t* pe_data() { return pe_data_.data(); }
-
-  const std::vector<IMAGE_SECTION_HEADER>& sections() { return sections_; }
-  const std::vector<IMAGE_SECTION_HEADER>& xex_sections() { return xex_sections_; }
-
-  const std::map<std::string, std::map<uint32_t, XEXFunction>>& imports() { return imports_; }
-  const std::map<uint32_t, XEXFunction>& exports() { return exports_; }
-
-  std::map<std::string, xex_opt::XexImportTable>& import_tables() { return import_tables_; }
-  const std::string& exports_libname() { return exports_libname_; }
-
-  // Returns value of an optional header, if exists
-  uint32_t opt_header(uint32_t id);
-
-  // Returns pointer to an optional headers value, if exists
-  void* opt_header_ptr(uint32_t id);
-
-  const xex_opt::XexVitalStats* vital_stats() { return vital_stats_; }
   const std::string& pe_module_name() { return pe_module_name_; }
+  const xex_opt::XexVitalStats* vital_stats() { return vital_stats_; }
+  const xex_opt::XexFileDataDescriptor* data_descriptor() { return data_descriptor_; }
 };

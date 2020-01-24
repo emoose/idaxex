@@ -49,17 +49,21 @@ namespace xex {
     uint32_t DataCenterRequired         : 1; //= 0x00000010
     uint32_t DataCenterAware            : 1; //= 0x00000020
     uint32_t                            : 2; //= 0x00000040-0x00000080
+
+    // HV privileges section:
     uint32_t CardeaKey                  : 1; //= 0x00000100
     uint32_t XeikaKey                   : 1; //= 0x00000200
     uint32_t TitleUserMode              : 1; //= 0x00000400
     uint32_t SystemUserMode             : 1; //= 0x00000800
-    uint32_t Orange0                    : 1; //= 0x00001000
+    uint32_t Orange0                    : 1; //= 0x000010001
     uint32_t Orange1                    : 1; //= 0x00002000
     uint32_t Orange2                    : 1; //= 0x00004000
-    uint32_t                            : 1; //= 0x00008000
+    uint32_t SignedKeyVaultRequired     : 1; //= 0x00008000
     uint32_t IptvSignupApplication      : 1; //= 0x00010000
     uint32_t IptvTitleApplication       : 1; //= 0x00020000
-    uint32_t                            : 8; //= 0x00040000-0x02000000
+    uint32_t NccpKeys                   : 1; //= 0x00040000
+
+    uint32_t                            : 7; //= 0x00040000-0x02000000
     uint32_t KeyVaultPrivilegesRequired : 1; //= 0x04000000
     uint32_t OnlineActivationRequired   : 1; //= 0x08000000
     uint32_t PageSize4Kb                : 1; //= 0x10000000
@@ -86,9 +90,12 @@ namespace xex {
   enum ApprovalType : uint8_t
   {
     ApprovalType_Unapproved = 0x00,
+    ApprovalType_Tool = 0x4,
+    ApprovalType_Executable = 0x10,
     ApprovalType_PossiblyApproved = 0x20,
     ApprovalType_Approved = 0x40,
-    ApprovalType_Expired = 0x60
+    ApprovalType_Expired = 0x60,
+    ApprovalType_Debug = 0x80,
   };
   static_assert(sizeof(ApprovalType) == 1, "xex::ApprovalType");
 
@@ -131,6 +138,26 @@ namespace xex {
     xe::be<uint32_t> Value; // 0x4 sz:0x4
   }; // size 8
   static_assert(sizeof(XexDirectoryEntry) == 8, "xex::XexDirectoryEntry");
+
+  enum HvPageInfoFlags
+  {
+    PageInfoFlag_NoWrite = 1,
+    PageInfoFlag_NoExecute = 2,
+    PageInfoFlag_Protect = 4,
+    PageInfoFlag_Encrypt = 8,
+  };
+
+  struct HvPageInfo {
+    union {
+      struct {
+        uint32_t Info : 4;
+        uint32_t Size : 28;
+      };
+      uint32_t SizeInfo;
+    };
+    uint8_t DataDigest[0x14];
+  };
+  static_assert(sizeof(HvPageInfo) == 0x18, "xex:HvPageInfo");
 };
 
 namespace xex2 {

@@ -107,7 +107,7 @@ namespace xex_opt {
     uint32_t TitleBothUtilityPartitions      : 1; //= 0x00800000
     uint32_t HandleIPTVInput                 : 1; //= 0x01000000
     uint32_t PreferBigButtonInput            : 1; //= 0x02000000
-    uint32_t Reserved26                      : 1; //= 0x04000000
+    uint32_t AllowXsamReservation            : 1; //= 0x04000000
     uint32_t MultidiscCrossTitle             : 1; //= 0x08000000
     uint32_t TitleInstallIncompatible        : 1; //= 0x10000000
     uint32_t AllowAvatarGetMetadataByXUID    : 1; //= 0x20000000

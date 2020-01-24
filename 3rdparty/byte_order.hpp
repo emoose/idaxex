@@ -78,7 +78,7 @@ namespace xe {
       return static_cast<T>(byte_swap(static_cast<uint64_t>(value)));
     }
     else {
-      assert_always("not handled");
+      //assert_always("not handled");
     }
   }
 
