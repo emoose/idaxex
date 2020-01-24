@@ -74,5 +74,8 @@
     <ClInclude Include="3rdparty\sha1.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="xex_keys.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

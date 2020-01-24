@@ -125,6 +125,7 @@
     <ClInclude Include="3rdparty\sha1.hpp" />
     <ClInclude Include="xex.hpp" />
     <ClInclude Include="xex_headerids.hpp" />
+    <ClInclude Include="xex_keys.hpp" />
     <ClInclude Include="xex_optheaders.hpp" />
     <ClInclude Include="xex_structs.hpp" />
   </ItemGroup>

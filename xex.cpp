@@ -1,46 +1,14 @@
 #include "../idaldr.h"
 #include "xex.hpp"
 #include "xex_headerids.hpp"
+#include "xex_keys.hpp"
+
 #include <cstdio>
+#include <memory>
 
 #include "3rdparty/aes.hpp"
 #include "3rdparty/lzx.hpp"
 #include "3rdparty/sha1.hpp"
-
-// Various encryption keys used to decrypt XEX image key
-// There's no indication inside the XEX which key is used though :(
-// Only way to know is to try decrypting and check if the resulting data is valid
-const uint8_t retail_key[16] = {
-  0x20, 0xB1, 0x85, 0xA5, 0x9D, 0x28, 0xFD, 0xC3,
-  0x40, 0x58, 0x3F, 0xBB, 0x08, 0x96, 0xBF, 0x91
-};
-const uint8_t devkit_key[16] = {
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
-
-// unsure if any of the xex1 keys get used, we'll still try them as last resort anyway
-const uint8_t retail_key_xex1[16] = {
-  0xA2, 0x6C, 0x10, 0xF7, 0x1F, 0xD9, 0x35, 0xE9,
-  0x8B, 0x99, 0x92, 0x2C, 0xE9, 0x32, 0x15, 0x72
-};
-const uint8_t devkit_key_xex1[16] = {
-  0xA8, 0xB0, 0x05, 0x12, 0xED, 0xE3, 0x63, 0x8D,
-  0xC6, 0x58, 0xB3, 0x10, 0x1F, 0x9F, 0x50, 0xD1
-};
-
-const uint8_t* key_bytes[4] = {
-  retail_key,
-  devkit_key,
-  retail_key_xex1,
-  devkit_key_xex1
-};
-const char* key_names[4] = {
-  "retail",
-  "devkit",
-  "retail-XEX1",
-  "devkit-XEX1"
-};
 
 bool XEXFile::VerifyBaseFileHeader(const uint8_t* data)
 {
@@ -139,13 +107,11 @@ bool XEXFile::load(void* file)
     if (header)
     {
       // Copy string and null terminate it ourselves, just in case
-      auto str = new char[header->Size + 1];
-      memcpy(str, header->Data, header->Size);
-      str[header->Size] = '\0';
+      auto str = std::make_unique<char[]>(header->Size + 1);
+      memcpy(str.get(), header->Data, header->Size);
+      str.get()[header->Size] = '\0';
 
-      pe_module_name_ = str;
-
-      delete[] str;
+      pe_module_name_ = str.get();
     }
   }
 
@@ -512,10 +478,10 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
     return false;
 
   int num_blocks = (data_descriptor_->Size - 8) / 8;
-  auto* xex_blocks = new xex_opt::XexRawDataDescriptor[num_blocks];
+  auto xex_blocks = std::make_unique<xex_opt::XexRawDataDescriptor[]>(num_blocks);
 
   seek(file, directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8, 0);
-  read(xex_blocks, sizeof(xex_opt::XexRawDataDescriptor), num_blocks, file);
+  read(xex_blocks.get(), sizeof(xex_opt::XexRawDataDescriptor), num_blocks, file);
 
   AES_ctx aes;
   uint8_t iv[] = {
@@ -544,7 +510,6 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
       if (!VerifyBaseFileHeader(pe_data_.data()))
       {
         pe_data_.clear();
-        delete[] xex_blocks;
         return false;
       }
 
@@ -563,8 +528,6 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
     position += xex_blocks[i].ZeroSize;
   }
   // todo: verify block size sum == ImageSize ?
-
-  delete[] xex_blocks;
 
   return true;
 }
