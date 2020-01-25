@@ -49,6 +49,28 @@ namespace xex_opt {
   }; // size 24
   static_assert(sizeof(XexExecutionId) == 0x18, "xex_opt::XexExecutionId");
 
+  namespace xex25 {
+    // xex25 version of execution ID is missing base version, and has 3 extra DWORDs
+    // changing the uint8_t fields to uint32_t seems to fill in those extra DWORDs nicely
+    struct XexExecutionId {
+      xe::be<uint32_t> MediaID;
+      xex::Version Version;
+      union {
+        xe::be<uint32_t> TitleID;
+        struct {
+          xe::be<uint16_t> PublisherID;
+          xe::be<uint16_t> GameID;
+        };
+      };
+      xe::be<uint32_t> Platform;
+      xe::be<uint32_t> ExecutableType;
+      xe::be<uint32_t> DiscNum;
+      xe::be<uint32_t> DiscsInSet;
+      xe::be<uint32_t> SaveGameID;
+    }; // size 32
+    static_assert(sizeof(XexExecutionId) == 32, "xex_opt::xex25::XexExecutionId");
+  }
+
   struct XexSectionHeader {
     char SectionName[0x8]; // 0x0 sz:0x8
     xe::be<uint32_t> VirtualAddress; // 0x8 sz:0x4

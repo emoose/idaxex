@@ -95,6 +95,7 @@
     <ClInclude Include="3rdparty\aes.hpp" />
     <ClInclude Include="3rdparty\byte_order.hpp" />
     <ClInclude Include="3rdparty\cxxopts.hpp" />
+    <ClInclude Include="3rdparty\date.hpp" />
     <ClInclude Include="3rdparty\lzx.h" />
     <ClInclude Include="3rdparty\lzx.hpp" />
     <ClInclude Include="3rdparty\lzx_int.h" />

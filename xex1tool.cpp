@@ -6,6 +6,7 @@
 #include <filesystem>
 
 #include "3rdparty/cxxopts.hpp"
+#include "3rdparty/date.hpp"
 
 #include "xex.hpp"
 #include "xex_headerids.hpp"
@@ -17,8 +18,38 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
 {
   printf("\nXEX Info\n");
 
-  bool encrypted = false;
+  auto& header = xex.header();
+  const char* exe_type = nullptr;
+  const char* exe_versions = nullptr;
+  switch (header.Magic) {
+  case MAGIC_XEX2:
+    exe_type = "XEX2";
+    exe_versions = ">=1861";
+    break;
+  case MAGIC_XEX1:
+    exe_type = "XEX1";
+    exe_versions = ">=1838";
+    break;
+  case MAGIC_XEX25:
+    exe_type = "XEX25 ('XEX%')";
+    exe_versions = ">=1746";
+    break;
+  case MAGIC_XEX2D:
+    exe_type = "XEX2D ('XEX-')";
+    exe_versions = ">=1640";
+    break;
+  case MAGIC_XEX3F:
+    exe_type = "XEX2F ('XEX?')";
+    exe_versions = ">=1529";
+    break;
+  }
 
+  if (!exe_type)
+    return; // wtf
+
+  printf("  %s %s (%s)\n", exe_type, xex.basefile_is_pe() ? "Executable" : "Image", exe_versions);
+
+  bool encrypted = false;
   if (xex.data_descriptor())
   {
     auto* desc = xex.data_descriptor();
@@ -45,19 +76,19 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  %sEncrypted\n", (!encrypted ? "Not " : ""));
   }
 
-  if (xex.header().ModuleFlags.TitleProcess)
+  if (header.ModuleFlags.TitleProcess)
     printf("  Title Module\n");
-  if (xex.header().ModuleFlags.TitleImports)
+  if (header.ModuleFlags.TitleImports)
     printf("  Title Exports\n");
-  if (xex.header().ModuleFlags.Debugger)
+  if (header.ModuleFlags.Debugger)
     printf("  System Debugger\n");
-  if (xex.header().ModuleFlags.Dll)
+  if (header.ModuleFlags.Dll)
     printf("  DLL Module\n");
-  if (xex.header().ModuleFlags.PatchFull)
+  if (header.ModuleFlags.PatchFull)
     printf("  Full Patch\n");
-  if (xex.header().ModuleFlags.PatchDelta)
+  if (header.ModuleFlags.PatchDelta)
     printf("  Delta Patch\n");
-  if (xex.header().ModuleFlags.UserMode)
+  if (header.ModuleFlags.UserMode)
     printf("  User Mode\n");
 
   auto& sec_info = xex.security_info();
@@ -112,7 +143,11 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   if(mslogo)
     printf("  Xbox360 Logo Data Present\n");
 
-  // TODO: Exports by Name ?
+  if (xex.has_header(XEX_HEADER_PE_IMPORTS))
+    printf("  Imports By Name\n");
+
+  if (xex.has_header(XEX_HEADER_PE_EXPORTS))
+    printf("  Exports By Name\n");
 
   auto* callcap = xex.opt_header_ptr<xex_opt::XexCallcapImports>(XEX_HEADER_CALLCAP_IMPORTS);
   if (callcap)
@@ -250,36 +285,43 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   if (stats)
   {
     printf("  Checksum:           %08X\n", (uint32_t)stats->Checksum);
-    printf("  Filetime:           %08X\n", (uint32_t)stats->Timestamp);
+
+    uint32_t timestamp = stats->Timestamp;
+    date::sys_seconds tp{ std::chrono::seconds{timestamp} };
+    std::string s = date::format("%a %b %d %I:%M:%S %Y", tp);
+
+    printf("  Filetime:           %08X - %s\n", timestamp, s.c_str());
   }
   auto stack_size = xex.opt_header(XEX_HEADER_STACK_SIZE);
   if (stack_size) {
     printf("  Stack Size:         %08X\n", stack_size);
   }
 
-  // TODO regions / media types
-
-  printf("\nRegions\n");
-  if (sec_info.ImageInfo.ImageFlags.NoGameRegion || (sec_info.ImageInfo.GameRegion & xex::Region_All))
-    printf("  All Regions\n");
-  else
+  // Write out region info (XEX1/XEX2 only)
+  if (header.Magic == MAGIC_XEX1 || header.Magic == MAGIC_XEX2)
   {
-    if (sec_info.ImageInfo.GameRegion & xex::Region_NorthAmerica)
-      printf("  North America\n");
-    if (sec_info.ImageInfo.GameRegion & xex::Region_Japan)
-      printf("  Japan\n");
-    if (sec_info.ImageInfo.GameRegion & xex::Region_China)
-      printf("  China\n");
-    if (sec_info.ImageInfo.GameRegion & xex::Region_RestOfAsia)
-      printf("  Rest of Asia\n");
-    if (sec_info.ImageInfo.GameRegion & xex::Region_AustraliaNewZealand)
-      printf("  Australia & New Zealand\n");
-    if (sec_info.ImageInfo.GameRegion & xex::Region_RestOfEurope)
-      printf("  Rest of Europe\n");
-    if (sec_info.ImageInfo.GameRegion & xex::Region_Europe)
-      printf("  Europe\n");
-    if (sec_info.ImageInfo.GameRegion & xex::Region_RestOfWorld)
-      printf("  Rest of the World\n");
+    printf("\nRegions\n");
+    if (sec_info.ImageInfo.ImageFlags.NoGameRegion || (sec_info.ImageInfo.GameRegion & xex::Region_All))
+      printf("  All Regions\n");
+    else
+    {
+      if (sec_info.ImageInfo.GameRegion & xex::Region_NorthAmerica)
+        printf("  North America\n");
+      if (sec_info.ImageInfo.GameRegion & xex::Region_Japan)
+        printf("  Japan\n");
+      if (sec_info.ImageInfo.GameRegion & xex::Region_China)
+        printf("  China\n");
+      if (sec_info.ImageInfo.GameRegion & xex::Region_RestOfAsia)
+        printf("  Rest of Asia\n");
+      if (sec_info.ImageInfo.GameRegion & xex::Region_AustraliaNewZealand)
+        printf("  Australia & New Zealand\n");
+      if (sec_info.ImageInfo.GameRegion & xex::Region_RestOfEurope)
+        printf("  Rest of Europe\n");
+      if (sec_info.ImageInfo.GameRegion & xex::Region_Europe)
+        printf("  Europe\n");
+      if (sec_info.ImageInfo.GameRegion & xex::Region_RestOfWorld)
+        printf("  Rest of the World\n");
+    }
   }
 
   printf("\nAllowed Media\n");
@@ -412,6 +454,20 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  Executable Type:    %d\n", exec_info->ExecutableType);
     printf("  Disc Number:        %d\n", exec_info->DiscNum);
     printf("  Number of Discs:    %d\n", exec_info->DiscsInSet);
+  }
+
+  auto* exec_info25 = xex.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
+  if (exec_info25)
+  {
+    printf("\nExecution ID (XEX25)\n");
+    printf("  Media ID:           %08X\n", (uint32_t)exec_info25->MediaID);
+    printf("  Title ID:           %08X\n", (uint32_t)exec_info25->TitleID);
+    printf("  Savegame ID:        %08X\n", (uint32_t)exec_info25->SaveGameID);
+    printf("  Version:            v%d.%d.%d.%d\n", exec_info25->Version.Major, exec_info25->Version.Minor, exec_info25->Version.Build, exec_info25->Version.QFE);
+    printf("  Platform:           %d\n", (uint32_t)exec_info25->Platform);
+    printf("  Executable Type:    %d\n", (uint32_t)exec_info25->ExecutableType);
+    printf("  Disc Number:        %d\n", (uint32_t)exec_info25->DiscNum);
+    printf("  Number of Discs:    %d\n", (uint32_t)exec_info25->DiscsInSet);
   }
 
   auto* libs = xex.opt_header_ptr<xex_opt::XexImageLibraryVersions>(XEX_HEADER_BUILD_VERSIONS);

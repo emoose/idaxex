@@ -62,8 +62,10 @@ bool XEXFile::load(void* file)
 
     // XEX25 (and probably XEX2D) use a different imports key
     // some part of them isn't loading properly though, so disable loading imports for those for now
-    /*if (header.Key == XEX_BETAHEADER_IMPORTS)
-      directory_entries_[XEX_HEADER_IMPORTS] = header.Value;*/
+    if (header.Key == XEX_HEADER_IMPORTS_BETA)
+      directory_entries_[XEX_HEADER_IMPORTS] = header.Value;
+    if (header.Key == XEX_HEADER_BUILD_VERSIONS_BETA)
+      directory_entries_[XEX_HEADER_BUILD_VERSIONS] = header.Value;
   }
 
   // Read security info
@@ -95,19 +97,24 @@ bool XEXFile::load(void* file)
   *(uint32_t*)&privileges_ = opt_header(XEX_HEADER_PRIVILEGES);
   *(uint32_t*)&privileges32_ = opt_header(XEX_HEADER_PRIVILEGES_32);
 
-  execution_id_ = reinterpret_cast<xex_opt::XexExecutionId*>(opt_header_ptr(XEX_HEADER_EXECUTION_ID));
+  execution_id_ = opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
   if (execution_id_)
   {
     *(uint32_t*)&execution_id_->BaseVersion = _byteswap_ulong(*(uint32_t*)&execution_id_->BaseVersion);
     *(uint32_t*)&execution_id_->Version = _byteswap_ulong(*(uint32_t*)&execution_id_->Version);
   }
 
-  vital_stats_ = reinterpret_cast<xex_opt::XexVitalStats*>(opt_header_ptr(XEX_HEADER_VITAL_STATS));
-  tls_data_ = reinterpret_cast<xex_opt::XexTlsData*>(opt_header_ptr(XEX_HEADER_TLS_DATA));
+  auto exec_id_25 = opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
+  if(exec_id_25)
+    *(uint32_t*)&exec_id_25->Version = _byteswap_ulong(*(uint32_t*)&exec_id_25->Version);
 
-  data_descriptor_ = reinterpret_cast<xex_opt::XexFileDataDescriptor*>(opt_header_ptr(XEX_FILE_DATA_DESCRIPTOR_HEADER));
 
-  auto libs = reinterpret_cast<xex_opt::XexImageLibraryVersions*>(opt_header_ptr(XEX_HEADER_BUILD_VERSIONS));
+  vital_stats_ = opt_header_ptr<xex_opt::XexVitalStats>(XEX_HEADER_VITAL_STATS);
+  tls_data_ = opt_header_ptr<xex_opt::XexTlsData>(XEX_HEADER_TLS_DATA);
+
+  data_descriptor_ = opt_header_ptr<xex_opt::XexFileDataDescriptor>(XEX_FILE_DATA_DESCRIPTOR_HEADER);
+
+  auto libs = opt_header_ptr<xex_opt::XexImageLibraryVersions>(XEX_HEADER_BUILD_VERSIONS);
   if (libs)
   {
     auto count = (libs->Size - 4) / sizeof(xex_opt::XexImageLibraryVersion);
@@ -117,7 +124,7 @@ bool XEXFile::load(void* file)
 
   if (directory_entries_.count(XEX_HEADER_PE_MODULE_NAME))
   {
-    auto* header = (xex_opt::XexStringHeader*)opt_header_ptr(XEX_HEADER_PE_MODULE_NAME);
+    auto* header = opt_header_ptr<xex_opt::XexStringHeader>(XEX_HEADER_PE_MODULE_NAME);
     if (header)
       pe_module_name_ = std::string(header->Data, (uint32_t)header->Size);
   }
@@ -131,7 +138,7 @@ bool XEXFile::load(void* file)
     return false;
 
   // Let's map in the XEX sections too, seeing as there's no tools for pre-XEX2 to view these with
-  auto sects = reinterpret_cast<xex_opt::XexSectionHeaders*>(opt_header_ptr(XEX_HEADER_SECTION_TABLE));
+  auto sects = opt_header_ptr<xex_opt::XexSectionHeaders>(XEX_HEADER_SECTION_TABLE);
   if (sects)
   {
     auto count = (sects->Size - 4) / sizeof(xex_opt::XexSectionHeader);
