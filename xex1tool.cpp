@@ -43,7 +43,7 @@ bool LoadSpa(XEXFile& xex, xe::kernel::xam::xdbf::SpaFile& spa)
   {
     auto* exec_info25 = xex.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
     if (exec_info25)
-      title_id = exec_info->TitleID;
+      title_id = exec_info25->TitleID;
   }
 
   auto tid = titleid2str(title_id, true);
