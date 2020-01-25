@@ -14,6 +14,12 @@
 extern const char* key_names[4];
 extern bool xex_log_verbose;
 
+std::string time2str(uint32_t time)
+{
+  date::sys_seconds tp{ std::chrono::seconds{time} };
+  return date::format("%a %b %d %I:%M:%S %Y", tp);
+}
+
 void PrintInfo(XEXFile& xex, bool print_mem_pages)
 {
   printf("\nXEX Info\n");
@@ -289,11 +295,8 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   {
     printf("  Checksum:           %08X\n", (uint32_t)stats->Checksum);
 
-    uint32_t timestamp = stats->Timestamp;
-    date::sys_seconds tp{ std::chrono::seconds{timestamp} };
-    std::string s = date::format("%a %b %d %I:%M:%S %Y", tp);
-
-    printf("  Filetime:           %08X - %s\n", timestamp, s.c_str());
+    auto s = time2str(stats->Timestamp);
+    printf("  Filetime:           %08X - %s\n", (uint32_t)stats->Timestamp, s.c_str());
   }
   auto stack_size = xex.opt_header(XEX_HEADER_STACK_SIZE);
   if (stack_size) {
@@ -427,11 +430,51 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("\n");
   }
 
+  auto* time_range = xex.opt_header_ptr<xex_opt::XexSystemTimeRange>(XEX_HEADER_TIME_RANGE);
+  if (!time_range)
+  {
+    time_range = xex.opt_header_ptr<xex_opt::XexSystemTimeRange>(XEX_HEADER_TIME_RANGE_ALT);
+    if (time_range)
+      printf("\n[+] Uses alt time range header!!!\n");
+  }
+  auto* kv_privs = xex.opt_header_ptr<xex_opt::XexKeyVaultPrivileges>(XEX_HEADER_KEY_VAULT_PRIVS);
+  if (!kv_privs)
+  {
+    kv_privs = xex.opt_header_ptr<xex_opt::XexKeyVaultPrivileges>(XEX_HEADER_KEY_VAULT_PRIVS_ALT);
+    if (kv_privs)
+      printf("\n[+] Uses alt KV privs header!!!\n");
+  }
+  if (time_range || kv_privs)
+  {
+    printf("\nRestrictions for Use\n");
+    // TODO: print these as strings!
+    if (time_range)
+    {
+      printf("  Start Date:         %llX\n", (uint64_t)time_range->Start);
+      printf("  End Date:           %llX\n", (uint64_t)time_range->End);
+    }
+    if (kv_privs)
+    {
+      printf("  KeyVault Mask:      %llX\n", (uint64_t)kv_privs->Mask);
+      printf("  KeyVault Value:     %llX\n", (uint64_t)kv_privs->Match);
+    }
+    // TODO: consoleID table
+  }
+
   auto* bound_path = xex.opt_header_ptr<xex_opt::XexStringHeader>(XEX_HEADER_BOUND_PATH);
   if (bound_path)
   {
     printf("\nBound Path\n");
     printf("  %.*s\n", (uint32_t)bound_path->Size, bound_path->Data);
+  }
+
+  key = (uint8_t*)xex.opt_header_ptr(XEX_HEADER_DEVICE_ID);
+  if (key)
+  {
+    printf("\nBound Device ID\n  ");
+    for (int i = 0; i < 0x14; i++)
+      printf("%02X ", key[i]);
+    printf("\n");
   }
 
   auto* tls_info = xex.opt_header_ptr<xex_opt::XexTlsData>(XEX_HEADER_TLS_DATA);
