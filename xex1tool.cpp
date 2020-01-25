@@ -20,6 +20,17 @@ std::string time2str(uint32_t time)
   return date::format("%a %b %d %I:%M:%S %Y", tp);
 }
 
+std::string titleid2str(uint32_t tid)
+{
+  char str[64];
+  if ((((tid >> 24) & 0xFF) - 0x21 > 0x59) || (((tid >> 16) & 0xFF) - 0x21 > 0x59))
+    sprintf_s(str, "%08X", tid);
+  else
+    sprintf_s(str, "%08X (%c%c-%d)", tid, ((tid >> 24) & 0xFF), ((tid >> 16) & 0xFF), (tid & 0xFFFF));
+
+  return str;
+}
+
 void PrintInfo(XEXFile& xex, bool print_mem_pages)
 {
   printf("\nXEX Info\n");
@@ -295,13 +306,36 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   {
     printf("  Checksum:           %08X\n", (uint32_t)stats->Checksum);
 
+    // TODO: should this be the VA from inside PE headers?
+    auto* exp_table = xex.opt_header_ptr<IMAGE_DATA_DIRECTORY>(XEX_HEADER_PE_EXPORTS);
+    if (exp_table)
+      printf("  Export Table:       %08X\n", exp_table->VirtualAddress);
+
     auto s = time2str(stats->Timestamp);
     printf("  Filetime:           %08X - %s\n", (uint32_t)stats->Timestamp, s.c_str());
   }
-  auto stack_size = xex.opt_header(XEX_HEADER_STACK_SIZE);
-  if (stack_size) {
-    printf("  Stack Size:         %08X\n", stack_size);
+  auto size = xex.opt_header(XEX_HEADER_STACK_SIZE);
+  if (size)
+    printf("  Stack Size:         %8X\n", size);
+
+  size = xex.opt_header(XEX_HEADER_XAPI_HEAP_SIZE);
+  if (size)
+    printf("  Heap Size:          %8X\n", size);
+
+  auto* page_heap = xex.opt_header_ptr<xex_opt::XexPageHeapOptions>(XEX_HEADER_PAGE_HEAP_SIZE_FLAGS);
+  if (page_heap)
+  {
+    printf("  Page Heap Size:     %8X\n", (uint32_t)page_heap->Size);
+    printf("  Page Heap Flags:    %8X\n", (uint32_t)page_heap->Flags);
   }
+
+  size = xex.opt_header(XEX_HEADER_WORKSPACE_SIZE);
+  if (size)
+    printf("  Workspace Size:     %8X\n", size);
+
+  size = xex.opt_header(XEX_HEADER_FSCACHE_SIZE);
+  if (size)
+    printf("  Filesystem Cache Size:  %8X\n", size);
 
   // Write out region info (XEX1/XEX2 only)
   if (header.Magic == MAGIC_XEX1 || header.Magic == MAGIC_XEX2)
@@ -492,7 +526,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   {
     printf("\nExecution ID\n");
     printf("  Media ID:           %08X\n", (uint32_t)exec_info->MediaID);
-    printf("  Title ID:           %08X\n", (uint32_t)exec_info->TitleID);
+    printf("  Title ID:           %s\n", titleid2str(exec_info->TitleID).c_str());
     printf("  Savegame ID:        %08X\n", (uint32_t)exec_info->SaveGameID);
     printf("  Version:            v%d.%d.%d.%d\n", exec_info->Version.Major, exec_info->Version.Minor, exec_info->Version.Build, exec_info->Version.QFE);
     printf("  Base Version:       v%d.%d.%d.%d\n", exec_info->BaseVersion.Major, exec_info->BaseVersion.Minor, exec_info->BaseVersion.Build, exec_info->BaseVersion.QFE);
@@ -507,7 +541,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   {
     printf("\nExecution ID (XEX25)\n");
     printf("  Media ID:           %08X\n", (uint32_t)exec_info25->MediaID);
-    printf("  Title ID:           %08X\n", (uint32_t)exec_info25->TitleID);
+    printf("  Title ID:           %s\n", titleid2str(exec_info25->TitleID).c_str());
     printf("  Savegame ID:        %08X\n", (uint32_t)exec_info25->SaveGameID);
     printf("  Version:            v%d.%d.%d.%d\n", exec_info25->Version.Major, exec_info25->Version.Minor, exec_info25->Version.Build, exec_info25->Version.QFE);
     printf("  Platform:           %d\n", (uint32_t)exec_info25->Platform);
@@ -515,6 +549,26 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  Disc Number:        %d\n", (uint32_t)exec_info25->DiscNum);
     printf("  Number of Discs:    %d\n", (uint32_t)exec_info25->DiscsInSet);
   }
+
+  auto* title_ids = xex.opt_header_ptr<uint32_t>(XEX_HEADER_ALTERNATE_TITLE_IDS);
+  if (title_ids)
+  {
+    uint32_t size = _byteswap_ulong(*title_ids);
+    uint32_t count = (size - 4) / sizeof(uint32_t);
+    if (count > 0)
+    {
+      printf("\nAlternate Title Ids\n");
+      title_ids++;
+      for (uint32_t i = 0; i < count; i++)
+      {
+        uint32_t tid = _byteswap_ulong(*title_ids);
+        title_ids++;
+        printf("  %3d) %s\n", i, titleid2str(tid).c_str());
+      }
+    }
+  }
+
+  // TODO: ratings!
 
   auto* libs = xex.opt_header_ptr<xex_opt::XexImageLibraryVersions>(XEX_HEADER_BUILD_VERSIONS);
   if (libs)

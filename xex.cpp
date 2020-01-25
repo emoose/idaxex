@@ -62,10 +62,20 @@ bool XEXFile::load(void* file)
 
     // XEX25 (and probably XEX2D) use a different imports key
     // some part of them isn't loading properly though, so disable loading imports for those for now
+#ifndef IDALDR
     if (header.Key == XEX_HEADER_IMPORTS_BETA)
       directory_entries_[XEX_HEADER_IMPORTS] = header.Value;
+#endif
     if (header.Key == XEX_HEADER_BUILD_VERSIONS_BETA)
       directory_entries_[XEX_HEADER_BUILD_VERSIONS] = header.Value;
+    if (header.Key == XEX_HEADER_TLS_DATA_BETA)
+      directory_entries_[XEX_HEADER_TLS_DATA] = header.Value;
+    if (header.Key == XEX_HEADER_STACK_SIZE_BETA)
+      directory_entries_[XEX_HEADER_STACK_SIZE] = header.Value;
+
+    // Not sure if we should do this:
+    if (header.Key == XEX_HEADER_PE_EXPORTS_BETA)
+      directory_entries_[XEX_HEADER_PE_EXPORTS] = header.Value;
   }
 
   // Read security info
