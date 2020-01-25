@@ -24,6 +24,18 @@ namespace xex_opt {
   };
   static_assert(sizeof(XexImportTable) == 0x28, "xex_opt::XexImportTable");
 
+  namespace xex2d {
+    struct XexImportTable {
+      xe::be<uint32_t> TableSize;
+      uint8_t NextImportDigest[0x14];
+      xe::be<uint32_t> ModuleNumber;
+      xex::Version Version;
+      uint8_t Unused;
+      uint8_t ModuleIndex;
+      xe::be<uint16_t> ImportCount;
+    };
+    static_assert(sizeof(XexImportTable) == 0x24, "xex_opt::xex2d::XexImportTable");
+  }
   struct XexCallcapImports {
     xe::be<uint32_t> BeginFunctionThunkAddress;
     xe::be<uint32_t> EndFunctionThunkAddress;
@@ -69,6 +81,26 @@ namespace xex_opt {
       xe::be<uint32_t> SaveGameID;
     }; // size 32
     static_assert(sizeof(XexExecutionId) == 32, "xex_opt::xex25::XexExecutionId");
+  }
+
+  namespace xex2d {
+    // xex2d version of execution ID is missing base version, and has 3 extra DWORDs
+    // changing the uint8_t fields to uint32_t seems to fill in those extra DWORDs nicely
+    struct XexExecutionId {
+      xe::be<uint32_t> MediaID;
+      xex::Version Version;
+      union {
+        xe::be<uint32_t> TitleID;
+        struct {
+          xe::be<uint16_t> PublisherID;
+          xe::be<uint16_t> GameID;
+        };
+      };
+      xe::be<uint32_t> UnkC;
+      xe::be<uint32_t> Unk10;
+      xe::be<uint32_t> Unk14;
+    }; // size 24
+    static_assert(sizeof(xex_opt::xex2d::XexExecutionId) == 0x18, "xex_opt::xex25::XexExecutionId");
   }
 
   struct XexSectionHeader {

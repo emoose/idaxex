@@ -146,52 +146,56 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  User Mode\n");
 
   auto& sec_info = xex.security_info();
-  if (sec_info.ImageInfo.ImageFlags.Unknown1)
-    printf("  Has Unknown1 flag\n");
-  if (sec_info.ImageInfo.ImageFlags.ManufacturingUtility)
-    printf("  Manufacturing Utility\n");
-  if (sec_info.ImageInfo.ImageFlags.ManufacturingSupportTool)
-    printf("  Manufacturing Support Tool\n");
-  if (sec_info.ImageInfo.ImageFlags.Xgd2MediaOnly)
-    printf("  XGD2 Media Only\n");
-  if (sec_info.ImageInfo.ImageFlags.DataCenterRequired)
-    printf("  DataCenter Required\n");
-  if (sec_info.ImageInfo.ImageFlags.DataCenterAware)
-    printf("  DataCenter Aware\n");
-  if (sec_info.ImageInfo.ImageFlags.CardeaKey)
-    printf("  Cardea Key\n");
-  if (sec_info.ImageInfo.ImageFlags.XeikaKey)
-    printf("  Xeika Key\n");
-  if (sec_info.ImageInfo.ImageFlags.TitleUserMode)
-    printf("  Title UserMode\n");
-  if (sec_info.ImageInfo.ImageFlags.SystemUserMode)
-    printf("  System UserMode\n");
-  if (sec_info.ImageInfo.ImageFlags.Orange0)
-    printf("  Orange0\n");
-  if (sec_info.ImageInfo.ImageFlags.Orange1)
-    printf("  Orange1\n");
-  if (sec_info.ImageInfo.ImageFlags.Orange2)
-    printf("  Orange2\n");
-  if (sec_info.ImageInfo.ImageFlags.SignedKeyVaultRequired)
-    printf("  Signed KeyVault Required\n");
-  if (sec_info.ImageInfo.ImageFlags.IptvSignupApplication)
-    printf("  Iptv Signup Application\n");
-  if (sec_info.ImageInfo.ImageFlags.IptvTitleApplication)
-    printf("  Iptv Title Application\n");
-  if (sec_info.ImageInfo.ImageFlags.NccpKeys)
-    printf("  NCCP Keys\n");
-  if (sec_info.ImageInfo.ImageFlags.KeyVaultPrivilegesRequired)
-    printf("  KeyVault Privileges Required\n");
-  if (sec_info.ImageInfo.ImageFlags.OnlineActivationRequired)
-    printf("  Online Activation Required\n");
-  if (sec_info.ImageInfo.ImageFlags.PageSize4Kb)
-    printf("  Page Size 4Kb\n");
-  if (sec_info.ImageInfo.ImageFlags.NoGameRegion)
-    printf("  No Game Region\n");
-  if (sec_info.ImageInfo.ImageFlags.RevocationCheckOptional)
-    printf("  Revocation Check Optional\n");
-  if (sec_info.ImageInfo.ImageFlags.RevocationCheckRequired)
-    printf("  Revocation Check Required\n");
+  // Flags aren't correct for XEX2D afaik...
+  if (header.Magic != MAGIC_XEX2D)
+  {
+    if (sec_info.ImageInfo.ImageFlags.Unknown1)
+      printf("  Has Unknown1 flag\n");
+    if (sec_info.ImageInfo.ImageFlags.ManufacturingUtility)
+      printf("  Manufacturing Utility\n");
+    if (sec_info.ImageInfo.ImageFlags.ManufacturingSupportTool)
+      printf("  Manufacturing Support Tool\n");
+    if (sec_info.ImageInfo.ImageFlags.Xgd2MediaOnly)
+      printf("  XGD2 Media Only\n");
+    if (sec_info.ImageInfo.ImageFlags.DataCenterRequired)
+      printf("  DataCenter Required\n");
+    if (sec_info.ImageInfo.ImageFlags.DataCenterAware)
+      printf("  DataCenter Aware\n");
+    if (sec_info.ImageInfo.ImageFlags.CardeaKey)
+      printf("  Cardea Key\n");
+    if (sec_info.ImageInfo.ImageFlags.XeikaKey)
+      printf("  Xeika Key\n");
+    if (sec_info.ImageInfo.ImageFlags.TitleUserMode)
+      printf("  Title UserMode\n");
+    if (sec_info.ImageInfo.ImageFlags.SystemUserMode)
+      printf("  System UserMode\n");
+    if (sec_info.ImageInfo.ImageFlags.Orange0)
+      printf("  Orange0\n");
+    if (sec_info.ImageInfo.ImageFlags.Orange1)
+      printf("  Orange1\n");
+    if (sec_info.ImageInfo.ImageFlags.Orange2)
+      printf("  Orange2\n");
+    if (sec_info.ImageInfo.ImageFlags.SignedKeyVaultRequired)
+      printf("  Signed KeyVault Required\n");
+    if (sec_info.ImageInfo.ImageFlags.IptvSignupApplication)
+      printf("  Iptv Signup Application\n");
+    if (sec_info.ImageInfo.ImageFlags.IptvTitleApplication)
+      printf("  Iptv Title Application\n");
+    if (sec_info.ImageInfo.ImageFlags.NccpKeys)
+      printf("  NCCP Keys\n");
+    if (sec_info.ImageInfo.ImageFlags.KeyVaultPrivilegesRequired)
+      printf("  KeyVault Privileges Required\n");
+    if (sec_info.ImageInfo.ImageFlags.OnlineActivationRequired)
+      printf("  Online Activation Required\n");
+    if (sec_info.ImageInfo.ImageFlags.PageSize4Kb)
+      printf("  Page Size 4Kb\n");
+    if (sec_info.ImageInfo.ImageFlags.NoGameRegion)
+      printf("  No Game Region\n");
+    if (sec_info.ImageInfo.ImageFlags.RevocationCheckOptional)
+      printf("  Revocation Check Optional\n");
+    if (sec_info.ImageInfo.ImageFlags.RevocationCheckRequired)
+      printf("  Revocation Check Required\n");
+  }
 
   auto mslogo = xex.has_header(XEX_HEADER_MSLOGO);
   if(mslogo)
@@ -401,62 +405,66 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     }
   }
 
-  printf("\nAllowed Media\n");
-  auto media_int = *(uint32_t*)&sec_info.AllowedMediaTypes;
-  if (sec_info.ImageInfo.ImageFlags.Xgd2MediaOnly)
+  // XEX2D seems to use different media values or something...
+  if (header.Magic != MAGIC_XEX2D)
   {
-    if (sec_info.AllowedMediaTypes.DvdCd)
-      printf("  DVD-XGD2 (Xbox360 Original Disc)\n");
-    else
-      printf("  Updated DVD-XGD2 (Updated version of Xbox360 Original Disc)\n");
-  }
-  else
-  {
-    if (!media_int || media_int == 0xFFFFFFFF)
-      printf("  All Media Types\n");
-    else {
-      if (sec_info.AllowedMediaTypes.HardDisk)
-        printf("  Hard Disk\n");
-      if (sec_info.AllowedMediaTypes.DvdX2)
-        printf("  DVD-X2 (Xbox OG Original Disc)\n");
+    printf("\nAllowed Media\n");
+    auto media_int = *(uint32_t*)&sec_info.AllowedMediaTypes;
+    if (sec_info.ImageInfo.ImageFlags.Xgd2MediaOnly)
+    {
       if (sec_info.AllowedMediaTypes.DvdCd)
-        printf("  DVD / CD\n");
-      if (sec_info.AllowedMediaTypes.Dvd5)
-        printf("  DVD-5\n");
-      if (sec_info.AllowedMediaTypes.Dvd9)
-        printf("  DVD-9\n");
-      if (sec_info.AllowedMediaTypes.SystemFlash)
-        printf("  System Flash\n");
-      if (sec_info.AllowedMediaTypes._Unknown40)
-        printf("  _Unknown40\n");
-      if (sec_info.AllowedMediaTypes.MemoryUnit)
-        printf("  Memory Unit\n");
-      if (sec_info.AllowedMediaTypes.MassStorageDevice)
-        printf("  USB Mass Storage Device\n");
-      if (sec_info.AllowedMediaTypes.SmbFilesystem)
-        printf("  Networked SMB Share\n");
-      if (sec_info.AllowedMediaTypes.DirectFromRam)
-        printf("  Direct From RAM\n");
-      if (sec_info.AllowedMediaTypes._Unknown800)
-        printf("  _Unknown800\n");
-      if (sec_info.AllowedMediaTypes.SecureVirtualOpticalDevice)
-        printf("  Secure Virtual Optical Device (\"SVOD\")\n");
-      if (sec_info.AllowedMediaTypes.WirelessNStorageDevice)
-        printf("  WirelessN Storage Device\n");
-      if (sec_info.AllowedMediaTypes.SystemExtendedPartition)
-        printf("  System Extended Partition (\"SEP\")\n");
-      if (sec_info.AllowedMediaTypes.SystemAuxiliaryPartition)
-        printf("  System Auxiliary Partition (\"SAP\")\n");
-      if (sec_info.AllowedMediaTypes.InsecurePackage)
-        printf("  Insecure Package (\"CON\")\n");
-      if (sec_info.AllowedMediaTypes.SaveGamePackage)
-        printf("  Savegame Package (\"CON\")\n");
-      if (sec_info.AllowedMediaTypes.LocallySignedPackage)
-        printf("  Locally Signed Package (\"CON\")\n");
-      if (sec_info.AllowedMediaTypes.LiveSignedPackage)
-        printf("  Live Signed Package (\"LIVE\")\n");
-      if (sec_info.AllowedMediaTypes.XboxPlatformPackage)
-        printf("  Xbox Platform Package (\"PIRS\")\n");
+        printf("  DVD-XGD2 (Xbox360 Original Disc)\n");
+      else
+        printf("  Updated DVD-XGD2 (Updated version of Xbox360 Original Disc)\n");
+    }
+    else
+    {
+      if (!media_int || media_int == 0xFFFFFFFF)
+        printf("  All Media Types\n");
+      else {
+        if (sec_info.AllowedMediaTypes.HardDisk)
+          printf("  Hard Disk\n");
+        if (sec_info.AllowedMediaTypes.DvdX2)
+          printf("  DVD-X2 (Xbox OG Original Disc)\n");
+        if (sec_info.AllowedMediaTypes.DvdCd)
+          printf("  DVD / CD\n");
+        if (sec_info.AllowedMediaTypes.Dvd5)
+          printf("  DVD-5\n");
+        if (sec_info.AllowedMediaTypes.Dvd9)
+          printf("  DVD-9\n");
+        if (sec_info.AllowedMediaTypes.SystemFlash)
+          printf("  System Flash\n");
+        if (sec_info.AllowedMediaTypes._Unknown40)
+          printf("  _Unknown40\n");
+        if (sec_info.AllowedMediaTypes.MemoryUnit)
+          printf("  Memory Unit\n");
+        if (sec_info.AllowedMediaTypes.MassStorageDevice)
+          printf("  USB Mass Storage Device\n");
+        if (sec_info.AllowedMediaTypes.SmbFilesystem)
+          printf("  Networked SMB Share\n");
+        if (sec_info.AllowedMediaTypes.DirectFromRam)
+          printf("  Direct From RAM\n");
+        if (sec_info.AllowedMediaTypes._Unknown800)
+          printf("  _Unknown800\n");
+        if (sec_info.AllowedMediaTypes.SecureVirtualOpticalDevice)
+          printf("  Secure Virtual Optical Device (\"SVOD\")\n");
+        if (sec_info.AllowedMediaTypes.WirelessNStorageDevice)
+          printf("  WirelessN Storage Device\n");
+        if (sec_info.AllowedMediaTypes.SystemExtendedPartition)
+          printf("  System Extended Partition (\"SEP\")\n");
+        if (sec_info.AllowedMediaTypes.SystemAuxiliaryPartition)
+          printf("  System Auxiliary Partition (\"SAP\")\n");
+        if (sec_info.AllowedMediaTypes.InsecurePackage)
+          printf("  Insecure Package (\"CON\")\n");
+        if (sec_info.AllowedMediaTypes.SaveGamePackage)
+          printf("  Savegame Package (\"CON\")\n");
+        if (sec_info.AllowedMediaTypes.LocallySignedPackage)
+          printf("  Locally Signed Package (\"CON\")\n");
+        if (sec_info.AllowedMediaTypes.LiveSignedPackage)
+          printf("  Live Signed Package (\"LIVE\")\n");
+        if (sec_info.AllowedMediaTypes.XboxPlatformPackage)
+          printf("  Xbox Platform Package (\"PIRS\")\n");
+      }
     }
   }
 
@@ -558,19 +566,33 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  Raw Data Size:      %08X\n", (uint32_t)tls_info->SizeOfRawData);
   }
 
-  auto* exec_info = xex.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
-  if (exec_info)
-  {
-    printf("\nExecution ID\n");
-    printf("  Media ID:           %08X\n", (uint32_t)exec_info->MediaID);
-    printf("  Title ID:           %s\n", titleid2str(exec_info->TitleID).c_str());
-    printf("  Savegame ID:        %08X\n", (uint32_t)exec_info->SaveGameID);
-    printf("  Version:            v%d.%d.%d.%d\n", exec_info->Version.Major, exec_info->Version.Minor, exec_info->Version.Build, exec_info->Version.QFE);
-    printf("  Base Version:       v%d.%d.%d.%d\n", exec_info->BaseVersion.Major, exec_info->BaseVersion.Minor, exec_info->BaseVersion.Build, exec_info->BaseVersion.QFE);
-    printf("  Platform:           %d\n", exec_info->Platform);
-    printf("  Executable Type:    %d\n", exec_info->ExecutableType);
-    printf("  Disc Number:        %d\n", exec_info->DiscNum);
-    printf("  Number of Discs:    %d\n", exec_info->DiscsInSet);
+  if (header.Magic != MAGIC_XEX2D) {
+    auto* exec_info = xex.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+    if (exec_info)
+    {
+      printf("\nExecution ID\n");
+      printf("  Media ID:           %08X\n", (uint32_t)exec_info->MediaID);
+      printf("  Title ID:           %s\n", titleid2str(exec_info->TitleID).c_str());
+      printf("  Savegame ID:        %08X\n", (uint32_t)exec_info->SaveGameID);
+      printf("  Version:            v%d.%d.%d.%d\n", exec_info->Version.Major, exec_info->Version.Minor, exec_info->Version.Build, exec_info->Version.QFE);
+      printf("  Base Version:       v%d.%d.%d.%d\n", exec_info->BaseVersion.Major, exec_info->BaseVersion.Minor, exec_info->BaseVersion.Build, exec_info->BaseVersion.QFE);
+      printf("  Platform:           %d\n", exec_info->Platform);
+      printf("  Executable Type:    %d\n", exec_info->ExecutableType);
+      printf("  Disc Number:        %d\n", exec_info->DiscNum);
+      printf("  Number of Discs:    %d\n", exec_info->DiscsInSet);
+    }
+  } else {
+    auto* exec_info = xex.opt_header_ptr<xex_opt::xex2d::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+    if (exec_info)
+    {
+      printf("\nExecution ID (XEX2D)\n");
+      printf("  Media ID:           %08X\n", (uint32_t)exec_info->MediaID);
+      printf("  Title ID:           %s\n", titleid2str(exec_info->TitleID).c_str());
+      printf("  Version:            v%d.%d.%d.%d\n", exec_info->Version.Major, exec_info->Version.Minor, exec_info->Version.Build, exec_info->Version.QFE);
+      printf("  UnkC:               %08X\n", (uint32_t)exec_info->UnkC);
+      printf("  Unk10:              %08X\n", (uint32_t)exec_info->Unk10);
+      printf("  Unk14:              %08X\n", (uint32_t)exec_info->Unk14);
+    }
   }
 
   auto* exec_info25 = xex.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);

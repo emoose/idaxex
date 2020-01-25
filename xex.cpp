@@ -110,8 +110,16 @@ bool XEXFile::load(void* file)
   execution_id_ = opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
   if (execution_id_)
   {
-    *(uint32_t*)&execution_id_->BaseVersion = _byteswap_ulong(*(uint32_t*)&execution_id_->BaseVersion);
-    *(uint32_t*)&execution_id_->Version = _byteswap_ulong(*(uint32_t*)&execution_id_->Version);
+    if (header().Magic != MAGIC_XEX2D)
+    {
+      *(uint32_t*)&execution_id_->BaseVersion = _byteswap_ulong(*(uint32_t*)&execution_id_->BaseVersion);
+      *(uint32_t*)&execution_id_->Version = _byteswap_ulong(*(uint32_t*)&execution_id_->Version);
+    }
+    else
+    {
+      auto* exec_2d = (xex_opt::xex2d::XexExecutionId*)execution_id_;
+      *(uint32_t*)&exec_2d->Version = _byteswap_ulong(*(uint32_t*)&exec_2d->Version);
+    }
   }
 
   auto exec_id_25 = opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
@@ -229,10 +237,27 @@ bool XEXFile::read_imports(void* file)
 
     // Read in import table header
     xex_opt::XexImportTable table_header;
-    read(&table_header, sizeof(xex_opt::XexImportTable), 1, file);
-    *(uint32_t*)&table_header.Version = _byteswap_ulong(*(uint32_t*)&table_header.Version);
-    *(uint32_t*)&table_header.VersionMin = _byteswap_ulong(*(uint32_t*)&table_header.VersionMin);
+    if (header().Magic == MAGIC_XEX2D) {
+      // XEX2D has a slightly smaller import table, read it and copy stuff over...
+      xex_opt::xex2d::XexImportTable table_header_2d;
+      read(&table_header_2d, sizeof(xex_opt::xex2d::XexImportTable), 1, file);
 
+      // Copy over to normal table header
+      table_header.TableSize = table_header_2d.TableSize;
+      memcpy(table_header.NextImportDigest, table_header_2d.NextImportDigest, 0x14);
+      table_header.ModuleNumber = table_header_2d.ModuleNumber;
+      *(uint32_t*)&table_header.Version = _byteswap_ulong(*(uint32_t*)&table_header_2d.Version);
+      *(uint32_t*)&table_header.VersionMin = 0;
+      table_header.Unused = table_header_2d.Unused;
+      table_header.ModuleIndex = table_header_2d.ModuleIndex;
+      table_header.ImportCount = table_header_2d.ImportCount;
+    }
+    else
+    {
+      read(&table_header, sizeof(xex_opt::XexImportTable), 1, file);
+      *(uint32_t*)&table_header.Version = _byteswap_ulong(*(uint32_t*)&table_header.Version);
+      *(uint32_t*)&table_header.VersionMin = _byteswap_ulong(*(uint32_t*)&table_header.VersionMin);
+    }
     auto& libname = import_libs.at(table_header.ModuleIndex);
 
     if (!imports_.count(libname))
