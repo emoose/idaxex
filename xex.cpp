@@ -164,11 +164,47 @@ bool XEXFile::load(void* file)
     {
       auto& section = sects->Sections[i];
 
-      IMAGE_SECTION_HEADER pe_sec;
+      IMAGE_SECTION_HEADER pe_sec = {};
       pe_sec.Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ;
       pe_sec.VirtualAddress = section.VirtualAddress - base_address();
       pe_sec.VirtualSize = section.VirtualSize;
       pe_sec.SizeOfRawData = section.VirtualSize;
+      memcpy(pe_sec.Name, section.SectionName, 8);
+
+      xex_sections_.push_back(pe_sec);
+    }
+  }
+
+  // XEX3F stores resources with PE sections in a different table:
+  auto sects_beta = opt_header_ptr<xex_opt::xex3f::XexSectionHeaders>(XEX_HEADER_SECTION_TABLE_BETA);
+  if (sects_beta)
+  {
+    auto count = (sects_beta->Size - 4) / sizeof(xex_opt::xex3f::XexSectionHeader);
+    int start_index = sections_.size(); // skip PE sections
+    for (uint32_t i = start_index; i < count; i++)
+    {
+      auto& section = sects_beta->Sections[i];
+
+      IMAGE_SECTION_HEADER pe_sec = {};
+
+      pe_sec.Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA;
+      if ((section.PageInfoFlags & xex::HvPageInfoFlags::PageInfoFlag_NoWrite))
+      {
+        if (!(section.PageInfoFlags & xex::HvPageInfoFlags::PageInfoFlag_NoExecute))
+          pe_sec.Characteristics = IMAGE_SCN_CNT_CODE;
+      }
+
+      pe_sec.Characteristics |= IMAGE_SCN_MEM_READ;
+
+      if (!(section.PageInfoFlags & xex::HvPageInfoFlags::PageInfoFlag_NoWrite))
+        pe_sec.Characteristics |= IMAGE_SCN_MEM_WRITE;
+      if (!(section.PageInfoFlags & xex::HvPageInfoFlags::PageInfoFlag_NoExecute))
+        pe_sec.Characteristics |= IMAGE_SCN_MEM_EXECUTE;
+
+      pe_sec.VirtualAddress = section.VirtualAddress;
+      pe_sec.VirtualSize = section.VirtualSize;
+      pe_sec.SizeOfRawData = section.SizeOfRawData;
+      pe_sec.PointerToRawData = section.PointerToRawData - xex_header_.SizeOfHeaders;
       memcpy(pe_sec.Name, section.SectionName, 8);
 
       xex_sections_.push_back(pe_sec);
@@ -716,37 +752,37 @@ bool XEXFile::pe_load_imports(const uint8_t* data)
   while (import_desc->FirstThunk)
   {
     auto module_name_addr = pe_rva_to_offset(import_desc->Name);
-    if (!module_name_addr)
-      continue;
-
-    char* libname = (char*)(data + module_name_addr);
-
-    imports_addr = pe_rva_to_offset(import_desc->FirstThunk);
-    if (!imports_addr)
-      continue;
-
-    if (!imports_.count(libname))
-      imports_[libname] = std::map<uint32_t, XEXFunction>();
-
-    // Loop through imports...
-    uint32_t import_offset = 0;
-    auto* import_data = (uint32_t*)(data + imports_addr);
-    while (*import_data)
+    if (module_name_addr)
     {
-      auto ordinal = *import_data & 0xFFFF;
+      char* libname = (char*)(data + module_name_addr);
 
-      XEXFunction imp;
-      if (imports_[libname].count(ordinal))
-        imp = imports_[libname][ordinal];
+      imports_addr = pe_rva_to_offset(import_desc->FirstThunk);
+      if (imports_addr)
+      {
 
-      imp.ThunkAddr = base_address() + import_desc->FirstThunk + import_offset;
+        if (!imports_.count(libname))
+          imports_[libname] = std::map<uint32_t, XEXFunction>();
 
-      imports_[libname][ordinal] = imp;
-      import_offset += 4;
+        // Loop through imports...
+        uint32_t import_offset = 0;
+        auto* import_data = (uint32_t*)(data + imports_addr);
+        while (*import_data++)
+        {
+          auto ordinal = *import_data & 0xFFFF;
 
-      // todo: search code for references to ThunkAddr
+          XEXFunction imp;
+          if (imports_[libname].count(ordinal))
+            imp = imports_[libname][ordinal];
+
+          imp.ThunkAddr = base_address() + import_desc->FirstThunk + import_offset;
+
+          imports_[libname][ordinal] = imp;
+          import_offset += 4;
+
+          // todo: search code for references to ThunkAddr
+        }
+      }
     }
-
     import_desc++;
   }
 
@@ -820,7 +856,7 @@ bool XEXFile::pe_load(const uint8_t* data)
     sizeof(IMAGE_NT_HEADERS));
 
   for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
-    sections_.push_back(sects[i]);
+      sections_.push_back(sects[i]);
 
   if (xex_header_.Magic == MAGIC_XEX3F)
   {

@@ -315,4 +315,22 @@ namespace xex_opt {
   };
   static_assert(sizeof(XexStringHeader) == 5, "xex_opt::XexStringHeader");
 #pragma pack(pop)
+
+  namespace xex3f {
+    struct XexSectionHeader {
+      char SectionName[8];
+      xe::be<uint32_t> VirtualAddress;
+      xe::be<uint32_t> VirtualSize;
+      xe::be<uint32_t> PointerToRawData;
+      xe::be<uint32_t> SizeOfRawData;
+      xe::be<uint32_t> PageInfoFlags; // HvPageInfoFlags
+      xe::be<uint32_t> Unknown1C;
+    };
+    static_assert(sizeof(xex3f::XexSectionHeader) == 0x20, "xex_opt::xex3f::XexSectionHeader");
+  
+    struct XexSectionHeaders {
+      xe::be<uint32_t> Size; // (Size - 4) / 0x20 = count
+      XexSectionHeader Sections[1];
+    };
+  }
 };

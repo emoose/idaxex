@@ -837,7 +837,11 @@ int main(int argc, char* argv[])
           printf("Error %d opening file %s for writing\n", res, res_path.string().c_str());
         }
         else {
+
           auto addr = xex.pe_rva_to_offset(section.VirtualAddress);
+          if (xex.header().Magic == MAGIC_XEX3F || !addr)
+            addr = section.PointerToRawData;
+
           auto* data = xex.pe_data() + addr;
           fwrite(data, 1, std::min(section.SizeOfRawData, section.VirtualSize), file);
           fclose(file);
