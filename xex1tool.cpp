@@ -11,6 +11,8 @@
 #include "xex.hpp"
 #include "xex_headerids.hpp"
 
+#include "xdbf/xdbf.hpp"
+
 extern const char* key_names[4];
 extern bool xex_log_verbose;
 
@@ -20,15 +22,50 @@ std::string time2str(uint32_t time)
   return date::format("%a %b %d %I:%M:%S %Y", tp);
 }
 
-std::string titleid2str(uint32_t tid)
+std::string titleid2str(uint32_t tid, bool id_only = false)
 {
   char str[64];
-  if ((((tid >> 24) & 0xFF) - 0x21 > 0x59) || (((tid >> 16) & 0xFF) - 0x21 > 0x59))
+  if (id_only || (((tid >> 24) & 0xFF) - 0x21 > 0x59) || (((tid >> 16) & 0xFF) - 0x21 > 0x59))
     sprintf_s(str, "%08X", tid);
   else
     sprintf_s(str, "%08X (%c%c-%d)", tid, ((tid >> 24) & 0xFF), ((tid >> 16) & 0xFF), (tid & 0xFFFF));
 
   return str;
+}
+
+bool LoadSpa(XEXFile& xex, xe::kernel::xam::xdbf::SpaFile& spa)
+{
+  uint32_t title_id = 0;
+  auto* exec_info = xex.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+  if (exec_info)
+    title_id = exec_info->TitleID;
+  else
+  {
+    auto* exec_info25 = xex.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
+    if (exec_info25)
+      title_id = exec_info->TitleID;
+  }
+
+  auto tid = titleid2str(title_id, true);
+
+  auto& sects = xex.xex_sections();
+  for (auto section : sects)
+  {
+    char name[9];
+    memset(name, 0, 9);
+    memcpy(name, section.Name, 8);
+
+    if (std::string(name) != tid)
+      continue;
+
+    auto* data = xex.pe_data();
+    data += xex.pe_rva_to_offset(section.VirtualAddress);
+    auto size = std::min(section.SizeOfRawData, section.VirtualSize);
+
+    return spa.Read(data, size);
+  }
+
+  return false;
 }
 
 void PrintInfo(XEXFile& xex, bool print_mem_pages)
@@ -548,6 +585,19 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  Executable Type:    %d\n", (uint32_t)exec_info25->ExecutableType);
     printf("  Disc Number:        %d\n", (uint32_t)exec_info25->DiscNum);
     printf("  Number of Discs:    %d\n", (uint32_t)exec_info25->DiscsInSet);
+  }
+
+  xe::kernel::xam::xdbf::SpaFile spa;
+  if (LoadSpa(xex, spa)) {
+    printf("\nSPA / XDBF Info\n");
+    printf("  Title Name:         %s\n", spa.GetTitleName().c_str());
+    xe::kernel::xam::xdbf::X_XDBF_XTHD_DATA title_data;
+    if (spa.GetTitleData(&title_data))
+    {
+      printf("  Title Type:         %d\n", (uint32_t)title_data.title_type);
+      printf("  XDBF Version:       v%d.%d.%d.%d\n", (uint32_t)title_data.title_version_major, (uint32_t)title_data.title_version_minor, (uint32_t)title_data.title_version_build, (uint32_t)title_data.title_version_revision);
+    }
+    printf("  Achievement Count:  %d\n", spa.GetAchievements(xe::kernel::xam::xdbf::XLanguage::kEnglish, nullptr));
   }
 
   auto* title_ids = xex.opt_header_ptr<uint32_t>(XEX_HEADER_ALTERNATE_TITLE_IDS);

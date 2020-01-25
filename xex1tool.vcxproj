@@ -87,6 +87,7 @@
     <ClCompile Include="3rdparty\aes.c" />
     <ClCompile Include="3rdparty\lzx.c" />
     <ClCompile Include="3rdparty\sha1.c" />
+    <ClCompile Include="xdbf\xdbf.cc" />
     <ClCompile Include="xex.cpp" />
     <ClCompile Include="xex1tool.cpp" />
   </ItemGroup>
@@ -102,6 +103,8 @@
     <ClInclude Include="3rdparty\sha1.h" />
     <ClInclude Include="3rdparty\sha1.hpp" />
     <ClInclude Include="pe_structs.hpp" />
+    <ClInclude Include="xdbf\xdbf.hpp" />
+    <ClInclude Include="xdbf\xdbf_xbox.hpp" />
     <ClInclude Include="xex.hpp" />
     <ClInclude Include="xex_headerids.hpp" />
     <ClInclude Include="xex_keys.hpp" />

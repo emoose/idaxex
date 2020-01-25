@@ -30,6 +30,9 @@
     <ClCompile Include="3rdparty\sha1.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="xdbf\xdbf.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xex_headerids.hpp">
@@ -78,6 +81,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="3rdparty\date.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xdbf\xdbf.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xdbf\xdbf_xbox.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
