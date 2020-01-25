@@ -162,114 +162,117 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  Requires %dMB Extra Debug Memory\n", addt_mem);
 
   auto privileges = xex.opt_header(XEX_HEADER_PRIVILEGES);
-  if (privileges)
+  auto privileges32 = xex.opt_header(XEX_HEADER_PRIVILEGES_32);
+  if (privileges || privileges32)
   {
     printf("\nXEX Privileges\n");
-    auto* privs = (xex_opt::XexPrivileges*)&privileges;
-    if (privs->NoForceReboot)
-      printf("  No Force Reboot\n");
-    if (privs->ForegroundTasks)
-      printf("  Foreground Tasks\n");
-    if (privs->NoOddMapping)
-      printf("  No ODD Mapping\n");
-    if (privs->HandleMceInput)
-      printf("  Handles MCE Input\n");
-    if (privs->RestrictHudFeatures)
-      printf("  Restricted HUD Features\n");
-    if (privs->HandleGamepadDisconnect)
-      printf("  Handles Gamepad Disconnect\n");
-    if (privs->InsecureSockets)
-      printf("  Has Insecure Sockets\n");
-    if (privs->Xbox1XspInterop)
-      printf("  Xbox1 XSP Interoperability\n");
-    if (privs->SetDashContext)
-      printf("  Can Set Dash Context\n");
-    if (privs->TitleUsesGameVoiceChannel)
-      printf("  Uses Game Voice Channel\n");
-    if (privs->TitlePal50Incompatible)
-      printf("  PAL-50 Incompatible\n");
-    if (privs->TitleInsecureUtilityDrive)
-      printf("  Supports Insecure Utility Drive\n");
-    if (privs->TitleXamHooks)
-      printf("  Xam Hooks\n");
-    if (privs->TitlePii)
-      printf("  PII\n");
-    if (privs->CrossplatformSystemLink)
-      printf("  Crossplatform System Link\n");
-    if (privs->MultidiscSwap)
-      printf("  Multidisc Swap\n");
-    if (privs->MultidiscInsecureMedia)
-      printf("  Supports Insecure Multidisc Media\n");
-    if (privs->Ap25Media)
-      printf("  AP25 Media\n");
-    if (privs->NoConfirmExit)
-      printf("  No Confirm Exit\n");
-    if (privs->AllowBackgroundDownload)
-      printf("  Allows Background Downloads\n");
-    if (privs->CreatePersistableRamdrive)
-      printf("  Creates Persistable Ramdrive\n");
-    if (privs->InheritPersistedRamdrive)
-      printf("  Inherits Persisted Ramdrive\n");
-    if (privs->AllowHudVibration)
-      printf("  Allows HUD Vibration\n");
-    if (privs->TitleBothUtilityPartitions)
-      printf("  Can Use Both Utility Partitions\n");
-    if (privs->HandleIPTVInput)
-      printf("  Handles IPTV Input\n");
-    if (privs->PreferBigButtonInput)
-      printf("  Prefers Big Button Input\n");
-    if (privs->AllowXsamReservation)
-      printf("  Allow Xsam Reservation\n");
-    if (privs->MultidiscCrossTitle)
-      printf("  Multidisc Cross Title\n");
-    if (privs->TitleInstallIncompatible)
-      printf("  Title Install Incompatible\n");
-    if (privs->AllowAvatarGetMetadataByXUID)
-      printf("  Allow Avatar Get Metadata By XUID\n");
-    if (privs->AllowControllerSwapping)
-      printf("  Allow Controller Swapping\n");
-    if (privs->DashExtensibilityModule)
-      printf("  Dash Extensibility Module\n");
+    if (privileges)
+    {
+      auto* privs = (xex_opt::XexPrivileges*)&privileges;
+      if (privs->NoForceReboot)
+        printf("  0x00: No Force Reboot\n");
+      if (privs->ForegroundTasks)
+        printf("  0x01: Foreground Tasks\n");
+      if (privs->NoOddMapping)
+        printf("  0x02: No ODD Mapping\n");
+      if (privs->HandleMceInput)
+        printf("  0x03: Handles MCE Input\n");
+      if (privs->RestrictHudFeatures)
+        printf("  0x04: Restricted HUD Features\n");
+      if (privs->HandleGamepadDisconnect)
+        printf("  0x05: Handles Gamepad Disconnect\n");
+      if (privs->InsecureSockets)
+        printf("  0x06: Has Insecure Sockets\n");
+      if (privs->Xbox1XspInterop)
+        printf("  0x07: Xbox1 XSP Interoperability\n");
+      if (privs->SetDashContext)
+        printf("  0x08: Can Set Dash Context\n");
+      if (privs->TitleUsesGameVoiceChannel)
+        printf("  0x09: Uses Game Voice Channel\n");
+      if (privs->TitlePal50Incompatible)
+        printf("  0x0A: PAL-50 Incompatible\n");
+      if (privs->TitleInsecureUtilityDrive)
+        printf("  0x0B: Supports Insecure Utility Drive\n");
+      if (privs->TitleXamHooks)
+        printf("  0x0C: Xam Hooks\n");
+      if (privs->TitlePii)
+        printf("  0x0D: PII\n");
+      if (privs->CrossplatformSystemLink)
+        printf("  0x0E: Crossplatform System Link\n");
+      if (privs->MultidiscSwap)
+        printf("  0x0F: Multidisc Swap\n");
+      if (privs->MultidiscInsecureMedia)
+        printf("  0x10: Supports Insecure Multidisc Media\n");
+      if (privs->Ap25Media)
+        printf("  0x11: AP25 Media\n");
+      if (privs->NoConfirmExit)
+        printf("  0x12: No Confirm Exit\n");
+      if (privs->AllowBackgroundDownload)
+        printf("  0x13: Allows Background Downloads\n");
+      if (privs->CreatePersistableRamdrive)
+        printf("  0x14: Creates Persistable Ramdrive\n");
+      if (privs->InheritPersistedRamdrive)
+        printf("  0x15: Inherits Persisted Ramdrive\n");
+      if (privs->AllowHudVibration)
+        printf("  0x16: Allows HUD Vibration\n");
+      if (privs->TitleBothUtilityPartitions)
+        printf("  0x17: Can Use Both Utility Partitions\n");
+      if (privs->HandleIPTVInput)
+        printf("  0x18: Handles IPTV Input\n");
+      if (privs->PreferBigButtonInput)
+        printf("  0x19: Prefers Big Button Input\n");
+      if (privs->AllowXsamReservation)
+        printf("  0x1A: Allow Xsam Reservation\n");
+      if (privs->MultidiscCrossTitle)
+        printf("  0x1B: Multidisc Cross Title\n");
+      if (privs->TitleInstallIncompatible)
+        printf("  0x1C: Title Install Incompatible\n");
+      if (privs->AllowAvatarGetMetadataByXUID)
+        printf("  0x1D: Allow Avatar Get Metadata By XUID\n");
+      if (privs->AllowControllerSwapping)
+        printf("  0x1E: Allow Controller Swapping\n");
+      if (privs->DashExtensibilityModule)
+        printf("  0x1F: Dash Extensibility Module\n");
+    }
+
+    if (privileges32)
+    {
+      auto* privs = (xex_opt::XexPrivileges32*)&privileges32;
+      if (privs->AllowNetworkReadCancel)
+        printf("  0x20: Allow Network Read Cancel\n");
+      if (privs->UninterruptableReads)
+        printf("  0x21: Uninterruptable Reads\n");
+      if (privs->RequireExperienceFull)
+        printf("  0x22: Requires NXE\n");
+      if (privs->GameVoiceRequiredUI)
+        printf("  0x23: Game Voice Required UI\n");
+      if (privs->TitleSetPresenceString)
+        printf("  0x24: Sets Presence String\n");
+      if (privs->NatalTiltControl)
+        printf("  0x25: Natal Tilt Control\n");
+      if (privs->TitleRequiresSkeletalTracking)
+        printf("  0x26: Requires Skeletal Tracking\n");
+      if (privs->TitleSupportsSkeletalTracking)
+        printf("  0x27: Supports Skeletal Tracking\n");
+      if (privs->UseLargeHDsFileCache)
+        printf("  0x28: Uses Large HDs File Cache\n");
+      if (privs->TitleSupportsDeepLink)
+        printf("  0x29: Supports Deep Link\n");
+      if (privs->TitleBodyProfile)
+        printf("  0x2A: Supports Body Profile\n");
+      if (privs->TitleWinUSB)
+        printf("  0x2B: Supports WinUSB\n");
+      if (privs->TitleSupportsDeepLinkRefresh)
+        printf("  0x2C: Supports Deep Link Refresh\n");
+      if (privs->LocalOnlySockets)
+        printf("  0x2D: Local Only Sockets\n");
+      if (privs->TitleContentAcquireAndDownload)
+        printf("  0x2E: Title Content Acquire And Download\n");
+      if (privs->AllowSystemForeground)
+        printf("  0x2F: Allow System Foreground\n");
+    }
   }
 
-  auto privileges32 = xex.opt_header(XEX_HEADER_PRIVILEGES_32);
-  if (privileges32)
-  {
-    printf("\nXEX Extended Privileges\n");
-    auto* privs = (xex_opt::XexPrivileges32*)&privileges32;
-    if (privs->AllowNetworkReadCancel)
-      printf("  Allow Network Read Cancel\n");
-    if (privs->UninterruptableReads)
-      printf("  Uninterruptable Reads\n");
-    if (privs->RequireExperienceFull)
-      printf("  Requires NXE\n");
-    if (privs->GameVoiceRequiredUI)
-      printf("  Game Voice Required UI\n");
-    if (privs->TitleSetPresenceString)
-      printf("  Sets Presence String\n");
-    if (privs->NatalTiltControl)
-      printf("  Natal Tilt Control\n");
-    if (privs->TitleRequiresSkeletalTracking)
-      printf("  Requires Skeletal Tracking\n");
-    if (privs->TitleSupportsSkeletalTracking)
-      printf("  Supports Skeletal Tracking\n");
-    if (privs->UseLargeHDsFileCache)
-      printf("  Uses Large HDs File Cache\n");
-    if (privs->TitleSupportsDeepLink)
-      printf("  Supports Deep Link\n");
-    if (privs->TitleBodyProfile)
-      printf("  Supports Body Profile\n");
-    if (privs->TitleWinUSB)
-      printf("  Supports WinUSB\n");
-    if (privs->TitleSupportsDeepLinkRefresh)
-      printf("  Supports Deep Link Refresh\n");
-    if (privs->LocalOnlySockets)
-      printf("  Local Only Sockets\n");
-    if (privs->TitleContentAcquireAndDownload)
-      printf("  Title Content Acquire And Download\n");
-    if (privs->AllowSystemForeground)
-      printf("  Allow System Foreground\n");
-  }
 
   printf("\nBasefile Info\n");
   auto& pe_name = xex.pe_module_name();
