@@ -3,6 +3,7 @@
 #else
 #include <cstdarg>
 #endif
+
 #include "xex.hpp"
 #include "xex_headerids.hpp"
 #include "xex_keys.hpp"
@@ -14,6 +15,10 @@
 #include "3rdparty/aes.hpp"
 #include "3rdparty/lzx.hpp"
 #include "3rdparty/sha1.hpp"
+
+#ifndef IDALDR
+#include <excrypt.h>
+#endif
 
 bool xex_log_verbose = true;
 
@@ -455,9 +460,70 @@ bool XEXFile::read_exports(void* file)
   return true;
 }
 
+uint32_t XEXFile::verify_secinfo(void* file)
+{
+  if (xex_header_.Magic == MAGIC_XEX3F)
+    return 0; // TODO!
+
+  signature_valid_ = false;
+
+#ifndef IDALDR
+  int imageinfo_offset = 8;
+  if (xex_header_.Magic == MAGIC_XEX2D)
+    imageinfo_offset = 4;
+  seek(file, xex_header_.SecurityInfo + imageinfo_offset, 0);
+
+  int imageinfo_size = sizeof(xex2::HvImageInfo);
+  switch (xex_header_.Magic) {
+  case MAGIC_XEX1:
+    imageinfo_size = sizeof(xex1::HvImageInfo);
+    break;
+  case MAGIC_XEX25:
+    imageinfo_size = sizeof(xex25::HvImageInfo);
+    break;
+  case MAGIC_XEX2D:
+    imageinfo_size = sizeof(xex2d::HvImageInfo);
+    break;
+  }
+
+  auto imageinfo = std::make_unique<uint8_t[]>(imageinfo_size);
+  read(imageinfo.get(), imageinfo_size, 1, file);  
+
+  uint8_t hash[20];
+  ExCryptRotSumSha(imageinfo.get() + 0x100, imageinfo_size - 0x100, 0, 0, hash, 20);
+
+  auto* salt = "XBOX360XEX";
+  if (security_info_.ImageInfo.ImageFlags.RevocationCheckRequired)
+    salt = "XBOX360REV";
+
+  int pubkey_idx = 0;
+  signature_valid_ = false;
+  for (; pubkey_idx < num_pubkeys; pubkey_idx++)
+  {
+    EXCRYPT_RSAPUB_2048 pubKey;
+    ExCryptBn_BeToLeKey((EXCRYPT_RSA*)&pubKey, pubkey_bytes[pubkey_idx], 0x110);
+
+    EXCRYPT_SIG tmp;
+    memcpy(&tmp, (EXCRYPT_SIG*)imageinfo.get(), sizeof(EXCRYPT_SIG));
+
+    signature_valid_ = ExCryptBnQwBeSigVerify(&tmp, hash, (uint8_t*)salt, (EXCRYPT_RSA*)&pubKey);
+    if (signature_valid_)
+    {
+      signkey_index_ = pubkey_idx;
+      break;
+    }
+  }
+
+  return signature_valid_;
+#endif
+  return 0;
+}
+
 // Reads in the different XEX formats SecurityInfo into the XEX2 SecurityInfo struct
 bool XEXFile::read_secinfo(void* file)
 {
+  uint32_t state = verify_secinfo(file);
+
   auto magic = xex_header_.Magic;
 
   if (magic == MAGIC_XEX3F)
@@ -968,6 +1034,13 @@ bool XEXFile::read_basefile(void* file, int key_index)
     return basefile_is_valid();
 
   return result;
+}
+
+const char* XEXFile::sign_key_name()
+{
+  if (signkey_index_ < 0 || signkey_index_ >= num_pubkeys)
+    return "unknown";
+  return pubkey_names[signkey_index_];
 }
 
 // Shim function to allow using vprintf cstdio function

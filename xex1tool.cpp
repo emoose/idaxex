@@ -103,15 +103,25 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
 
   printf("  %s %s (%s)\n", exe_type, xex.basefile_is_pe() ? "Executable" : "Image", exe_versions);
 
+  // We only have pub keys / verify method for XEX2 atm
+  // No point printing any misleading info...
+  if (header.Magic == MAGIC_XEX2)
+  {
+    if (xex.signature_valid() && xex.sign_key_index() != -1)
+      printf("  Signature valid (signed with '%s' key)\n", xex.sign_key_name());
+    else
+      printf("  Signature invalid!\n");
+  }
+
   bool encrypted = false;
   if (xex.data_descriptor())
   {
     auto* desc = xex.data_descriptor();
     encrypted = desc->Flags != 0;
     if (encrypted && xex.encryption_key_index() != -1)
-    {
-      printf("  Uses %s key\n", key_names[xex.encryption_key_index()]);
-    }
+      printf("  Encrypted using '%s' key\n", key_names[xex.encryption_key_index()]);
+    else if (!encrypted)
+      printf("  Not Encrypted\n");
 
     switch (desc->Format)
     {
@@ -126,8 +136,6 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
       printf("  Delta Compressed\n");
       break;
     }
-
-    printf("  %sEncrypted\n", (!encrypted ? "Not " : ""));
   }
 
   if (header.ModuleFlags.TitleProcess)

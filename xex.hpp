@@ -46,6 +46,9 @@ class XEXFile
   xex2::SecurityInfo security_info_ = {};
   std::vector<xex::HvPageInfo> page_descriptors_;
 
+  int signkey_index_ = -1;
+  bool signature_valid_ = false;
+
   int key_index_ = -1;
   uint8_t session_key_[0x10];
 
@@ -81,6 +84,7 @@ class XEXFile
   bool read_exports(void* file);
 
   bool read_secinfo(void* file);
+  uint32_t verify_secinfo(void* file);
 
   bool read_basefile(void* file, int key_index);
   bool read_basefile_raw(void* file, bool encrypted);
@@ -149,6 +153,10 @@ public:
   T* opt_header_ptr(uint32_t id) {
     return (T*)opt_header_ptr(id);
   }
+
+  const char* sign_key_name();
+  uint32_t sign_key_index() { return signkey_index_; }
+  bool signature_valid() { return signature_valid_; }
 
   uint32_t encryption_key_index() { return key_index_; }
   uint8_t* session_key() { return session_key_; }
