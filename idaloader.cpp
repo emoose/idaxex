@@ -193,11 +193,15 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
     auto exports_libname = file.exports_libname();
     if (exports_libname.empty())
     {
-      char module_name[256];
-      memset(module_name, 0, 256);
+      exports_libname = pe_module_name;
+      if (exports_libname.empty())
+      {
+        char module_name[256];
+        memset(module_name, 0, 256);
 
-      get_root_filename(module_name, 256);
-      exports_libname = module_name;
+        get_root_filename(module_name, 256);
+        exports_libname = module_name;
+      }
     }
 
     for (auto exp : file.exports())

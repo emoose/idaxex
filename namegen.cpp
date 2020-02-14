@@ -3123,6 +3123,9 @@ std::string DoNameGen(const std::string& libName, int id)
   auto pos = lib.find_first_of('.');
   if (pos != std::string::npos)
     lib = lib.substr(0, pos);
+  pos = lib.find_last_of('\\');
+  if (pos != std::string::npos && lib.length() > pos + 1)
+    lib = lib.substr(pos + 1);
 
   const char* name = 0;
   if (lib == "connectx")
@@ -3131,9 +3134,9 @@ std::string DoNameGen(const std::string& libName, int id)
     name = createprofileNameGen(id);
   if (lib == "vk")
     name = vkNameGen(id);
-  if (lib == "xam")
+  if (lib == "xam" || lib == "xamc" || lib == "xamd")
     name = xamNameGen(id);
-  if (lib == "xapi")
+  if (lib == "xapi" || lib == "xapid")
     name = xapiNameGen(id);
   if (lib == "xbdm")
     name = xbdmNameGen(id);
