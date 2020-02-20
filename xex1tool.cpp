@@ -107,10 +107,13 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   // No point printing any misleading info...
   if (header.Magic == MAGIC_XEX2)
   {
-    if (xex.signature_valid() && xex.sign_key_index() != -1)
-      printf("  Signature valid (signed with '%s' key)\n", xex.sign_key_name());
+    if (xex.valid_signature() && xex.sign_key_index() != -1)
+      printf("  Valid RSA signature (signed with '%s' key)\n", xex.sign_key_name());
     else
-      printf("  Signature invalid!\n");
+      printf("  Invalid RSA signature!\n");
+
+    if (!xex.valid_header_hash())
+      printf("  Invalid header hash!");
   }
 
   bool encrypted = false;

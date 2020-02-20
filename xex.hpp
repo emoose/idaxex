@@ -47,7 +47,8 @@ class XEXFile
   std::vector<xex::HvPageInfo> page_descriptors_;
 
   int signkey_index_ = -1;
-  bool signature_valid_ = false;
+  bool valid_signature_ = false;
+  bool valid_header_hash_ = false;
 
   int key_index_ = -1;
   uint8_t session_key_[0x10];
@@ -156,7 +157,8 @@ public:
 
   const char* sign_key_name();
   uint32_t sign_key_index() { return signkey_index_; }
-  bool signature_valid() { return signature_valid_; }
+  bool valid_signature() { return valid_signature_; }
+  bool valid_header_hash() { return valid_header_hash_; }
 
   uint32_t encryption_key_index() { return key_index_; }
   uint8_t* session_key() { return session_key_; }

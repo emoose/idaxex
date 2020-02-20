@@ -86,6 +86,8 @@ bool XEXFile::load(void* file)
   // Read security info
   bool has_secinfo = read_secinfo(file);
   if (has_secinfo) {
+    uint32_t state = verify_secinfo(file);
+
     // Kinda hacky way to get the security info size...
     // Maybe should save this somewhere when reading instead?
     auto page_desc_size = security_info_.PageDescriptorCount * sizeof(xex::HvPageInfo);
@@ -462,16 +464,16 @@ bool XEXFile::read_exports(void* file)
 
 uint32_t XEXFile::verify_secinfo(void* file)
 {
+  valid_signature_ = false;
+  valid_header_hash_ = false;
+
   if (xex_header_.Magic == MAGIC_XEX3F)
     return 0; // TODO!
-
-  signature_valid_ = false;
 
 #ifndef IDALDR
   int imageinfo_offset = 8;
   if (xex_header_.Magic == MAGIC_XEX2D)
     imageinfo_offset = 4;
-  seek(file, xex_header_.SecurityInfo + imageinfo_offset, 0);
 
   int imageinfo_size = sizeof(xex2::HvImageInfo);
   switch (xex_header_.Magic) {
@@ -486,35 +488,64 @@ uint32_t XEXFile::verify_secinfo(void* file)
     break;
   }
 
-  auto imageinfo = std::make_unique<uint8_t[]>(imageinfo_size);
-  read(imageinfo.get(), imageinfo_size, 1, file);  
+  // "XEX: XexpVerifyXexHeaders: SecurityInfo offset invalid\n";
+  uint32_t header_remainder = xex_header_.SizeOfHeaders - xex_header_.SecurityInfo;
+  bool valid_offset = true;
+  if (xex_header_.SecurityInfo > xex_header_.SizeOfHeaders || header_remainder < 4)
+    valid_offset = false;
+
+  // "XEX: XexpVerifyXexHeaders: SecurityInfo size invalid\n"
+  bool valid_size = true;
+  if (security_info_.Size < 0x184 || security_info_.Size > header_remainder)
+    valid_size = false;
 
   uint8_t hash[20];
-  ExCryptRotSumSha(imageinfo.get() + 0x100, imageinfo_size - 0x100, 0, 0, hash, 20);
-
-  auto* salt = "XBOX360XEX";
-  if (security_info_.ImageInfo.ImageFlags.RevocationCheckRequired)
-    salt = "XBOX360REV";
-
-  int pubkey_idx = 0;
-  signature_valid_ = false;
-  for (; pubkey_idx < num_pubkeys; pubkey_idx++)
+  if (valid_offset && valid_size)
   {
-    EXCRYPT_RSAPUB_2048 pubKey;
-    ExCryptBn_BeToLeKey((EXCRYPT_RSA*)&pubKey, pubkey_bytes[pubkey_idx], 0x110);
+    // Check signature validity
+    auto imageinfo = std::make_unique<uint8_t[]>(imageinfo_size);
+    seek(file, xex_header_.SecurityInfo + imageinfo_offset, 0);
+    read(imageinfo.get(), imageinfo_size, 1, file);
 
-    EXCRYPT_SIG tmp;
-    memcpy(&tmp, (EXCRYPT_SIG*)imageinfo.get(), sizeof(EXCRYPT_SIG));
+    ExCryptRotSumSha(imageinfo.get() + 0x100, imageinfo_size - 0x100, 0, 0, hash, 20);
 
-    signature_valid_ = ExCryptBnQwBeSigVerify(&tmp, hash, (uint8_t*)salt, (EXCRYPT_RSA*)&pubKey);
-    if (signature_valid_)
+    auto* salt = "XBOX360XEX";
+    if (security_info_.ImageInfo.ImageFlags.RevocationCheckRequired)
+      salt = "XBOX360REV";
+
+    int pubkey_idx = 0;
+    for (; pubkey_idx < num_pubkeys; pubkey_idx++)
     {
-      signkey_index_ = pubkey_idx;
-      break;
+      EXCRYPT_RSAPUB_2048 pubKey;
+      ExCryptBn_BeToLeKey((EXCRYPT_RSA*)&pubKey, pubkey_bytes[pubkey_idx], 0x110);
+
+      EXCRYPT_SIG tmp;
+      memcpy(&tmp, (EXCRYPT_SIG*)imageinfo.get(), sizeof(EXCRYPT_SIG));
+
+      valid_signature_ = ExCryptBnQwBeSigVerify(&tmp, hash, (uint8_t*)salt, (EXCRYPT_RSA*)&pubKey);
+      if (valid_signature_)
+      {
+        signkey_index_ = pubkey_idx;
+        break;
+      }
     }
+
+    // Check header hash
+    uint32_t imageinfo_end = xex_header_.SecurityInfo + imageinfo_offset + imageinfo_size;
+    uint32_t header_remainsize = xex_header_.SizeOfHeaders - imageinfo_end;
+    auto header_remainbytes = std::make_unique<uint8_t[]>(header_remainsize);
+    seek(file, imageinfo_end, 0);
+    read(header_remainbytes.get(), header_remainsize, 1, file);
+
+    auto xex_header_raw = std::make_unique<uint8_t[]>(xex_header_.SecurityInfo + 8);
+    seek(file, 0, 0);
+    read(xex_header_raw.get(), 1, xex_header_.SecurityInfo + 8, file);
+
+    ExCryptSha(header_remainbytes.get(), header_remainsize, xex_header_raw.get(), xex_header_.SecurityInfo + 8, 0, 0, hash, 20);
+    valid_header_hash_ = ExCryptMemDiff(hash, security_info_.ImageInfo.HeaderHash, 20) == 0;
   }
 
-  return signature_valid_;
+  return valid_signature_ && valid_header_hash_;
 #endif
   return 0;
 }
@@ -522,8 +553,6 @@ uint32_t XEXFile::verify_secinfo(void* file)
 // Reads in the different XEX formats SecurityInfo into the XEX2 SecurityInfo struct
 bool XEXFile::read_secinfo(void* file)
 {
-  uint32_t state = verify_secinfo(file);
-
   auto magic = xex_header_.Magic;
 
   if (magic == MAGIC_XEX3F)
