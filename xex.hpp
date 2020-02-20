@@ -50,6 +50,7 @@ class XEXFile
   bool valid_signature_ = false;
   bool valid_header_hash_ = false;
   bool valid_image_hash_ = false;
+  bool valid_imports_hash_ = false;
 
   int key_index_ = -1;
   uint8_t session_key_[0x10];
@@ -161,6 +162,7 @@ public:
   bool valid_signature() { return valid_signature_; }
   bool valid_header_hash() { return valid_header_hash_; }
   bool valid_image_hash() { return valid_image_hash_; }
+  bool valid_imports_hash() { return valid_imports_hash_; }
 
   uint32_t encryption_key_index() { return key_index_; }
   uint8_t* session_key() { return session_key_; }

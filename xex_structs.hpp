@@ -166,13 +166,13 @@ namespace xex2 {
     xe::be<uint32_t> InfoSize;
     xex::ImageFlags ImageFlags;
     xe::be<uint32_t> LoadAddress;
-    uint8_t ImageHash[0x14];
+    uint8_t ImageHash[0x14]; // SHA1(first_page, first_page_descriptor)
     xe::be<uint32_t> ImportTableCount;
-    uint8_t ImportDigest[0x14];
+    uint8_t ImportDigest[0x14]; // SHA1(import_table[4:])
     uint8_t MediaID[0x10];
     uint8_t ImageKey[0x10];
     xe::be<uint32_t> ExportTableAddress;
-    uint8_t HeaderHash[0x14];
+    uint8_t HeaderHash[0x14]; // SHA1(xex_headers[0:SizeOfHeaders]) - except for this HvImageInfo section itself, this section is explicitly excluded from the hash!
     xe::be<xex::GameRegion> GameRegion;
   };
   static_assert(sizeof(HvImageInfo) == 0x174, "xex2::HvImageInfo");

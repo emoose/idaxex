@@ -117,6 +117,9 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
 
     if (!xex.valid_image_hash())
       printf("  Invalid image hash!\n");
+
+    if (!xex.valid_imports_hash())
+      printf("  Invalid import table hash!\n");
   }
 
   bool encrypted = false;

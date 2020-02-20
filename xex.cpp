@@ -290,10 +290,39 @@ bool XEXFile::read_imports(void* file)
       cur_lib += name_char;
   }
 
+  // Get import table hashes ready for verifying...
+  // (Hash is of +4 into the table, ie skipping the TableSize field)
+  uint8_t hash_expected[20];
+  uint8_t hash[20];
+  memcpy(hash_expected, security_info_.ImageInfo.ImportDigest, 20);
+
+  valid_imports_hash_ = true;
+
   // Read in each import library
   for (uint32_t i = 0; i < import_desc.ModuleCount; i++)
   {
     auto table_addr = tell(file);
+
+#ifndef IDALDR
+    // Check hash of table against expected hash
+    // TODO: this only seems to work for XEX2 atm, need to find method for XEX1...
+    if (valid_imports_hash_) // Only check import hashes while they're valid
+    {
+      xe::be<uint32_t> table_size;
+      read(&table_size, 4, 1, file);
+
+      auto table_data = std::make_unique<uint8_t[]>(table_size - 4);
+      read(table_data.get(), table_size - 4, 1, file);
+
+      ExCryptSha(table_data.get(), table_size - 4, 0, 0, 0, 0, hash, 20);
+      valid_imports_hash_ = ExCryptMemDiff(hash, hash_expected, 20) == 0;
+
+      // Copy the next tables hash from NextImportDigest
+      memcpy(hash_expected, table_data.get(), 20);
+    }
+#endif
+
+    seek(file, table_addr, 0);
 
     // Read in import table header
     xex_opt::XexImportTable table_header;
