@@ -46,6 +46,8 @@ class XEXFile
   xex2::SecurityInfo security_info_ = {};
   std::vector<xex::HvPageInfo> page_descriptors_;
 
+  bool has_secinfo_ = false;
+
   int signkey_index_ = -1;
   bool valid_signature_ = false;
   bool valid_header_hash_ = false;
@@ -93,6 +95,8 @@ class XEXFile
   bool read_basefile_raw(void* file, bool encrypted);
   bool read_basefile_uncompressed(void* file, bool encrypted);
   bool read_basefile_compressed(void* file, bool encrypted);
+
+  bool basefile_verify();
 
   bool pe_load(const uint8_t* data);
   bool pe_load_imports(const uint8_t* data);

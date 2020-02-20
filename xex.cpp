@@ -84,8 +84,8 @@ bool XEXFile::load(void* file)
   }
 
   // Read security info
-  bool has_secinfo = read_secinfo(file);
-  if (has_secinfo) {
+  has_secinfo_ = read_secinfo(file);
+  if (has_secinfo_) {
     uint32_t state = verify_secinfo(file);
 
     // Kinda hacky way to get the security info size...
@@ -158,45 +158,10 @@ bool XEXFile::load(void* file)
   if (!read_basefile(file, 0) && !read_basefile(file, 1) && !read_basefile(file, 2) && !read_basefile(file, 3))
     return false;
 
-  // Try checking the image page hashes, hash = SHA1(page, page_descriptor)
-  // Page descriptors contain the size of the current page, and the hash of the next page
-  // (ImageHash inside HvImageInfo contains the first pages hash)
-  valid_image_hash_ = !has_secinfo;
-
-#ifndef IDALDR
-  if (has_secinfo)
-  {
-    auto page_size = base_address() < 0x90000000 ? 64 * 1024 : 4 * 1024;
-
-    uint8_t hash[20];
-    uint8_t expected_hash[20];
-    memcpy(expected_hash, security_info_.ImageInfo.ImageHash, 20);
-
-    auto* data = pe_data();
-    xex::HvPageInfo tmp_page;
-    for (auto page : page_descriptors_)
-    {
-      int size = page_size * page.Size;
-
-      // we byteswapped the descriptor when we read it in, so swap it back
-      tmp_page = page;
-      tmp_page.SizeInfo = _byteswap_ulong(tmp_page.SizeInfo); 
-
-      ExCryptSha(data, size, (const uint8_t*)&tmp_page, sizeof(xex::HvPageInfo), 0, 0, hash, 20);
-      valid_image_hash_ = ExCryptMemDiff(hash, expected_hash, 20) == 0;
-      if (!valid_image_hash_)
-        break;
-
-      // descriptor contains the hash of the next page
-      memcpy(expected_hash, tmp_page.DataDigest, 20);
-      data += size;
-    }
-  }
-#endif
-
   // Basefile seems to have read fine, try reading the PE headers
-  if (!pe_load(pe_data_.data()))
-    return false;
+  if(basefile_is_pe())
+    if (!pe_load(pe_data_.data()))
+      return false;
 
   // Let's map in the XEX sections too, seeing as there's no tools for pre-XEX2 to view these with
   auto sects = opt_header_ptr<xex_opt::XexSectionHeaders>(XEX_HEADER_SECTION_TABLE);
@@ -254,9 +219,12 @@ bool XEXFile::load(void* file)
     }
   }
 
-  // Try reading imports & exports
-  read_imports(file);
-  read_exports(file);
+  if (basefile_is_pe())
+  {
+    // Try reading imports & exports
+    read_imports(file);
+    read_exports(file);
+  }
 
   return true;
 }
@@ -1123,11 +1091,61 @@ bool XEXFile::read_basefile(void* file, int key_index)
     result = false;
   }
 
-  // if reading was "successful", validate the basefiles magic
+  // if reading was "successful", try validating the basefile
+#ifndef IDALDR
+  if (result)
+    if (basefile_verify())
+      return true;
+  // if basefile_verify failed (wrong hash, maybe XEX was modded), fall back to below:
+#endif
+
   if (result)
     return basefile_is_valid();
 
   return result;
+}
+
+bool XEXFile::basefile_verify()
+{
+  // Try checking the image page hashes, hash = SHA1(page, page_descriptor)
+  // Page descriptors contain the size of the current page, and the hash of the next page
+  // (ImageHash inside HvImageInfo contains the first pages hash)
+  valid_image_hash_ = !has_secinfo_;
+
+#ifdef IDALDR
+  valid_image_hash_ = true;
+#else
+  if (has_secinfo_)
+  {
+    auto page_size = base_address() < 0x90000000 ? 64 * 1024 : 4 * 1024;
+
+    uint8_t hash[20];
+    uint8_t expected_hash[20];
+    memcpy(expected_hash, security_info_.ImageInfo.ImageHash, 20);
+
+    auto* data = pe_data();
+    xex::HvPageInfo tmp_page;
+    for (auto page : page_descriptors_)
+    {
+      int size = page_size * page.Size;
+
+      // we byteswapped the descriptor when we read it in, so swap it back
+      tmp_page = page;
+      tmp_page.SizeInfo = _byteswap_ulong(tmp_page.SizeInfo);
+
+      ExCryptSha(data, size, (const uint8_t*)&tmp_page, sizeof(xex::HvPageInfo), 0, 0, hash, 20);
+      valid_image_hash_ = ExCryptMemDiff(hash, expected_hash, 20) == 0;
+      if (!valid_image_hash_)
+        break;
+
+      // descriptor contains the hash of the next page
+      memcpy(expected_hash, tmp_page.DataDigest, 20);
+      data += size;
+    }
+  }
+#endif
+
+  return valid_image_hash_;
 }
 
 const char* XEXFile::sign_key_name()
