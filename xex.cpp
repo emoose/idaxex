@@ -158,6 +158,23 @@ bool XEXFile::load(void* file)
   if (!read_basefile(file, 0) && !read_basefile(file, 1) && !read_basefile(file, 2) && !read_basefile(file, 3))
     return false;
 
+  // Try checking the image hash, hash = SHA1(first_page, first_page_descriptor)
+  valid_image_hash_ = false;
+
+#ifndef IDALDR
+  if (has_secinfo)
+  {
+    auto page_size = base_address() < 0x90000000 ? 64 * 1024 : 4 * 1024;
+    auto first_page = page_descriptors_[0];
+    first_page.SizeInfo = _byteswap_ulong(first_page.SizeInfo); // we swapped this when we read it in, so swap it back
+
+    uint8_t hash[20];
+    ExCryptSha(pe_data(), page_size, (const uint8_t*)&first_page, sizeof(xex::HvPageInfo), 0, 0, hash, 20);
+
+    valid_image_hash_ = ExCryptMemDiff(hash, security_info_.ImageInfo.ImageHash, 20) == 0;
+  }
+#endif
+
   // Basefile seems to have read fine, try reading the PE headers
   if (!pe_load(pe_data_.data()))
     return false;
@@ -467,8 +484,8 @@ uint32_t XEXFile::verify_secinfo(void* file)
   valid_signature_ = false;
   valid_header_hash_ = false;
 
-  if (xex_header_.Magic == MAGIC_XEX3F)
-    return 0; // TODO!
+  if (xex_header_.Magic != MAGIC_XEX2)
+    return 0; // TODO: figure out how to verify XEX1 etc...
 
 #ifndef IDALDR
   int imageinfo_offset = 8;
@@ -504,7 +521,7 @@ uint32_t XEXFile::verify_secinfo(void* file)
   {
     // Check signature validity
     auto imageinfo = std::make_unique<uint8_t[]>(imageinfo_size);
-    seek(file, xex_header_.SecurityInfo + imageinfo_offset, 0);
+    seek(file, (uint64_t)xex_header_.SecurityInfo + imageinfo_offset, 0);
     read(imageinfo.get(), imageinfo_size, 1, file);
 
     ExCryptRotSumSha(imageinfo.get() + 0x100, imageinfo_size - 0x100, 0, 0, hash, 20);
@@ -537,9 +554,9 @@ uint32_t XEXFile::verify_secinfo(void* file)
     seek(file, imageinfo_end, 0);
     read(header_remainbytes.get(), header_remainsize, 1, file);
 
-    auto xex_header_raw = std::make_unique<uint8_t[]>(xex_header_.SecurityInfo + 8);
+    auto xex_header_raw = std::make_unique<uint8_t[]>((uint64_t)xex_header_.SecurityInfo + 8);
     seek(file, 0, 0);
-    read(xex_header_raw.get(), 1, xex_header_.SecurityInfo + 8, file);
+    read(xex_header_raw.get(), 1, (uint64_t)xex_header_.SecurityInfo + 8, file);
 
     ExCryptSha(header_remainbytes.get(), header_remainsize, xex_header_raw.get(), xex_header_.SecurityInfo + 8, 0, 0, hash, 20);
     valid_header_hash_ = ExCryptMemDiff(hash, security_info_.ImageInfo.HeaderHash, 20) == 0;

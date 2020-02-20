@@ -113,7 +113,10 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
       printf("  Invalid RSA signature!\n");
 
     if (!xex.valid_header_hash())
-      printf("  Invalid header hash!");
+      printf("  Invalid header hash!\n");
+
+    if (!xex.valid_image_hash())
+      printf("  Invalid image hash!\n");
   }
 
   bool encrypted = false;
