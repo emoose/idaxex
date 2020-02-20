@@ -158,20 +158,39 @@ bool XEXFile::load(void* file)
   if (!read_basefile(file, 0) && !read_basefile(file, 1) && !read_basefile(file, 2) && !read_basefile(file, 3))
     return false;
 
-  // Try checking the image hash, hash = SHA1(first_page, first_page_descriptor)
-  valid_image_hash_ = false;
+  // Try checking the image page hashes, hash = SHA1(page, page_descriptor)
+  // Page descriptors contain the size of the current page, and the hash of the next page
+  // (ImageHash inside HvImageInfo contains the first pages hash)
+  valid_image_hash_ = !has_secinfo;
 
 #ifndef IDALDR
   if (has_secinfo)
   {
     auto page_size = base_address() < 0x90000000 ? 64 * 1024 : 4 * 1024;
-    auto first_page = page_descriptors_[0];
-    first_page.SizeInfo = _byteswap_ulong(first_page.SizeInfo); // we swapped this when we read it in, so swap it back
 
     uint8_t hash[20];
-    ExCryptSha(pe_data(), page_size, (const uint8_t*)&first_page, sizeof(xex::HvPageInfo), 0, 0, hash, 20);
+    uint8_t expected_hash[20];
+    memcpy(expected_hash, security_info_.ImageInfo.ImageHash, 20);
 
-    valid_image_hash_ = ExCryptMemDiff(hash, security_info_.ImageInfo.ImageHash, 20) == 0;
+    auto* data = pe_data();
+    xex::HvPageInfo tmp_page;
+    for (auto page : page_descriptors_)
+    {
+      int size = page_size * page.Size;
+
+      // we byteswapped the descriptor when we read it in, so swap it back
+      tmp_page = page;
+      tmp_page.SizeInfo = _byteswap_ulong(tmp_page.SizeInfo); 
+
+      ExCryptSha(data, size, (const uint8_t*)&tmp_page, sizeof(xex::HvPageInfo), 0, 0, hash, 20);
+      valid_image_hash_ = ExCryptMemDiff(hash, expected_hash, 20) == 0;
+      if (!valid_image_hash_)
+        break;
+
+      // descriptor contains the hash of the next page
+      memcpy(expected_hash, tmp_page.DataDigest, 20);
+      data += size;
+    }
   }
 #endif
 

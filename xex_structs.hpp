@@ -155,7 +155,7 @@ namespace xex {
       };
       uint32_t SizeInfo;
     };
-    uint8_t DataDigest[0x14];
+    uint8_t DataDigest[0x14]; // Digest of the next page + next page descriptor
   };
   static_assert(sizeof(HvPageInfo) == 0x18, "xex:HvPageInfo");
 };
@@ -190,8 +190,8 @@ namespace xex2 {
 namespace xex1 {
   struct HvImageInfo {
     uint8_t Signature[0x100];
-    uint8_t ImageHash[0x14];
     uint8_t ImportDigest[0x14];
+    uint8_t ImageHash[0x14]; // confirmed
     xe::be<uint32_t> LoadAddress;
     uint8_t ImageKey[0x10];
     uint8_t MediaID[0x10];
@@ -214,8 +214,8 @@ namespace xex1 {
 namespace xex25 {
   struct HvImageInfo {
     uint8_t Signature[0x100];
-    uint8_t ImageHash[0x14];
     uint8_t ImportDigest[0x14];
+    uint8_t ImageHash[0x14];
     xe::be<uint32_t> LoadAddress;
     uint8_t ImageKey[0x10];
     xex::ImageFlags ImageFlags;
@@ -236,8 +236,8 @@ namespace xex25 {
 namespace xex2d {
   struct HvImageInfo {
     uint8_t Signature[0x100];
-    uint8_t ImageHash[0x14];
     uint8_t ImportDigest[0x14];
+    uint8_t ImageHash[0x14];
     xe::be<uint32_t> LoadAddress;
     xex::ImageFlags ImageFlags;
     xe::be<uint32_t> ExportTableAddress;
