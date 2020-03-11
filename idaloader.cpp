@@ -15,7 +15,7 @@
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
 #define FF_DWORD    0x20000000
 
-bool exclude_unneeded_sections = false;
+bool exclude_unneeded_sections = true;
 
 std::string DoNameGen(const std::string& libName, int id); // namegen.cpp
 
@@ -84,17 +84,23 @@ void pe_add_sections(XEXFile& file)
     if (exclude_unneeded_sections)
     {
       if (!strcmp(name, ".edata"))
-        return; // no .edata
+        return;
       if (!strcmp(name, ".idata"))
-        return; // no .idata
+        return;
       if (!strcmp(name, ".XBLD"))
-        return; // no .XBLD
+        return;
+      if (!strcmp(name, ".reloc"))
+        return;
     }
 
-    uint32 sec_addr = file.header().Magic == MAGIC_XEX3F ? 
-      section.PointerToRawData : section.VirtualAddress;
+    uint32 sec_addr = section.VirtualAddress;
+    uint32 sec_size = section.VirtualSize;
 
-    int sec_size = std::min(section.VirtualSize, section.SizeOfRawData);
+    if (file.header().Magic == MAGIC_XEX3F)
+    {
+      sec_addr = section.PointerToRawData;
+      sec_size = section.SizeOfRawData; // TODO: verify this?
+    }
 
     // Size could be beyond file bounds, if so fix the size to what we can fit
     if (sec_addr + sec_size > file.image_size())
@@ -124,7 +130,7 @@ void pe_add_sections(XEXFile& file)
     add_segm_ex(&segm, name, seg_class, 0);
 
     if (sec_size <= 0)
-      return;
+      continue;
 
     // Load data into IDA
     mem2base(file.pe_data() + sec_addr, seg_addr, seg_addr + sec_size, -1);
