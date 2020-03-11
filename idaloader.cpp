@@ -243,7 +243,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
         if (imp.second.ThunkAddr && imp.second.ThunkAddr != imp.second.FuncAddr)
         {
-          auto thunk_name = "_imp__" + imp_name;
+          auto thunk_name = "__imp_" + imp_name;
           if (!imp.second.FuncAddr)
             thunk_name = imp_name;
 
