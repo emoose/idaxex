@@ -609,10 +609,14 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
       printf("\nExecution ID (XEX2D)\n");
       printf("  Media ID:           %08X\n", (uint32_t)exec_info->MediaID);
       printf("  Title ID:           %s\n", titleid2str(exec_info->TitleID).c_str());
+      printf("  Savegame ID:        %X\n", exec_info->SaveGameID);
       printf("  Version:            v%d.%d.%d.%d\n", exec_info->Version.Major, exec_info->Version.Minor, exec_info->Version.Build, exec_info->Version.QFE);
-      printf("  UnkC:               %08X\n", (uint32_t)exec_info->UnkC);
-      printf("  Unk10:              %08X\n", (uint32_t)exec_info->Unk10);
-      printf("  Unk14:              %08X\n", (uint32_t)exec_info->Unk14);
+      printf("  UpdatedVersion:     %04X\n", (uint16_t)exec_info->UpdatedVersion);
+      printf("  Region:             %04X\n", (uint16_t)exec_info->Region);
+      printf("  Rating:             %08X\n", (uint32_t)exec_info->Rating);
+      printf("  Platform:           %d\n", exec_info->Platform);
+      printf("  Executable Type:    %d\n", exec_info->ExecutableType);
+      printf("  Disc Number:        %d\n", exec_info->DiscNum);
     }
   }
 
@@ -628,6 +632,22 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  Executable Type:    %d\n", (uint32_t)exec_info25->ExecutableType);
     printf("  Disc Number:        %d\n", (uint32_t)exec_info25->DiscNum);
     printf("  Number of Discs:    %d\n", (uint32_t)exec_info25->DiscsInSet);
+  }
+
+  // TODO: read in as XEX3F/XEX0 depending on variant when XEX0 support is added!
+  auto* exec_info3f = xex.opt_header_ptr<xex_opt::xex3f::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA3F);
+  if (exec_info3f)
+  {
+    printf("\nExecution ID (XEX3F)\n");
+    printf("  Media ID:           %08X\n", (uint32_t)exec_info3f->MediaID);
+    printf("  Title ID:           %s\n", titleid2str(exec_info3f->TitleID).c_str());
+    printf("  Savegame ID:        %X\n", exec_info3f->SaveGameID);
+    printf("  Version:            v%d.%d.%d.%d\n", exec_info3f->Version.Major, exec_info3f->Version.Minor, exec_info3f->Version.Build, exec_info3f->Version.QFE);
+    printf("  UpdatedVersion:     %04X\n", (uint16_t)exec_info3f->UpdatedVersion);
+    printf("  Region:             %04X\n", (uint16_t)exec_info3f->Region);
+    printf("  Platform:           %d\n", exec_info3f->Platform);
+    printf("  Executable Type:    %d\n", exec_info3f->ExecutableType);
+    printf("  Disc Number:        %d\n", exec_info3f->DiscNum);
   }
 
   xe::kernel::xam::xdbf::SpaFile spa;

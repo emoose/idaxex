@@ -15,16 +15,18 @@
 #define XEX_PATCH_FILE_BASE_REFERENCE     XEX_HEADER_FIXED_SIZE  (0x0004, 20)
 #define XEX_HEADER_DELTA_PATCH_DESCRIPTOR XEX_HEADER_SIZEDSTRUCT (0x0005)
 
-#define XEX_HEADER_KEY_VAULT_PRIVS			  XEX_HEADER_STRUCT      (0x0040, xex_opt::XexKeyVaultPrivileges)
+#define XEX_HEADER_KEY_VAULT_PRIVS        XEX_HEADER_STRUCT      (0x0040, xex_opt::XexKeyVaultPrivileges)
 #define XEX_HEADER_KEY_VAULT_PRIVS_ALT    XEX_HEADER_SIZEDSTRUCT (0x0040) // alternate keyvault privs header ID? (source: ???)
 #define XEX_HEADER_TIME_RANGE             XEX_HEADER_STRUCT      (0x0041, xex_opt::XexSystemTimeRange)
 #define XEX_HEADER_TIME_RANGE_ALT         XEX_HEADER_SIZEDSTRUCT (0x0041) // alternate time range header ID?? (source: ???)
-#define XEX_HEADER_CONSOLE_ID_TABLE			  XEX_HEADER_SIZEDSTRUCT (0x0042) // blocked console ID list?
+#define XEX_HEADER_CONSOLE_ID_TABLE       XEX_HEADER_SIZEDSTRUCT (0x0042) // blocked console ID list?
 #define XEX_HEADER_DISC_PROFILE_ID        XEX_HEADER_FIXED_SIZE  (0x0043, 16)
 
 #define XEX_HEADER_BOUND_PATH             XEX_HEADER_STRING      (0x0080)
 #define XEX_HEADER_PE_EXPORTS_BETA        XEX_HEADER_STRUCT      (0x0081, IMAGE_DATA_DIRECTORY) // unsure! may be PE exports header in some pre-XEX2, can't remember which
-#define XEX_HEADER_DEVICE_ID				      XEX_HEADER_FIXED_SIZE  (0x0081, 20)
+#define XEX_HEADER_DEVICE_ID              XEX_HEADER_FIXED_SIZE  (0x0081, 20)
+
+#define XEX_HEADER_EXECUTION_ID_BETA3F    XEX_HEADER_STRUCT      (0x0100, xex_opt::xex3f::XexExecutionId)
 
 #define XEX_HEADER_ORIGINAL_BASE_ADDRESS  XEX_HEADER_ULONG       (0x0100)
 #define XEX_HEADER_ENTRY_POINT            XEX_HEADER_FLAG        (0x0101)
@@ -36,7 +38,7 @@
 
 #define XEX_HEADER_VITAL_STATS            XEX_HEADER_STRUCT      (0x0180, xex_opt::XexVitalStats)
 #define XEX_HEADER_CALLCAP_IMPORTS        XEX_HEADER_STRUCT      (0x0181, xex_opt::XexCallcapImports)
-#define XEX_HEADER_FASTCAP_ENABLED		  	XEX_HEADER_FLAG        (0x0182)
+#define XEX_HEADER_FASTCAP_ENABLED        XEX_HEADER_FLAG        (0x0182)
 #define XEX_HEADER_PE_MODULE_NAME         XEX_HEADER_STRING      (0x0183)
 
 #define XEX_HEADER_BUILD_VERSIONS         XEX_HEADER_SIZEDSTRUCT (0x0200)
@@ -65,5 +67,5 @@
 #define XEX_HEADER_ADDITIONAL_TITLE_MEM   XEX_HEADER_ULONG       (0x0408)
 
 #define XEX_HEADER_PE_IMPORTS             XEX_HEADER_STRUCT      (0xE103, IMAGE_DATA_DIRECTORY) // unsure if this is correct struct!
-#define XEX_HEADER_PE_EXPORTS				      XEX_HEADER_STRUCT      (0xE104, IMAGE_DATA_DIRECTORY)
+#define XEX_HEADER_PE_EXPORTS             XEX_HEADER_STRUCT      (0xE104, IMAGE_DATA_DIRECTORY)
 #define XEX_HEADER_USERMODE_IMPORTS       XEX_HEADER_SIZEDSTRUCT (0xE105)

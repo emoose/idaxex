@@ -84,8 +84,7 @@ namespace xex_opt {
   }
 
   namespace xex2d {
-    // xex2d version of execution ID is missing base version, and has 3 extra DWORDs
-    // changing the uint8_t fields to uint32_t seems to fill in those extra DWORDs nicely
+    // xex2d version of execution ID is missing base version and has some extra data removed in later versions
     struct XexExecutionId {
       xe::be<uint32_t> MediaID;
       xex::Version Version;
@@ -96,11 +95,57 @@ namespace xex_opt {
           xe::be<uint16_t> GameID;
         };
       };
-      xe::be<uint32_t> UnkC;
-      xe::be<uint32_t> Unk10;
-      xe::be<uint32_t> Unk14;
+      xe::be<uint16_t> UpdatedVersion;
+      xe::be<uint16_t> Region;
+      xe::be<uint32_t> Rating;
+      uint8_t Platform;
+      uint8_t ExecutableType;
+      uint8_t SaveGameID;
+      uint8_t DiscNum;
     }; // size 24
     static_assert(sizeof(xex_opt::xex2d::XexExecutionId) == 0x18, "xex_opt::xex25::XexExecutionId");
+  }
+
+  namespace xex3f {
+    struct XexExecutionId {
+      xe::be<uint32_t> MediaID;
+      xex::Version Version;
+      union {
+        xe::be<uint32_t> TitleID;
+        struct {
+          xe::be<uint16_t> PublisherID;
+          xe::be<uint16_t> GameID;
+        };
+      };
+      xe::be<uint16_t> UpdatedVersion;
+      xe::be<uint16_t> Region;
+      uint8_t Platform;
+      uint8_t ExecutableType;
+      uint8_t SaveGameID;
+      uint8_t DiscNum;
+    }; // size 20
+    static_assert(sizeof(xex_opt::xex3f::XexExecutionId) == 0x14, "xex_opt::xex3f::XexExecutionId");
+  }
+
+  namespace xex0 {
+    struct XexExecutionId {
+      xe::be<uint32_t> MediaID;
+      xex::Version Version;
+      union {
+        xe::be<uint32_t> TitleID;
+        struct {
+          xe::be<uint16_t> PublisherID;
+          xe::be<uint16_t> GameID;
+        };
+      };
+      xe::be<uint16_t> UpdatedVersion;
+      xe::be<uint16_t> Region;
+      uint8_t Platform;
+      uint8_t ContentType;
+      uint8_t SaveGameId;
+      uint8_t DiscNum;
+    }; // size 20
+    static_assert(sizeof(xex_opt::xex0::XexExecutionId) == 0x14, "xex_opt::xex0::XexExecutionId");
   }
 
   struct XexSectionHeader {
