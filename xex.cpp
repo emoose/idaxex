@@ -607,11 +607,12 @@ bool XEXFile::read_secinfo(void* file)
   read(&security_info_.Size, sizeof(uint32_t), 1, file);
 
   // SecurityInfo.ImageSize - mostly at SecurityInfo[4]
-  if (magic != MAGIC_XEX2D)
-  {
-    seek(file, xex_header_.SecurityInfo + 4, 0);
-    read(&security_info_.ImageSize, sizeof(uint32_t), 1, file);
-  }
+  auto imageSizeOffset = 4;
+  if (magic == MAGIC_XEX2D)
+    imageSizeOffset = 0x130;
+
+  seek(file, xex_header_.SecurityInfo + imageSizeOffset, 0);
+  read(&security_info_.ImageSize, sizeof(uint32_t), 1, file);
 
   // Read fields common to all XEX versions
   // TODO: find some nicer way to handle all this!
