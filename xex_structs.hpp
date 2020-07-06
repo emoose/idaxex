@@ -29,17 +29,6 @@ namespace xex {
   }; // size 0x18
   static_assert(sizeof(XexHeader) == 0x18, "xex::XexHeader");
 
-  struct Xex3FHeader {
-    xe::be<uint32_t> Magic; // 0x0 sz:0x4
-    ModuleFlags ModuleFlags; // 0x4 sz:0x4
-    xe::be<uint32_t> SizeOfHeaders; // 0x8 sz:0x4
-    xe::be<uint32_t> SizeOfDiscardableHeaders; // 0xC sz:0x4
-    xe::be<uint32_t> LoadAddress; // 0x10 sz:0x4
-    xe::be<uint32_t> ImageSize; // not sure if name is correct, seems to increase with filesize though
-    xe::be<uint32_t> HeaderDirectoryEntryCount; // 0x18 sz:0x4
-  }; // size 0x1C
-  static_assert(sizeof(Xex3FHeader) == 0x1C, "xex::Xex3FHeader");
-
   struct ImageFlags {
     uint32_t Unknown1                   : 1; //= 0x00000001
     uint32_t ManufacturingUtility       : 1; //= 0x00000002
@@ -247,4 +236,36 @@ namespace xex2d {
     xe::be<uint16_t> ImageFlags;
   };
   static_assert(sizeof(SecurityInfo) == 0x140, "xex2d::SecurityInfo");
+};
+
+namespace xex0 {
+  struct ModuleFlags {
+    /* 0x01 */ uint32_t SystemProcess : 1;
+    /* 0x02 */ uint32_t TitleProcess : 1;
+    /* 0x04 */ uint32_t Dll : 1;
+    /* 0x08 */ uint32_t Debugger : 1; // xex3f only
+  };
+  static_assert(sizeof(ModuleFlags) == 4, "xex::ModuleFlags");
+
+  struct XexHeader {
+    /* 0x00 */ xe::be<uint32_t> Magic;
+    /* 0x04 */ xe::be<uint32_t> SizeOfHeaders;
+    /* 0x08 */ xe::be<uint32_t> LoadAddress;
+    /* 0x0C */ xe::be<uint32_t> ImageSize;
+    /* 0x10 */ xe::be<uint32_t> HeaderDirectoryEntryCount;
+  }; // size 0x14
+  static_assert(sizeof(XexHeader) == 0x14, "xex0::XexHeader");
+};
+
+namespace xex3f {
+  struct XexHeader {
+    /* 0x00 */ xe::be<uint32_t> Magic;
+    /* 0x04 */ xex0::ModuleFlags ModuleFlags;
+    /* 0x08 */ xe::be<uint32_t> SizeOfHeaders;
+    /* 0x0C */ xe::be<uint32_t> SizeOfDiscardableHeaders;
+    /* 0x10 */ xe::be<uint32_t> LoadAddress;
+    /* 0x14 */ xe::be<uint32_t> ImageSize;
+    /* 0x18 */ xe::be<uint32_t> HeaderDirectoryEntryCount;
+  }; // size 0x1C
+  static_assert(sizeof(XexHeader) == 0x1C, "xex3f::XexHeader");
 };

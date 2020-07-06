@@ -34,8 +34,48 @@ bool XEXFile::load(void* file)
 
   if (xex_header_.Magic != MAGIC_XEX2 && xex_header_.Magic != MAGIC_XEX1 && 
     xex_header_.Magic != MAGIC_XEX25 && xex_header_.Magic != MAGIC_XEX2D && 
-    xex_header_.Magic != MAGIC_XEX3F)
+    xex_header_.Magic != MAGIC_XEX3F && xex_header_.Magic != MAGIC_XEX0)
     return false;
+
+  // Convert XEX0/XEX3F header to XEX2
+  int dirHeaderOffset = sizeof(xex::XexHeader);
+  if (xex_header_.Magic == MAGIC_XEX0)
+  {
+    memset(&xex_header_, 0, sizeof(xex::XexHeader));
+
+    seek(file, 0, 0);
+    xex0::XexHeader header0;
+    read(&header0, sizeof(xex0::XexHeader), 1, file);
+
+    xex_header_.Magic = header0.Magic;
+    xex_header_.SizeOfHeaders = header0.SizeOfHeaders;
+    security_info_.ImageInfo.LoadAddress = header0.LoadAddress;
+    security_info_.ImageSize = header0.ImageSize;
+    xex_header_.HeaderDirectoryEntryCount = header0.HeaderDirectoryEntryCount;
+
+    dirHeaderOffset = sizeof(xex0::XexHeader);
+  }
+  else if (xex_header_.Magic == MAGIC_XEX3F)
+  {
+    memset(&xex_header_, 0, sizeof(xex::XexHeader));
+
+    seek(file, 0, 0);
+    xex3f::XexHeader header3f;
+    read(&header3f, sizeof(xex3f::XexHeader), 1, file);
+
+    xex_header_.Magic = header3f.Magic;
+    // TODO: convert flags from pre-XEX1 to XEX1+?
+    *(uint32_t*)&xex_header_.ModuleFlags =
+      _byteswap_ulong(*(uint32_t*)&header3f.ModuleFlags);
+
+    xex_header_.SizeOfHeaders = header3f.SizeOfHeaders;
+    xex_header_.SizeOfDiscardableHeaders = header3f.SizeOfDiscardableHeaders;
+    security_info_.ImageInfo.LoadAddress = header3f.LoadAddress;
+    security_info_.ImageSize = header3f.ImageSize;
+    xex_header_.HeaderDirectoryEntryCount = header3f.HeaderDirectoryEntryCount;
+
+    dirHeaderOffset = sizeof(xex3f::XexHeader);
+  }
 
   // Read in XEX header section
   xex_headers_.resize(xex_header_.SizeOfHeaders);
@@ -44,18 +84,7 @@ bool XEXFile::load(void* file)
 
   data_length_ = (uint32_t)(fsize - xex_header_.SizeOfHeaders);
 
-  seek(file, sizeof(xex::XexHeader), 0);
-
-  if (xex_header_.Magic == MAGIC_XEX3F)
-  {
-    // XEX3F has some unknown data (imagesize?) in place of the directory entry count
-    // directory count comes after that data, so read it into that datas place
-    security_info_.ImageSize = xex_header_.HeaderDirectoryEntryCount;
-    read(&xex_header_.HeaderDirectoryEntryCount, sizeof(uint32_t), 1, file);
-
-    // XEX3F has base address here instead of securityinfo offset
-    security_info_.ImageInfo.LoadAddress = xex_header_.SecurityInfo;
-  }
+  seek(file, dirHeaderOffset, 0);
 
   // Read in directory entry / optional header keyvalues
   for (uint32_t i = 0; i < xex_header_.HeaderDirectoryEntryCount; i++)
@@ -132,7 +161,6 @@ bool XEXFile::load(void* file)
   auto exec_id_25 = opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
   if(exec_id_25)
     *(uint32_t*)&exec_id_25->Version = _byteswap_ulong(*(uint32_t*)&exec_id_25->Version);
-
 
   vital_stats_ = opt_header_ptr<xex_opt::XexVitalStats>(XEX_HEADER_VITAL_STATS);
   tls_data_ = opt_header_ptr<xex_opt::XexTlsData>(XEX_HEADER_TLS_DATA);
@@ -588,8 +616,8 @@ bool XEXFile::read_secinfo(void* file)
 {
   auto magic = xex_header_.Magic;
 
-  if (magic == MAGIC_XEX3F)
-    return false; // XEX3F doesn't have securityinfo header!
+  if (magic == MAGIC_XEX3F || magic == MAGIC_XEX0)
+    return false; // XEX3F/XEX0 doesn't have securityinfo header!
 
   if (magic == MAGIC_XEX2)
   {
@@ -993,7 +1021,7 @@ bool XEXFile::pe_load(const uint8_t* data)
   for (int i = 0; i < nt_header->FileHeader.NumberOfSections; i++)
       sections_.push_back(sects[i]);
 
-  if (xex_header_.Magic == MAGIC_XEX3F)
+  if (xex_header_.Magic == MAGIC_XEX3F || xex_header_.Magic == MAGIC_XEX0)
   {
     if (nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size)
       pe_load_imports(data);
@@ -1010,8 +1038,8 @@ uint32_t XEXFile::pe_rva_to_offset(uint32_t rva)
 {
   if (rva > base_address())
     rva -= base_address();
-  if (xex_header_.Magic != MAGIC_XEX3F)
-    return rva; // all formats besides XEX3F seem to keep raw data lined up with in-memory PE?
+  if (xex_header_.Magic != MAGIC_XEX3F && xex_header_.Magic != MAGIC_XEX0)
+    return rva; // all formats besides XEX3F/XEX0 seem to keep raw data lined up with in-memory PE?
 
   for (auto section : sections_)
   {

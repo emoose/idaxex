@@ -142,7 +142,7 @@ namespace xex_opt {
       xe::be<uint16_t> Region;
       uint8_t Platform;
       uint8_t ContentType;
-      uint8_t SaveGameId;
+      uint8_t SaveGameID;
       uint8_t DiscNum;
     }; // size 20
     static_assert(sizeof(xex_opt::xex0::XexExecutionId) == 0x14, "xex_opt::xex0::XexExecutionId");

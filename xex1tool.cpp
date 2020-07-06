@@ -426,8 +426,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     }
   }
 
-  // XEX2D seems to use different media values or something...
-  if (header.Magic != MAGIC_XEX2D)
+  if (header.Magic == MAGIC_XEX2 || header.Magic == MAGIC_XEX1 || header.Magic == MAGIC_XEX25)
   {
     printf("\nAllowed Media\n");
     auto media_int = *(uint32_t*)&sec_info.AllowedMediaTypes;
@@ -489,10 +488,13 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     }
   }
 
-  printf("\nMedia ID\n  ");
-  for (int i = 0; i < 0x10; i++)
-    printf("%02X ", sec_info.ImageInfo.MediaID[i]);
-  printf("\n");
+  if (header.Magic == MAGIC_XEX2 || header.Magic == MAGIC_XEX1)
+  {
+    printf("\nMedia ID\n  ");
+    for (int i = 0; i < 0x10; i++)
+      printf("%02X ", sec_info.ImageInfo.MediaID[i]);
+    printf("\n");
+  }
 
   auto* key = (const uint8_t*)xex.opt_header_ptr(XEX_HEADER_DISC_PROFILE_ID);
   if (key)
@@ -503,14 +505,17 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("\n");
   }
 
-  key = encrypted ? xex.session_key() : sec_info.ImageInfo.ImageKey;
-  if (encrypted)
-    printf("\nEncryption Key (key decrypted using %s key)\n  ", key_names[xex.encryption_key_index()]);
-  else
-    printf("\nEncryption Key (raw value)\n  ");
-  for (int i = 0; i < 0x10; i++)
-    printf("%02X ", key[i]);
-  printf("\n");
+  if (header.Magic != MAGIC_XEX3F && header.Magic != MAGIC_XEX0) // these two don't use crypto
+  {
+    key = encrypted ? xex.session_key() : sec_info.ImageInfo.ImageKey;
+    if (encrypted)
+      printf("\nEncryption Key (key decrypted using %s key)\n  ", key_names[xex.encryption_key_index()]);
+    else
+      printf("\nEncryption Key (raw value)\n  ");
+    for (int i = 0; i < 0x10; i++)
+      printf("%02X ", key[i]);
+    printf("\n");
+  }
 
   key = (uint8_t*)xex.opt_header_ptr(XEX_HEADER_LAN_KEY);
   if (key)
@@ -587,7 +592,8 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  Raw Data Size:      %08X\n", (uint32_t)tls_info->SizeOfRawData);
   }
 
-  if (header.Magic != MAGIC_XEX2D) {
+  if (header.Magic != MAGIC_XEX2D)
+  {
     auto* exec_info = xex.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
     if (exec_info)
     {
@@ -602,7 +608,9 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
       printf("  Disc Number:        %d\n", exec_info->DiscNum);
       printf("  Number of Discs:    %d\n", exec_info->DiscsInSet);
     }
-  } else {
+  }
+  else
+  {
     auto* exec_info = xex.opt_header_ptr<xex_opt::xex2d::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
     if (exec_info)
     {
@@ -638,7 +646,10 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   auto* exec_info3f = xex.opt_header_ptr<xex_opt::xex3f::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA3F);
   if (exec_info3f)
   {
-    printf("\nExecution ID (XEX3F)\n");
+    if (header.Magic == MAGIC_XEX3F)
+      printf("\nExecution ID (XEX3F)\n");
+    else
+      printf("\nExecution ID (XEX0)\n");
     printf("  Media ID:           %08X\n", (uint32_t)exec_info3f->MediaID);
     printf("  Title ID:           %s\n", titleid2str(exec_info3f->TitleID).c_str());
     printf("  Savegame ID:        %X\n", exec_info3f->SaveGameID);
@@ -646,7 +657,10 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     printf("  UpdatedVersion:     %04X\n", (uint16_t)exec_info3f->UpdatedVersion);
     printf("  Region:             %04X\n", (uint16_t)exec_info3f->Region);
     printf("  Platform:           %d\n", exec_info3f->Platform);
-    printf("  Executable Type:    %d\n", exec_info3f->ExecutableType);
+    if (header.Magic == MAGIC_XEX3F)
+      printf("  Executable Type:    %d\n", exec_info3f->ExecutableType);
+    else
+      printf("  Content Type:       %d\n", exec_info3f->ExecutableType);
     printf("  Disc Number:        %d\n", exec_info3f->DiscNum);
   }
 
@@ -880,7 +894,7 @@ int main(int argc, char* argv[])
         else {
 
           auto addr = xex.pe_rva_to_offset(section.VirtualAddress);
-          if (xex.header().Magic == MAGIC_XEX3F || !addr)
+          if (xex.header().Magic == MAGIC_XEX3F || xex.header().Magic == MAGIC_XEX0 || !addr)
             addr = section.PointerToRawData;
 
           auto* data = xex.pe_data() + addr;

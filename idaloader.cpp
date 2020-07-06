@@ -96,7 +96,7 @@ void pe_add_sections(XEXFile& file)
     uint32 sec_addr = section.VirtualAddress;
     uint32 sec_size = section.VirtualSize;
 
-    if (file.header().Magic == MAGIC_XEX3F)
+    if (file.header().Magic == MAGIC_XEX3F || file.header().Magic == MAGIC_XEX0)
     {
       sec_addr = section.PointerToRawData;
       sec_size = section.SizeOfRawData; // TODO: verify this?
@@ -335,6 +335,11 @@ static int idaapi accept_file(
   {
     valid = 1;
     *fileformatname = "Xbox360 XEX?/XEX3F File (>=1529)";
+  }
+  else if (magic == MAGIC_XEX0)
+  {
+    valid = 1;
+    *fileformatname = "Xbox360 XEX0 File (>=1332)";
   }
 
   if (valid)
