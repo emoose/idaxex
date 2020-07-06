@@ -93,8 +93,12 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     exe_versions = ">=1640";
     break;
   case MAGIC_XEX3F:
-    exe_type = "XEX2F ('XEX?')";
+    exe_type = "XEX3F ('XEX?')";
     exe_versions = ">=1529";
+    break;
+  case MAGIC_XEX0:
+    exe_type = "XEX0";
+    exe_versions = ">=1332";
     break;
   }
 
@@ -826,10 +830,10 @@ int main(int argc, char* argv[])
       {
         printf("\nLoad basefile into IDA with the following details\n");
         printf("DO NOT load as a PE or EXE file as the format is not valid\n");
-        printf("File Type:       Binary file");
-        printf("Processor Type:  PowerPC: ppcbe");
-        printf("Load Address:    0x%08X", xex.base_address());
-        printf("Entry Point:     0x%08X", xex.entry_point());
+        printf("File Type:       Binary file\n");
+        printf("Processor Type:  PowerPC: ppcbe\n");
+        printf("Load Address:    0x%08X\n", xex.base_address());
+        printf("Entry Point:     0x%08X\n", xex.entry_point());
       }
     }
   }

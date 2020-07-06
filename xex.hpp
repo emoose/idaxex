@@ -9,6 +9,7 @@
 #include "pe_structs.hpp"
 
 // XEX header magic values
+#define MAGIC_XEX0 0x58455830  // 'XEX0'
 #define MAGIC_XEX1 0x58455831  // 'XEX1'
 #define MAGIC_XEX2 0x58455832  // 'XEX2'
 #define MAGIC_XEX2D 0x5845582D // 'XEX-'
