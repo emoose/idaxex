@@ -234,22 +234,17 @@ namespace xex25 {
 };
 
 namespace xex2d {
-  struct HvImageInfo {
-    uint8_t Signature[0x100];
-    uint8_t ImportDigest[0x14];
-    uint8_t ImageHash[0x14];
-    xe::be<uint32_t> LoadAddress;
-    xex::ImageFlags ImageFlags;
-    xe::be<uint32_t> ExportTableAddress;
-    xe::be<uint32_t> Unknown;
-  };
-  static_assert(sizeof(HvImageInfo) == 0x138, "xex2d::HvImageInfo");
-
   struct SecurityInfo {
     xe::be<uint32_t> Size;
-    HvImageInfo ImageInfo;
-    xex::AllowedMediaTypes AllowedMediaTypes;
-    xe::be<uint32_t> PageDescriptorCount;
+    uint8_t Signature[0x100];
+    uint8_t HeaderHash[0x14];
+    uint8_t ImageHash[0x14];
+    xe::be<uint32_t> LoadAddress;
+    xe::be<uint32_t> ImageSize;
+    xe::be<uint32_t> CurrentVersion;
+    xe::be<uint32_t> LowestAcceptableVersion;
+    xe::be<uint16_t> PageDescriptorCount;
+    xe::be<uint16_t> ImageFlags;
   };
-  static_assert(sizeof(SecurityInfo) == 0x144, "xex2d::SecurityInfo");
+  static_assert(sizeof(SecurityInfo) == 0x140, "xex2d::SecurityInfo");
 };

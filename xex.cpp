@@ -517,7 +517,7 @@ uint32_t XEXFile::verify_secinfo(void* file)
     imageinfo_size = sizeof(xex25::HvImageInfo);
     break;
   case MAGIC_XEX2D:
-    imageinfo_size = sizeof(xex2d::HvImageInfo);
+    imageinfo_size = sizeof(xex2d::SecurityInfo) - 4; // probably wrong, doesn't matter since XEX2D signatures are null anyway
     break;
   }
 
@@ -604,14 +604,33 @@ bool XEXFile::read_secinfo(void* file)
 
   // SecurityInfo.Size - always at SecurityInfo[0]
   seek(file, xex_header_.SecurityInfo, 0);
+
+  // Special case for XEX2D as security info is formatted a lot differently there
+  if (magic == MAGIC_XEX2D)
+  {
+    xex2d::SecurityInfo secInfo2D;
+    read(&secInfo2D, sizeof(xex2d::SecurityInfo), 1, file);
+
+    memset(&security_info_, 0, sizeof(xex2::SecurityInfo));
+
+    security_info_.Size = secInfo2D.Size;
+    memcpy(security_info_.ImageInfo.Signature, secInfo2D.Signature, 0x100);
+    // HeaderHash
+    memcpy(security_info_.ImageInfo.ImageHash, secInfo2D.ImageHash, 0x14);
+    security_info_.ImageInfo.LoadAddress = secInfo2D.LoadAddress;
+    security_info_.ImageSize = secInfo2D.ImageSize;
+    // CurrentVersion
+    // LowestAcceptableVersion
+    security_info_.PageDescriptorCount = (uint32_t)secInfo2D.PageDescriptorCount;
+    *(uint32_t*)&security_info_.ImageInfo.ImageFlags = (uint32_t)secInfo2D.ImageFlags; // todo: convert flags on-the-fly?
+
+    return true;
+  }
+
   read(&security_info_.Size, sizeof(uint32_t), 1, file);
 
   // SecurityInfo.ImageSize - mostly at SecurityInfo[4]
-  auto imageSizeOffset = 4;
-  if (magic == MAGIC_XEX2D)
-    imageSizeOffset = 0x130;
-
-  seek(file, xex_header_.SecurityInfo + imageSizeOffset, 0);
+  seek(file, xex_header_.SecurityInfo + 4, 0);
   read(&security_info_.ImageSize, sizeof(uint32_t), 1, file);
 
   // Read fields common to all XEX versions
@@ -622,7 +641,6 @@ bool XEXFile::read_secinfo(void* file)
 #define READ_FIELD(n, sz) offsets = { \
     {MAGIC_XEX1, offsetof(xex1::SecurityInfo, n)}, \
     {MAGIC_XEX25, offsetof(xex25::SecurityInfo, n)}, \
-    {MAGIC_XEX2D, offsetof(xex2d::SecurityInfo, n)}, \
   }; \
   seek(file, xex_header_.SecurityInfo + offsets[magic], 0); \
   read(&security_info_.##n, sz, 1, file);
@@ -631,6 +649,7 @@ bool XEXFile::read_secinfo(void* file)
     READ_FIELD(ImageInfo.LoadAddress, sizeof(uint32_t));
     READ_FIELD(ImageInfo.ImageHash, 0x14);
     READ_FIELD(ImageInfo.ImportDigest, 0x14);
+    READ_FIELD(ImageInfo.ImageKey, 0x10);
     READ_FIELD(ImageInfo.ExportTableAddress, sizeof(uint32_t));
 
     READ_FIELD(AllowedMediaTypes, sizeof(xex::AllowedMediaTypes));
@@ -638,19 +657,6 @@ bool XEXFile::read_secinfo(void* file)
     *(uint32_t*)&security_info_.ImageInfo.ImageFlags = _byteswap_ulong(*(uint32_t*)&security_info_.ImageInfo.ImageFlags);
     *(uint32_t*)&security_info_.AllowedMediaTypes = _byteswap_ulong(*(uint32_t*)&security_info_.AllowedMediaTypes);
 #undef READ_FIELD
-  }
-
-  // Read ImageInfo.ImageKey - special case as XEX2D doesn't include this field
-  if (magic == MAGIC_XEX2D)
-    memset(security_info_.ImageInfo.ImageKey, 0, 0x10);
-  else
-  {
-    offsets = {
-      {MAGIC_XEX1, offsetof(xex1::SecurityInfo, ImageInfo.ImageKey)},
-      {MAGIC_XEX25, offsetof(xex25::SecurityInfo, ImageInfo.ImageKey)},
-    };
-    seek(file, xex_header_.SecurityInfo + offsets[magic], 0);
-    read(&security_info_.ImageInfo.ImageKey, 1, 0x10, file);
   }
 
   // Read fields only shared between XEX1 & XEX2
@@ -1112,6 +1118,10 @@ bool XEXFile::basefile_verify()
   // Page descriptors contain the size of the current page, and the hash of the next page
   // (ImageHash inside HvImageInfo contains the first pages hash)
   valid_image_hash_ = !has_secinfo_;
+
+  // XEX2D ImageHash field is never set, can't check it sadly..
+  if (xex_header_.Magic == MAGIC_XEX2D)
+    return valid_image_hash_ = true;
 
 #ifdef IDALDR
   valid_image_hash_ = true;
