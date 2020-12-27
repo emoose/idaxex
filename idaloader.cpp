@@ -81,11 +81,10 @@ void pe_add_sections(XEXFile& file)
 
     // Exclude some sections from being added - don't know the reason, but xorlosers loader seems to
     // they don't seem important anyway, so i guess it's a good idea?
+    // TODO: actually this probably wasn't a good idea, will need to figure out a better way of excluding sections
     if (exclude_unneeded_sections)
     {
       if (!strcmp(name, ".edata"))
-        return;
-      if (!strcmp(name, ".idata"))
         return;
       if (!strcmp(name, ".XBLD"))
         return;
