@@ -6,14 +6,23 @@ Originally started as an [IDAPython loader](https://github.com/emoose/reversing/
 
 This should hopefully have the same features as xorloser's great Xex Loader (for IDA 6 and older), along with additional support for some early non-XEX2 formats, such as XEX1 used on beta-kits.
 
+## Supported formats
+
+Includes support for the following XEX formats:
+- XEX2 (>= kernel 1861)
+- XEX1 (>= 1838)
+- XEX% (>= 1746)
+- XEX- (>= 1640)
+- XEX? (>= 1529)
+- XEX0 (>= 1332)
+
 ## Features
 
-- Support for XEX2 (>= 186x), XEX1 (>= 1838), XEX% (>= 1746), XEX- (>= 1640) & XEX? (>= 1529) formats.
 - Can handle compressed/uncompressed images, and encrypted/decrypted (with support for retail, devkit & pre-release encryption keys)
 - Reads in imported functions & libraries into IDA's "imports" window, and also reads exports from the loaded module into the "exports" window.
-- (will automatically name imports that are well-known, such as imports from the kernel & XAM, just like xorloser's loader would)
+- Automatically names imports that are well-known, such as imports from the kernel & XAM, just like xorloser's loader would.
 - PE sections are created & marked with the appropriate permissions as given by the PE headers.
-- Hardware-accelerated AES-NI support, should allow loading encrypted XEXs pretty fast!
+- Hardware-accelerated AES-NI support which should allow loading encrypted XEXs pretty quickly!
 
 ## Install
 To install the loader simply extract the release zip into your IDA\loaders\ directory, eg. "C:\Program Files\IDA 7.0\loaders\idaxex64.dll"
