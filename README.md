@@ -25,11 +25,11 @@ Includes support for the following XEX formats:
 - Hardware-accelerated AES-NI support which should allow loading encrypted XEXs pretty quickly!
 
 ## Install
+Builds for IDA 7.2-7.5, both 32-bit and 64-bit, are available in the releases section.
+
 To install the loader simply extract the release zip into your IDA\loaders\ directory, eg. "C:\Program Files\IDA 7.0\loaders\idaxex64.dll"
 
 I recommend pairing this loader with the PPCAltivec plugin, an updated version for IDA 7 is available at yui-konnu's repo here: https://github.com/yui-konnu/PPC-Altivec-IDA
-
-(As that plugin is only built for 64-bit IDA, I also recommend only using the 64-bit version of idaxex too)
 
 ## Building
 You'll need to copy this repo into your idasdk\ldr\ folder, eg. for me I have it at C:\idasdk\ldr\xex\idaxex.sln
