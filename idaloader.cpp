@@ -143,7 +143,7 @@ void pe_add_sections(XEXFile& file)
 void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
 {
   // Set processor to PPC
-  set_processor_type("ppc", SETPROC_LOADER);
+  set_processor_type("ppc:vmx128", SETPROC_LOADER);
 
   // Set PPC_LISOFF to true
   // should help analyzer convert "lis r11, -0x7C46" to "lis r11, unk_83BA5600@h"
@@ -153,15 +153,16 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   // Set compiler info
   compiler_info_t comp;
   comp.id = COMP_MS;
-  comp.defalign = 0;
+  comp.cm = CM_N32_F48 | CM_CC_FASTCALL;
   comp.size_i = 4;
-  comp.size_b = 4;
+  comp.size_b = 1;
   comp.size_e = 4;
+  comp.defalign = 0;
   comp.size_s = 2;
   comp.size_l = 4;
   comp.size_ll = 8;
-  comp.cm = CM_N32_F48;
-  set_compiler(comp, 0, "xbox");
+  comp.size_ldbl = 0;
+  set_compiler(comp, SETCOMP_OVERRIDE);
 
   inf.baseaddr = 0;
 
@@ -172,6 +173,10 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   bool result = file.load(li);
   if (result)
   {
+    // If this is XEX2 try loading in x360.til, in case we have one
+    if (file.header().Magic == MAGIC_XEX2)
+      add_til("x360.til", 0);
+
     pe_add_sections(file);
 
     if (file.entry_point())

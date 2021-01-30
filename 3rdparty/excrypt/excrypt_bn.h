@@ -11,6 +11,8 @@ void ExCryptBnQw_SwapLeBe(const uint64_t* source, uint64_t* dest, uint32_t num_q
 void ExCryptBnQw_SwapDwQw(const uint64_t* source, uint64_t* dest, uint32_t num_qwords);
 void ExCryptBnQw_SwapDwQwLeBe(const uint64_t* source, uint64_t* dest, uint32_t num_qwords);
 
+int32_t ExCryptBnQwNeCompare(const uint64_t* input1, const uint64_t* input2, uint32_t num_qwords);
+
 // excrypt_bn_mod.cpp
 void ExCryptBnQwNeModMul(const uint64_t* input_A, const uint64_t* input_B, uint64_t* output_C, uint64_t inverse, const uint64_t* modulus, uint32_t modulus_size);
 uint64_t ExCryptBnQwNeModInv(uint64_t input);
@@ -60,4 +62,14 @@ int32_t ExCryptBnQwBeSigDifference(EXCRYPT_SIG* sig, const uint8_t* hash, const 
 
 // (not from XeCrypt)
 // Swaps an EXCRYPT_RSA key from Xbox360 format to a format usable with PC ExCrypt functions.
+// TODO: remove this - our funcs should be handling conversions automatically
 void ExCryptBn_BeToLeKey(EXCRYPT_RSA* key, const uint8_t* input, uint32_t input_size);
+
+// excrypt_bn_rsa.c
+BOOL ExCryptBnQwNeRsaPubCrypt(const uint64_t* input, uint64_t* output, EXCRYPT_RSA* key);
+
+// TODO: investigate PrivExp/'D' constant, XeCrypt struct doesn't provide it, but pretty much all RSA codebases need it
+// We only have the one for 1024-bit keys atm though I believe, could it be calculated from the other priv numbers?
+//BOOL ExCryptBnQwNeRsaPrvCrypt(const uint64_t* input, uint64_t* output, EXCRYPT_RSA* key); 
+
+//BOOL ExCryptBnQwNeRsaKeyGen(uint32_t num_bits, uint32_t public_exponent, EXCRYPT_RSA* pub_key, EXCRYPT_RSA* priv_key);
