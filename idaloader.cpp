@@ -72,7 +72,7 @@ void label_regsaveloads(ea_t start, ea_t end)
 
 void pe_add_sections(XEXFile& file)
 {
-  for (auto section : file.sections())
+  for (const auto& section : file.sections())
   {
     // New buffer for section name so we can null-terminate it
     char name[9];
@@ -85,11 +85,11 @@ void pe_add_sections(XEXFile& file)
     if (exclude_unneeded_sections)
     {
       if (!strcmp(name, ".edata"))
-        return;
+        continue;
       if (!strcmp(name, ".XBLD"))
-        return;
+        continue;
       if (!strcmp(name, ".reloc"))
-        return;
+        continue;
     }
 
     uint32 sec_addr = section.VirtualAddress;
@@ -136,6 +136,56 @@ void pe_add_sections(XEXFile& file)
 
     if (has_code)
       label_regsaveloads(seg_addr, seg_addr + section.VirtualSize);
+  }
+
+  // Try reading & marking functions from .pdata section
+  for (const auto& section : file.sections())
+  {
+    // New buffer for section name so we can null-terminate it
+    char name[9];
+    memset(name, 0, 9);
+    memcpy(name, section.Name, 8);
+
+    if (strcmp(name, ".pdata"))
+      continue;
+
+    uint32 sec_addr = section.VirtualAddress;
+    uint32 sec_size = section.VirtualSize;
+
+    if (file.header().Magic == MAGIC_XEX3F || file.header().Magic == MAGIC_XEX0)
+    {
+      sec_addr = section.PointerToRawData;
+      sec_size = section.SizeOfRawData; // TODO: verify this?
+    }
+
+    ea_t seg_addr = (ea_t)file.base_address() + (ea_t)section.VirtualAddress;
+
+    // Size could be beyond file bounds, if so fix the size to what we can fit
+    if (sec_addr + sec_size > file.image_size())
+      sec_size = file.image_size() - sec_addr;
+
+    // Store function addrs from .pdata inside a std::vector, so we can iterate over them in reverse
+    std::vector<uint32_t> funcs;
+    int offset = 0;
+    while (offset < sec_size)
+    {
+      create_data(seg_addr + offset, dword_flag(), 4, BADNODE);
+      create_data(seg_addr + offset + 4, dword_flag(), 4, BADNODE);
+
+      auto* fn_ptr = reinterpret_cast<const xe::be<uint32_t>*>(file.pe_data() + sec_addr + offset);
+      ea_t fn = *fn_ptr;
+
+      funcs.push_back(fn);
+
+      offset += 8;
+    }
+
+    // Iterate over functions in reverse, so hopefully they'll be marked with correct lengths
+    for (std::vector<uint32_t>::reverse_iterator i = funcs.rbegin(); i != funcs.rend(); ++i)
+    {
+      create_insn(*i);
+      add_func(*i);
+    }
   }
 }
 

@@ -42,9 +42,7 @@ This project is designed for IDA on Windows but maybe it could work on other OS'
 
 I've been using this loader for a few months now and it's worked pretty well, but no doubt there's probably bugs to be found in it - if you encounter anything strange please don't hesitate to make a bug report on the issue tracker!
 
-- .pdata support will be added soon, wasn't aware this section could be used for storing exports, but zeroKilo's [XEXLoaderWV for Ghidra](https://github.com/zeroKilo/XEXLoaderWV) gives a great look at how this section should be handled - will add support for loading in this section soon.
-
-- Right now known-import-names are hardcoded inside the loader, it'd be nice if we can make them external somehow... xorloser's loader seems to call into a DoNameGen function inside x360_imports.idc for this - maybe we can do the same?
+- Right now known-import-names are hardcoded inside the loader, it'd be nice if we can make them external somehow... xorloser's loader seems to read them from Xbox360.xml - maybe we can do something similar?
 
 ## Credits
 idaxex is based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name!
