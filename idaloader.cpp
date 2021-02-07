@@ -76,8 +76,8 @@ void pe_add_sections(XEXFile& file)
   {
     // New buffer for section name so we can null-terminate it
     char name[9];
-    memset(name, 0, 9);
-    memcpy(name, section.Name, 8);
+    std::copy_n(section.Name, 8, name);
+    name[8] = '\0';
 
     // Exclude some sections from being added - don't know the reason, but xorlosers loader seems to
     // they don't seem important anyway, so i guess it's a good idea?
@@ -143,8 +143,8 @@ void pe_add_sections(XEXFile& file)
   {
     // New buffer for section name so we can null-terminate it
     char name[9];
-    memset(name, 0, 9);
-    memcpy(name, section.Name, 8);
+    std::copy_n(section.Name, 8, name);
+    name[8] = '\0';
 
     if (strcmp(name, ".pdata"))
       continue;

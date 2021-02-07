@@ -52,8 +52,8 @@ bool LoadSpa(XEXFile& xex, xe::kernel::xam::xdbf::SpaFile& spa)
   for (auto section : sects)
   {
     char name[9];
-    memset(name, 0, 9);
-    memcpy(name, section.Name, 8);
+    std::copy_n(section.Name, 8, name);
+    name[8] = '\0';
 
     if (std::string(name) != tid)
       continue;
@@ -936,8 +936,8 @@ int main(int argc, char* argv[])
       for (auto section : sections)
       {
         char sectname[9];
-        memset(sectname, 0, 9);
-        memcpy(sectname, section.Name, 8);
+        std::copy_n(section.Name, 8, sectname);
+        sectname[8] = '\0';
 
         std::filesystem::path res_path = dump_path / sectname;
         FILE* file;
