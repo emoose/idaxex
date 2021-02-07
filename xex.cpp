@@ -903,6 +903,7 @@ uint32_t XEXFile::xex_va_to_offset(void* file, uint32_t va)
 
   xex_opt::XexDataFormat comp_format = (xex_opt::XexDataFormat)(uint16_t)data_descriptor_->Format;
 
+  // convert VA to RVA if necessary
   if (va >= base_address())
     va -= base_address();
 
@@ -925,7 +926,7 @@ uint32_t XEXFile::xex_va_to_offset(void* file, uint32_t va)
   for (int i = 0; i < num_blocks; i++)
   {
     const auto& block = xex_blocks[i];
-    int block_end = position + block.DataSize + block.ZeroSize;
+    int block_end = position + block.DataSize;
     if (va >= position && va < block_end)
       return xex_header_.SizeOfHeaders + real_position + (va - position);
 

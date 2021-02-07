@@ -871,17 +871,29 @@ int main(int argc, char* argv[])
       if (xex.header().Magic != MAGIC_XEX2)
         printf("XEX isn't XEX2, addresses might not be correct!\n");
 
+      uint32_t result = 0;
       if (rva >= xex.base_address())
       {
+        result = xex.xex_va_to_offset(file, rva);
         printf("Virtual Address -> File Offset\n");
         printf("Virtual Addr: 0x%X\n", rva);
-        printf("File Offset:  0x%X\n", xex.xex_va_to_offset(file, rva));
+        printf("File Offset:  0x%X\n", result);
       }
       else
       {
+        result = xex.xex_offset_to_va(file, rva);
         printf("File Offset -> Virtual Address\n");
         printf("File Offset:  0x%X\n", rva);
-        printf("Virtual Addr: 0x%X\n", xex.xex_offset_to_va(file, rva));
+        printf("Virtual Addr: 0x%X\n", result);
+      }
+
+      if (!result)
+      {
+        printf("\nThe given address was unable to be converted, either:\n");
+        printf("- The given number is invalid\n");
+        printf("- The address is out-of-bounds\n");
+        printf("- The VA is part of a zero-compressed block in the file\n");
+        printf("(even with uncompressed XEXs, blocks of zeroes are removed from the file to save some space)\n");
       }
     }
 
