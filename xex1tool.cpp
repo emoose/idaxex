@@ -874,14 +874,14 @@ int main(int argc, char* argv[])
       uint32_t result = 0;
       if (rva >= xex.base_address())
       {
-        result = xex.xex_va_to_offset(file, rva);
+        result = xex.xex_va_to_offset(rva);
         printf("Virtual Address -> File Offset\n");
         printf("Virtual Addr: 0x%X\n", rva);
         printf("File Offset:  0x%X\n", result);
       }
       else
       {
-        result = xex.xex_offset_to_va(file, rva);
+        result = xex.xex_offset_to_va(rva);
         printf("File Offset -> Virtual Address\n");
         printf("File Offset:  0x%X\n", rva);
         printf("Virtual Addr: 0x%X\n", result);

@@ -246,6 +246,11 @@ namespace xex_opt {
     xe::be<uint32_t> Size;
     xe::be<uint16_t> Flags;
     xe::be<uint16_t> Format;
+
+    XexDataFormat DataFormat()
+    {
+      return static_cast<XexDataFormat>((uint16_t)Format);
+    }
   };
   static_assert(sizeof(XexFileDataDescriptor) == 8, "xex_opt::XexFileDataDescriptor");
 
