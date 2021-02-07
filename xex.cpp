@@ -895,6 +895,90 @@ end:
   return retcode == 0;
 }
 
+// TODO: fix this to work with older XEX formats
+uint32_t XEXFile::xex_va_to_offset(void* file, uint32_t va)
+{
+  if (!data_descriptor_)
+    return false;
+
+  xex_opt::XexDataFormat comp_format = (xex_opt::XexDataFormat)(uint16_t)data_descriptor_->Format;
+
+  if (va >= base_address())
+    va -= base_address();
+
+  if (comp_format == xex_opt::XexDataFormat::None)
+    return xex_header_.SizeOfHeaders + va;
+
+  if (comp_format != xex_opt::XexDataFormat::Raw)
+    return 0; // can't get offset for compressed XEXs
+
+  int num_blocks = (data_descriptor_->Size - 8) / 8;
+  auto xex_blocks = std::make_unique<xex_opt::XexRawDataDescriptor[]>(num_blocks);
+
+  seek(file, directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8, 0);
+  read(xex_blocks.get(), sizeof(xex_opt::XexRawDataDescriptor), num_blocks, file);
+
+  // Uncompressed blocks can have any number of zeroes appended to them, instead of these zeroes being stored in the XEX
+  // To locate the RVA just track the block size + zero size together, and then return its proper address without zeroes.
+  uint32_t position = 0;
+  uint32_t real_position = 0;
+  for (int i = 0; i < num_blocks; i++)
+  {
+    const auto& block = xex_blocks[i];
+    int block_end = position + block.DataSize + block.ZeroSize;
+    if (va >= position && va < block_end)
+      return xex_header_.SizeOfHeaders + real_position + (va - position);
+
+    position += block.DataSize + block.ZeroSize;
+    real_position += block.DataSize;
+  }
+
+  return 0;
+}
+
+// TODO: fix this to work with older XEX formats
+uint32_t XEXFile::xex_offset_to_va(void* file, uint32_t offset)
+{
+  if (!data_descriptor_)
+    return false;
+
+  xex_opt::XexDataFormat comp_format = (xex_opt::XexDataFormat)(uint16_t)data_descriptor_->Format;
+
+  if (xex_header_.SizeOfHeaders > offset)
+    return 0;
+
+  offset -= xex_header_.SizeOfHeaders;
+
+  if (comp_format == xex_opt::XexDataFormat::None)
+    return base_address() + offset;
+
+  if (comp_format != xex_opt::XexDataFormat::Raw)
+    return 0; // can't get offset for compressed XEXs
+
+  int num_blocks = (data_descriptor_->Size - 8) / 8;
+  auto xex_blocks = std::make_unique<xex_opt::XexRawDataDescriptor[]>(num_blocks);
+
+  seek(file, directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8, 0);
+  read(xex_blocks.get(), sizeof(xex_opt::XexRawDataDescriptor), num_blocks, file);
+
+  // Uncompressed blocks can have any number of zeroes appended to them, instead of these zeroes being stored in the XEX
+  // To locate the RVA just track the block size + zero size together, and then return its proper address without zeroes.
+  uint32_t position = 0;
+  uint32_t real_position = 0;
+  for (int i = 0; i < num_blocks; i++)
+  {
+    const auto& block = xex_blocks[i];
+    int block_end = real_position + block.DataSize;
+    if (offset >= real_position && offset < block_end)
+      return base_address() + position + (offset - real_position);
+
+    position += block.DataSize + block.ZeroSize;
+    real_position += block.DataSize;
+  }
+
+  return 0;
+}
+
 // Reads import libraries & function info from PE headers
 bool XEXFile::pe_load_imports(const uint8_t* data)
 {

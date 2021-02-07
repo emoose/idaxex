@@ -125,6 +125,9 @@ public:
 
   uint32_t pe_rva_to_offset(uint32_t rva);
 
+  uint32_t xex_va_to_offset(void* file, uint32_t va);
+  uint32_t xex_offset_to_va(void* file, uint32_t offset);
+
   // Length of the pe_data member, not the same as image_size!
   uint32_t pe_data_length() { return pe_data_.size(); }
 

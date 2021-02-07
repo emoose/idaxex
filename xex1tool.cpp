@@ -798,6 +798,7 @@ int main(int argc, char* argv[])
     ("b,basefile", "Dump basefile from XEX", cxxopts::value<std::string>())
     ("d,dumpres", "Dump all resources to a dir (can be '.')", cxxopts::value<std::string>())
     ("v,verbose", "Enables verbose XEXFile debug output")
+    ("a,address", "Convert a virtual memory address to file offset, or vice-versa", cxxopts::value<uint32_t>())
     ("positional", "Positional parameters",
       cxxopts::value<std::vector<std::string>>())
     ;
@@ -845,6 +846,46 @@ int main(int argc, char* argv[])
   {
     printf("Error loading XEX file %s\n", filepath.c_str());
     return 0;
+  }
+
+  if (result.count("a"))
+  {
+    uint32_t rva = result["a"].as<uint32_t>();
+    printf("\n");
+
+    bool convert = true;
+    auto* data_descriptor = xex.data_descriptor();
+    if (!data_descriptor)
+      convert = false;
+    else
+    {
+      xex_opt::XexDataFormat comp_format = (xex_opt::XexDataFormat)(uint16_t)data_descriptor->Format;
+      convert = comp_format == xex_opt::XexDataFormat::None || comp_format == xex_opt::XexDataFormat::Raw;
+    }
+
+    if (!convert)
+      printf("XEX isn't uncompressed, unable to convert address with -a!\n");
+    else
+    {
+      // TODO: fix these functions to work with older formats
+      if (xex.header().Magic != MAGIC_XEX2)
+        printf("XEX isn't XEX2, addresses might not be correct!\n");
+
+      if (rva >= xex.base_address())
+      {
+        printf("Virtual Address -> File Offset\n");
+        printf("Virtual Addr: 0x%X\n", rva);
+        printf("File Offset:  0x%X\n", xex.xex_va_to_offset(file, rva));
+      }
+      else
+      {
+        printf("File Offset -> Virtual Address\n");
+        printf("File Offset:  0x%X\n", rva);
+        printf("Virtual Addr: 0x%X\n", xex.xex_offset_to_va(file, rva));
+      }
+    }
+
+    printf("\n");
   }
 
   if (result.count("b"))
