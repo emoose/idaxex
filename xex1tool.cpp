@@ -68,6 +68,36 @@ bool LoadSpa(XEXFile& xex, xe::kernel::xam::xdbf::SpaFile& spa)
   return false;
 }
 
+std::string DoNameGen(const std::string& libName, int id);
+
+void PrintImports(XEXFile& xex) {
+  printf("\nXEX Imports:\n");
+
+  auto& tables = xex.import_tables();
+
+  for (auto& lib : xex.imports()) {
+    auto& libname = lib.first;
+
+    if (tables.count(libname))
+    {
+      auto& table_header = tables.at(libname);
+
+      printf("# %s v%d.%d.%d.%d (minimum v%d.%d.%d.%d)\n", libname.c_str(),
+        table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
+        table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE);
+    }
+
+    for (auto imp : lib.second)
+    {
+      auto imp_name = DoNameGen(libname, imp.first);
+      auto imp_addr = imp.second.ThunkAddr;
+
+      printf("  %3d) %s\n", imp.first, imp_name.c_str());
+    }
+    printf("\n");
+  }
+}
+
 void PrintInfo(XEXFile& xex, bool print_mem_pages)
 {
   printf("\nXEX Info\n");
@@ -795,6 +825,7 @@ int main(int argc, char* argv[])
   options.add_options()
     ("l,listing", "Print executable info")
     ("m,listmem", "Print executable info & memory pages")
+    ("i,imports", "Print import libraries & functions")
     ("b,basefile", "Dump basefile from XEX", cxxopts::value<std::string>())
     ("d,dumpres", "Dump all resources to a dir (can be '.')", cxxopts::value<std::string>())
     ("v,verbose", "Enables verbose XEXFile debug output")
@@ -958,6 +989,9 @@ int main(int argc, char* argv[])
       }
     }
   }
+
+  if (result["i"].as<bool>())
+    PrintImports(xex);
 
   if (result["l"].as<bool>() || result["m"].as<bool>())
     PrintInfo(xex, result["m"].as<bool>());

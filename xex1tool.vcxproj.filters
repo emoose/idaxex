@@ -33,6 +33,9 @@
     <ClCompile Include="xdbf\xdbf.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="namegen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xex_headerids.hpp">

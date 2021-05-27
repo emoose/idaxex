@@ -93,6 +93,7 @@
     <ClCompile Include="3rdparty\aes.c" />
     <ClCompile Include="3rdparty\lzx.c" />
     <ClCompile Include="3rdparty\sha1.c" />
+    <ClCompile Include="namegen.cpp" />
     <ClCompile Include="xdbf\xdbf.cc" />
     <ClCompile Include="xex.cpp" />
     <ClCompile Include="xex1tool.cpp" />
