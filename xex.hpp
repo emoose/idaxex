@@ -129,7 +129,7 @@ public:
   uint32_t xex_offset_to_va(uint32_t offset);
 
   // Length of the pe_data member, not the same as image_size!
-  uint32_t pe_data_length() { return pe_data_.size(); }
+  size_t pe_data_length() { return pe_data_.size(); }
 
   bool basefile_is_pe() {
     return pe_data_length() > 4 && *(uint16_t*)pe_data() == EXE_MZ_SIGNATURE;

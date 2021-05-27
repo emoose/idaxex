@@ -216,8 +216,8 @@ bool XEXFile::load(void* file)
   if (sects_beta)
   {
     auto count = (sects_beta->Size - 4) / sizeof(xex_opt::xex3f::XexSectionHeader);
-    int start_index = sections_.size(); // skip PE sections
-    for (uint32_t i = start_index; i < count; i++)
+    auto start_index = sections_.size(); // skip PE sections
+    for (auto i = start_index; i < count; i++)
     {
       auto& section = sects_beta->Sections[i];
 
@@ -939,7 +939,7 @@ uint32_t XEXFile::xex_va_to_offset(uint32_t va)
   for (int i = 0; i < num_blocks; i++)
   {
     const auto& block = xex_blocks[i];
-    int block_end = position + block.DataSize;
+    auto block_end = position + block.DataSize;
     if (va >= position && va < block_end)
       return xex_header_.SizeOfHeaders + real_position + (va - position);
 
@@ -984,7 +984,7 @@ uint32_t XEXFile::xex_offset_to_va(uint32_t offset)
   for (int i = 0; i < num_blocks; i++)
   {
     const auto& block = xex_blocks[i];
-    int block_end = real_position + block.DataSize;
+    auto block_end = real_position + block.DataSize;
     if (offset >= real_position && offset < block_end)
       return base_address() + position + (offset - real_position);
 
