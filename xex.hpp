@@ -187,4 +187,16 @@ public:
   const std::string& pe_module_name() { return pe_module_name_; }
   const xex_opt::XexVitalStats* vital_stats() { return vital_stats_; }
   const xex_opt::XexFileDataDescriptor* data_descriptor() { return data_descriptor_; }
+
+  uint32_t min_kernel_version() {
+    switch (xex_header_.Magic) {
+      case MAGIC_XEX0:  return 1332;
+      case MAGIC_XEX3F: return 1529;
+      case MAGIC_XEX2D: return 1640;
+      case MAGIC_XEX25: return 1746;
+      case MAGIC_XEX1:  return 1838;
+      case MAGIC_XEX2:  return 1861;
+    }
+    return 0;
+  }
 };

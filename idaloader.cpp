@@ -264,7 +264,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       }
     }
 
-    auto exports_version = 0;
+    auto exports_version = file.min_kernel_version();
     if (file.header().Magic != MAGIC_XEX2D)
     {
       auto* exec_info = file.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
@@ -320,7 +320,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       // Track lowest record addr so we can add import module comment to it later
       ea_t lowest_addr = BADADDR;
 
-      int lib_version = 0;
+      int lib_version = file.min_kernel_version();
 
       auto& tables = file.import_tables();
       if (tables.count(libname))

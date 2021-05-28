@@ -78,7 +78,7 @@ void PrintImports(XEXFile& xex) {
   for (auto& lib : xex.imports()) {
     auto& libname = lib.first;
 
-    int version = 0;
+    int version = xex.min_kernel_version();
 
     if (tables.count(libname))
     {
