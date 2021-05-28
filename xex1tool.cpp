@@ -732,19 +732,23 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     *(uint32_t*)&patch_info.SourceVersion = _byteswap_ulong(*(uint32_t*)&patch_info.SourceVersion);
     *(uint32_t*)&patch_info.TargetVersion = _byteswap_ulong(*(uint32_t*)&patch_info.TargetVersion);
 
+    uint32_t media_id;
+    media_id = _byteswap_ulong(*(uint32_t*)(&xex.security_info().ImageInfo.MediaID[0xC]));
+
     printf("\nDelta Patch Descriptor\n");
-    printf("  Source Version:          v%d.%d.%d.%d\n", patch_info.SourceVersion.Major, patch_info.SourceVersion.Minor, patch_info.SourceVersion.Build, patch_info.SourceVersion.QFE);
-    printf("  Target Version:          v%d.%d.%d.%d\n", patch_info.TargetVersion.Major, patch_info.TargetVersion.Minor, patch_info.TargetVersion.Build, patch_info.TargetVersion.QFE);
+    printf("  Media ID:               %08X\n", media_id);
+    printf("  Source Version:         v%d.%d.%d.%d\n", patch_info.SourceVersion.Major, patch_info.SourceVersion.Minor, patch_info.SourceVersion.Build, patch_info.SourceVersion.QFE);
+    printf("  Target Version:         v%d.%d.%d.%d\n", patch_info.TargetVersion.Major, patch_info.TargetVersion.Minor, patch_info.TargetVersion.Build, patch_info.TargetVersion.QFE);
   
-    printf("  Headers source offset:   %X\n", uint32_t(patch_info.DeltaHeadersSourceOffset));
-    printf("  Headers source size:     %X\n", uint32_t(patch_info.DeltaHeadersSourceSize));
-    printf("  Headers target offset:   %X\n", uint32_t(patch_info.DeltaHeadersTargetOffset));
+    printf("  Headers source offset:  %X\n", uint32_t(patch_info.DeltaHeadersSourceOffset));
+    printf("  Headers source size:    %X\n", uint32_t(patch_info.DeltaHeadersSourceSize));
+    printf("  Headers target offset   %X\n", uint32_t(patch_info.DeltaHeadersTargetOffset));
 
-    printf("  Image source offset:     %X\n", uint32_t(patch_info.DeltaImageSourceOffset));
-    printf("  Image source size:       %X\n", uint32_t(patch_info.DeltaImageSourceSize));
-    printf("  Image target offset:     %X\n", uint32_t(patch_info.DeltaImageTargetOffset));
+    printf("  Image source offset:    %X\n", uint32_t(patch_info.DeltaImageSourceOffset));
+    printf("  Image source size:      %X\n", uint32_t(patch_info.DeltaImageSourceSize));
+    printf("  Image target offset:    %X\n", uint32_t(patch_info.DeltaImageTargetOffset));
 
-    printf("  Size of target headers:  %X\n", uint32_t(patch_info.SizeOfTargetHeaders));
+    printf("  Target header size:     %X\n", uint32_t(patch_info.SizeOfTargetHeaders));
 
     printf("\n  Source Digest\n    ");
     for (int i = 0; i < 0x14; i++)
