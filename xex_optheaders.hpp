@@ -334,8 +334,8 @@ namespace xex_opt {
 
   struct XexDeltaPatchDescriptor {
     xe::be<uint32_t> Size;
-    xe::be<uint32_t> TargetVersion;
-    xe::be<uint32_t> SourceVersion;
+    xex::Version TargetVersion;
+    xex::Version SourceVersion;
     uint8_t DigestSource[20];
     uint8_t ImageKeySource[16];
     xe::be<uint32_t> SizeOfTargetHeaders;

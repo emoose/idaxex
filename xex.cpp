@@ -253,6 +253,16 @@ bool XEXFile::load(void* file)
     read_imports(file);
     read_exports(file);
   }
+  else
+  {
+    // No image to hash, treat it as valid...
+    valid_image_hash_ = true;
+  }
+
+  if (!security_info_.ImageInfo.ImportTableCount) {
+    // No import tables to hash, so treat it as valid...
+    valid_imports_hash_ = true;
+  }
 
   return true;
 }
@@ -1220,6 +1230,8 @@ bool XEXFile::read_basefile(void* file, int key_index)
     result = read_basefile_uncompressed(file, enc_flag);
   else if (comp_format == xex_opt::XexDataFormat::Compressed)
     result = read_basefile_compressed(file, enc_flag);
+  else if (comp_format == xex_opt::XexDataFormat::DeltaCompressed)
+    return true; // TODO: any way to validate this?
   else
   {
     dbgmsg("[!] Error: XEX uses invalid compression format %hd!\n", (uint16_t)comp_format);

@@ -264,7 +264,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       }
     }
 
-    for (auto exp : file.exports())
+    for (auto& exp : file.exports())
     {
       auto exp_name = DoNameGen(exports_libname, exp.first);
       auto exp_addr = exp.second.FuncAddr;
@@ -290,7 +290,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       // Track lowest record addr so we can add import module comment to it later
       ea_t lowest_addr = BADADDR;
 
-      for (auto imp : lib.second)
+      for (auto& imp : lib.second)
       {
         auto imp_name = DoNameGen(libname, imp.first);
         auto imp_addr = imp.second.ThunkAddr;

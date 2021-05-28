@@ -82,12 +82,12 @@ void PrintImports(XEXFile& xex) {
     {
       auto& table_header = tables.at(libname);
 
-      printf("# %s v%d.%d.%d.%d (minimum v%d.%d.%d.%d)\n", libname.c_str(),
+      printf("# %s v%d.%d.%d.%d\n# (min v%d.%d.%d.%d, %llu imports)\n", libname.c_str(),
         table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
-        table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE);
+        table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE, lib.second.size());
     }
 
-    for (auto imp : lib.second)
+    for (auto& imp : lib.second)
     {
       auto imp_name = DoNameGen(libname, imp.first);
       auto imp_addr = imp.second.ThunkAddr;
@@ -723,6 +723,38 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
         printf("  %3d) %s\n", i, titleid2str(tid).c_str());
       }
     }
+  }
+
+  auto* patch_info_og = xex.opt_header_ptr<xex_opt::XexDeltaPatchDescriptor>(XEX_HEADER_DELTA_PATCH_DESCRIPTOR);
+  if (patch_info_og) {
+    xex_opt::XexDeltaPatchDescriptor patch_info = *patch_info_og;
+
+    *(uint32_t*)&patch_info.SourceVersion = _byteswap_ulong(*(uint32_t*)&patch_info.SourceVersion);
+    *(uint32_t*)&patch_info.TargetVersion = _byteswap_ulong(*(uint32_t*)&patch_info.TargetVersion);
+
+    printf("\nDelta Patch Descriptor\n");
+    printf("  Source Version:          v%d.%d.%d.%d\n", patch_info.SourceVersion.Major, patch_info.SourceVersion.Minor, patch_info.SourceVersion.Build, patch_info.SourceVersion.QFE);
+    printf("  Target Version:          v%d.%d.%d.%d\n", patch_info.TargetVersion.Major, patch_info.TargetVersion.Minor, patch_info.TargetVersion.Build, patch_info.TargetVersion.QFE);
+  
+    printf("  Headers source offset:   %X\n", uint32_t(patch_info.DeltaHeadersSourceOffset));
+    printf("  Headers source size:     %X\n", uint32_t(patch_info.DeltaHeadersSourceSize));
+    printf("  Headers target offset:   %X\n", uint32_t(patch_info.DeltaHeadersTargetOffset));
+
+    printf("  Image source offset:     %X\n", uint32_t(patch_info.DeltaImageSourceOffset));
+    printf("  Image source size:       %X\n", uint32_t(patch_info.DeltaImageSourceSize));
+    printf("  Image target offset:     %X\n", uint32_t(patch_info.DeltaImageTargetOffset));
+
+    printf("  Size of target headers:  %X\n", uint32_t(patch_info.SizeOfTargetHeaders));
+
+    printf("\n  Source Digest\n    ");
+    for (int i = 0; i < 0x14; i++)
+      printf("%02X ", patch_info.DigestSource[i]);
+    printf("\n");
+
+    printf("\n  Source Image Key\n    ");
+    for (int i = 0; i < 0x10; i++)
+      printf("%02X ", patch_info.ImageKeySource[i]);
+    printf("\n");
   }
 
   // TODO: ratings!
