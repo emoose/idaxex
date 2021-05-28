@@ -17,7 +17,7 @@
 
 bool exclude_unneeded_sections = true;
 
-std::string DoNameGen(const std::string& libName, int id); // namegen.cpp
+std::string DoNameGen(const std::string& libName, int id, int version); // namegen.cpp
 
 void label_regsaveloads(ea_t start, ea_t end)
 {
@@ -264,9 +264,39 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       }
     }
 
+    auto exports_version = 0;
+    if (file.header().Magic != MAGIC_XEX2D)
+    {
+      auto* exec_info = file.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+      if (exec_info)
+      {
+        exports_version = exec_info->Version.Build;
+      }
+    }
+    else
+    {
+      auto* exec_info = file.opt_header_ptr<xex_opt::xex2d::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+      if (exec_info)
+      {
+        exports_version = exec_info->Version.Build;
+      }
+    }
+
+    auto* exec_info25 = file.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
+    if (exec_info25)
+    {
+      exports_version = exec_info25->Version.Build;
+    }
+
+    auto* exec_info3f = file.opt_header_ptr<xex_opt::xex3f::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA3F);
+    if (exec_info3f)
+    {
+      exports_version = exec_info3f->Version.Build;
+    }
+
     for (auto& exp : file.exports())
     {
-      auto exp_name = DoNameGen(exports_libname, exp.first);
+      auto exp_name = DoNameGen(exports_libname, exp.first, exports_version);
       auto exp_addr = exp.second.FuncAddr;
 
       // Mark as func export if inside a code section
@@ -290,9 +320,17 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       // Track lowest record addr so we can add import module comment to it later
       ea_t lowest_addr = BADADDR;
 
+      int lib_version = 0;
+
+      auto& tables = file.import_tables();
+      if (tables.count(libname))
+      {
+        lib_version = tables.at(libname).Version.Build;
+      }
+
       for (auto& imp : lib.second)
       {
-        auto imp_name = DoNameGen(libname, imp.first);
+        auto imp_name = DoNameGen(libname, imp.first, lib_version);
         auto imp_addr = imp.second.ThunkAddr;
 
         if (imp.second.ThunkAddr && imp.second.ThunkAddr != imp.second.FuncAddr)
@@ -332,7 +370,6 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
       if (lowest_addr != BADADDR)
       {
-        auto& tables = file.import_tables();
         if (tables.count(libname))
         {
           auto& table_header = tables.at(libname);

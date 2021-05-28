@@ -68,7 +68,7 @@ bool LoadSpa(XEXFile& xex, xe::kernel::xam::xdbf::SpaFile& spa)
   return false;
 }
 
-std::string DoNameGen(const std::string& libName, int id);
+std::string DoNameGen(const std::string& libName, int id, int version);
 
 void PrintImports(XEXFile& xex) {
   printf("\nXEX Imports:\n");
@@ -78,6 +78,8 @@ void PrintImports(XEXFile& xex) {
   for (auto& lib : xex.imports()) {
     auto& libname = lib.first;
 
+    int version = 0;
+
     if (tables.count(libname))
     {
       auto& table_header = tables.at(libname);
@@ -85,11 +87,13 @@ void PrintImports(XEXFile& xex) {
       printf("# %s v%d.%d.%d.%d\n# (min v%d.%d.%d.%d, %llu imports)\n", libname.c_str(),
         table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
         table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE, lib.second.size());
+
+      version = table_header.Version.Build;
     }
 
     for (auto& imp : lib.second)
     {
-      auto imp_name = DoNameGen(libname, imp.first);
+      auto imp_name = DoNameGen(libname, imp.first, version);
       auto imp_addr = imp.second.ThunkAddr;
 
       printf("  %3d) %s\n", imp.first, imp_name.c_str());
