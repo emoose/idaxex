@@ -178,6 +178,9 @@ void pe_add_sections(XEXFile& file)
 
       funcs.push_back(fn);
 
+      // Delete useless .pdata -> fn xref
+      del_dref(seg_addr + offset, fn);
+
       offset += 8;
     }
 
