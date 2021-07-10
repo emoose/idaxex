@@ -181,6 +181,11 @@ void pe_add_sections(XEXFile& file)
       offset += 8;
     }
 
+    // TODO: loop below can take a while with no output to user, need some way to let them know IDA hasn't crashed...
+    // IDA sadly doesn't get a chance to update output window with msg below before the loop below is ran
+    // request_refresh() etc doesn't seem to help :(
+    msg("[+] Marking %lld functions from .pdata...\n", funcs.size());
+
     // Iterate over functions in reverse, so hopefully they'll be marked with correct lengths
     for (std::vector<uint32_t>::reverse_iterator i = funcs.rbegin(); i != funcs.rend(); ++i)
     {
