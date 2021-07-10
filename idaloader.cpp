@@ -9,6 +9,7 @@
 
 #include "../idaldr.h"
 #include "xex.hpp"
+#include "xex_headerids.hpp"
 #include <typeinf.hpp>
 #include <bytes.hpp>
 
