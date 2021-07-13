@@ -441,7 +441,7 @@ bool XEXFile::read_imports(void* file)
     if (!callcap.BeginFunctionThunkAddress || !callcap.EndFunctionThunkAddress)
       return true;
 
-    dbgmsg("[+] Naming callcap imports... (0x%X - 0x%X)\n", callcap.BeginFunctionThunkAddress, callcap.EndFunctionThunkAddress);
+    dbgmsg("[+] Naming callcap imports... (%X-%X)\n", uint32_t(callcap.BeginFunctionThunkAddress), uint32_t(callcap.EndFunctionThunkAddress));
     for (uint32_t i = callcap.BeginFunctionThunkAddress; i < callcap.EndFunctionThunkAddress + 0x10; i += 0x10)
     {
       uint32_t import_offset = pe_rva_to_offset(i);
