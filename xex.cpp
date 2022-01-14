@@ -13,12 +13,15 @@
 #include <cstdlib>
 
 #include "3rdparty/aes.hpp"
-#include "3rdparty/lzx.hpp"
 #include "3rdparty/sha1.hpp"
 
 #ifndef IDALDR
 #include <excrypt.h>
 #endif
+
+int lzx_decompress(const void* lzx_data, size_t lzx_len, void* dest,
+    size_t dest_len, uint32_t window_size, void* window_data,
+    size_t window_data_len); // lzx.cpp
 
 bool xex_log_verbose = true;
 
@@ -818,12 +821,9 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   }
 
   // read windowsize & first block from file_data_descriptor header
-  xex_opt::XexCompressedDataDescriptor compression_info;
-
-  std::copy_n(
-    reinterpret_cast<xex_opt::XexCompressedDataDescriptor*>(xex_headers_.data() + directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8),
-    1,
-    &compression_info);
+  xex_opt::XexCompressedDataDescriptor compression_info = 
+      *reinterpret_cast<xex_opt::XexCompressedDataDescriptor*>(
+          xex_headers_.data() + directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8);
 
   auto* cur_block = &compression_info.FirstDescriptor;
 
@@ -831,16 +831,15 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   pe_data_.resize(image_size());
 
   // LZX init...
-  LZXinit(compression_info.WindowSize);
-  uint8_t* comp_buffer = (uint8_t*)malloc(0x9800); // 0x9800 = max comp. block size (0x8000) + MAX_GROWTH (0x1800)
-  if (!comp_buffer)
+  std::unique_ptr<uint8_t[]> comp_buffer = std::make_unique<uint8_t[]>(data_length_);
+  if (!comp_buffer || !comp_buffer.get())
   {
     dbgmsg("[!] Error: failed to allocate decompression buffer!?\n");
     return false;
   }
 
-  uint32_t size_left = image_size();
-  uint32_t size_done = 0;
+  uint8_t* d = comp_buffer.get();
+
   int retcode = 0;
 
   // Start decompressing
@@ -884,19 +883,9 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
         goto end;
       }
       // Read in LZX buffer
-      std::copy_n(p, comp_size, comp_buffer);
+      std::copy_n(p, comp_size, d);
       p += comp_size;
-      if (comp_size < 0x9800) // if comp. size is below buffer size 0x9800, zero out the remainder of the buffer
-        memset(comp_buffer + comp_size, 0, 0x9800 - comp_size);
-
-      // Decompress!
-      auto dec_size = size_left < 0x8000 ? size_left : 0x8000;
-      retcode = LZXdecompress(comp_buffer, pe_data_.data() + size_done, comp_size, dec_size);
-      if (retcode != 0)
-        goto end;
-
-      size_done += dec_size;
-      size_left -= dec_size;
+      d += comp_size;
     }
     std::copy_n(reinterpret_cast<xex_opt::XexDataDescriptor*>(&next_block), 1, cur_block);
 
@@ -904,11 +893,11 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
     block_data = 0;
   }
 
+  retcode = lzx_decompress(comp_buffer.get(), d - comp_buffer.get(), pe_data_.data(), pe_data_.size(), compression_info.WindowSize, nullptr, 0);
+
 end:
   if (block_data)
     free(block_data);
-
-  free(comp_buffer);
 
   if (retcode != 0)
     dbgmsg("[!] read_basefile_decompressed error code = %d!\n", retcode);
