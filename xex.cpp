@@ -31,6 +31,8 @@ bool XEXFile::load(void* file)
   auto fsize = tell(file);
   seek(file, 0, 0);
 
+  load_error_ = uint32_t(XEXLoadError::Unfinished);
+
   read(&xex_header_, sizeof(xex::XexHeader), 1, file);
   *(uint32_t*)&xex_header_.ModuleFlags =
     _byteswap_ulong(*(uint32_t*)&xex_header_.ModuleFlags);
@@ -38,7 +40,10 @@ bool XEXFile::load(void* file)
   if (xex_header_.Magic != MAGIC_XEX2 && xex_header_.Magic != MAGIC_XEX1 && 
     xex_header_.Magic != MAGIC_XEX25 && xex_header_.Magic != MAGIC_XEX2D && 
     xex_header_.Magic != MAGIC_XEX3F && xex_header_.Magic != MAGIC_XEX0)
+  {
+    load_error_ = uint32_t(XEXLoadError::InvalidMagic);
     return false;
+  }
 
   // Convert XEX0/XEX3F header to XEX2
   int dirHeaderOffset = sizeof(xex::XexHeader);
@@ -162,7 +167,7 @@ bool XEXFile::load(void* file)
   }
 
   auto exec_id_25 = opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
-  if(exec_id_25)
+  if (exec_id_25)
     *(uint32_t*)&exec_id_25->Version = _byteswap_ulong(*(uint32_t*)&exec_id_25->Version);
 
   vital_stats_ = opt_header_ptr<xex_opt::XexVitalStats>(XEX_HEADER_VITAL_STATS);
@@ -190,7 +195,7 @@ bool XEXFile::load(void* file)
     return false;
 
   // Basefile seems to have read fine, try reading the PE headers
-  if(basefile_is_pe())
+  if (basefile_is_pe())
     if (!pe_load(pe_data_.data()))
       return false;
 
@@ -267,6 +272,7 @@ bool XEXFile::load(void* file)
     valid_imports_hash_ = true;
   }
 
+  load_error_ = uint32_t(XEXLoadError::Success);
   return true;
 }
 
@@ -748,7 +754,10 @@ bool XEXFile::read_basefile_raw(void* file, bool encrypted)
 bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
 {
   if (!data_descriptor_)
+  {
+    load_error_ = uint32_t(XEXLoadError::MissingDataDescriptor);
     return false;
+  }
 
   int num_blocks = (data_descriptor_->Size - 8) / 8;
   auto xex_blocks = std::make_unique<xex_opt::XexRawDataDescriptor[]>(num_blocks);
@@ -781,12 +790,16 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
       read(pe_data_.data(), 1, 0x10, file);
       AES_ECB_decrypt(&aes, pe_data_.data());
 
-      // Check basefile header
+#ifdef IDALDR
+      // Check basefile header - needed for IDALDR since we don't compute image hash for that
       if (!basefile_is_valid())
       {
         pe_data_.clear();
+
+        load_error_ = uint32_t(XEXLoadError::InvalidBaseFile);
         return false;
       }
+#endif
 
       // Reinit AES & seek back to start of block
       AES_init_ctx_iv(&aes, session_key_, iv);
@@ -834,6 +847,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   std::unique_ptr<uint8_t[]> comp_buffer = std::make_unique<uint8_t[]>(data_length_);
   if (!comp_buffer || !comp_buffer.get())
   {
+    load_error_ = uint32_t(XEXLoadError::AllocFailed);
     dbgmsg("[!] Error: failed to allocate decompression buffer!?\n");
     return false;
   }
@@ -864,6 +878,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
     if (memcmp(sha_hash, cur_block->DataDigest, 0x14) != 0)
     {
       retcode = 2;
+      load_error_ = uint32_t(XEXLoadError::BadBlockHash);
       goto end;
     }
 
@@ -880,6 +895,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
       if (comp_size > 0x9800) // sanity check: shouldn't be above 0x9800
       {
         retcode = 1;
+        load_error_ = uint32_t(XEXLoadError::BadBlockSize);
         goto end;
       }
       // Read in LZX buffer
@@ -900,7 +916,10 @@ end:
     free(block_data);
 
   if (retcode != 0)
+  {
+    load_error_ = retcode;
     dbgmsg("[!] read_basefile_decompressed error code = %d!\n", retcode);
+  }
 
   return retcode == 0;
 }
@@ -1099,11 +1118,17 @@ bool XEXFile::pe_load(const uint8_t* data)
 {
   IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
   if (dos_header->MZSignature != EXE_MZ_SIGNATURE)
+  {
+    load_error_ = uint32_t(XEXLoadError::PEMissingMZ);
     return false;
+  }
 
   IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(data + dos_header->AddressOfNewExeHeader);
   if (nt_header->Signature != EXE_NT_SIGNATURE)
+  {
+    load_error_ = uint32_t(XEXLoadError::PEMissingNTHeaders);
     return false;
+  }
 
   // Get base address/entrypoint from optionalheader if we don't already have them
   if (!base_address())
@@ -1223,6 +1248,7 @@ bool XEXFile::read_basefile(void* file, int key_index)
     return true; // TODO: any way to validate this?
   else
   {
+    load_error_ = uint32_t(XEXLoadError::InvalidCompression);
     dbgmsg("[!] Error: XEX uses invalid compression format %hd!\n", (uint16_t)comp_format);
     result = false;
   }
@@ -1236,7 +1262,14 @@ bool XEXFile::read_basefile(void* file, int key_index)
 #endif
 
   if (result)
-    return basefile_is_valid();
+  {
+    if (!basefile_is_valid())
+    {
+      load_error_ = uint32_t(XEXLoadError::InvalidBaseFile);
+      return false;
+    }
+    return true;
+  }
 
   return result;
 }

@@ -32,6 +32,22 @@ struct XEXFunction
   uint32_t FuncAddr = 0;
 };
 
+enum class XEXLoadError
+{
+  Success,
+  Unfinished,
+  InvalidMagic,
+  InvalidCompression,
+  InvalidBaseFile,
+  MissingDataDescriptor,
+  AllocFailed,
+  BadBlockHash,
+  BadBlockSize,
+  PEMissingMZ,
+  PEMissingNTHeaders,
+  Count
+};
+
 class XEXFile
 {
   // IO function pointers
@@ -85,6 +101,8 @@ class XEXFile
   // Sections from PE headers (includes XEX sections above)
   std::vector<IMAGE_SECTION_HEADER> sections_;
 
+  int load_error_ = 0;
+
   // Note: "void* file" below is a pointer to a FILE object, not to raw file data!
   bool read_imports(void* file);
   bool read_exports(void* file);
@@ -109,6 +127,8 @@ public:
     read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64; dbgmsg = stdio_msg;
 #endif
   }
+
+  int load_error() { return load_error_; }
 
   // Sets our IO function pointers to use IDA's IO functions
   void use_ida_io();

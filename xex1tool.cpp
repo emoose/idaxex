@@ -253,7 +253,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   }
 
   auto mslogo = xex.has_header(XEX_HEADER_MSLOGO);
-  if(mslogo)
+  if (mslogo)
     printf("  Xbox360 Logo Data Present\n");
 
   if (xex.has_header(XEX_HEADER_PE_IMPORTS))
@@ -915,8 +915,8 @@ int main(int argc, char* argv[])
 
   if (!loadresult)
   {
-    printf("Error loading XEX file %s\n", filepath.c_str());
-    return 0;
+    printf("Error %d while loading XEX file %s\n", xex.load_error(), filepath.c_str());
+    return xex.load_error();
   }
 
   if (result.count("a"))
