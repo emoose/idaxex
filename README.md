@@ -50,9 +50,9 @@ idaxex is based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by
 Thanks to everyone involved in the Xbox 360 modding/reverse-engineering community!
 
 # xex1tool
-Also included is an attempt at recreating xorloser's XexTool, with additions from idaxex such as support for XEX1 and older.  
+Also included is an attempt at recreating xorloser's XexTool, for working with older pre-XEX2 executables. 
 (The name is only to differentiate it from the original XexTool - it'll still support XEX2 files fine)
 
 So far it can print info on the various XEX headers (via -l), and extract the basefile (PE/XUIZ) from inside the XEX.
 
-Support for other XexTool features will slowly be added over time (of course any help is appreciated!)
+Support for other XexTool features may slowly be added over time (of course any help is appreciated!)
