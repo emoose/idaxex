@@ -52,8 +52,8 @@ bool LoadSpa(XEXFile& xex, xe::kernel::xam::xdbf::SpaFile& spa)
   for (auto section : sects)
   {
     char name[9];
-    memset(name, 0, 9);
-    memcpy(name, section.Name, 8);
+    std::copy_n(section.Name, 8, name);
+    name[8] = '\0';
 
     if (std::string(name) != tid)
       continue;
@@ -66,6 +66,40 @@ bool LoadSpa(XEXFile& xex, xe::kernel::xam::xdbf::SpaFile& spa)
   }
 
   return false;
+}
+
+std::string DoNameGen(const std::string& libName, int id, int version);
+
+void PrintImports(XEXFile& xex) {
+  printf("\nXEX Imports:\n");
+
+  auto& tables = xex.import_tables();
+
+  for (auto& lib : xex.imports()) {
+    auto& libname = lib.first;
+
+    int version = xex.min_kernel_version();
+
+    if (tables.count(libname))
+    {
+      auto& table_header = tables.at(libname);
+
+      printf("# %s v%d.%d.%d.%d\n# (min v%d.%d.%d.%d, %llu imports)\n", libname.c_str(),
+        table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
+        table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE, lib.second.size());
+
+      version = table_header.Version.Build;
+    }
+
+    for (auto& imp : lib.second)
+    {
+      auto imp_name = DoNameGen(libname, imp.first, version);
+      auto imp_addr = imp.second.ThunkAddr;
+
+      printf("  %3d) %s\n", imp.first, imp_name.c_str());
+    }
+    printf("\n");
+  }
 }
 
 void PrintInfo(XEXFile& xex, bool print_mem_pages)
@@ -219,7 +253,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   }
 
   auto mslogo = xex.has_header(XEX_HEADER_MSLOGO);
-  if(mslogo)
+  if (mslogo)
     printf("  Xbox360 Logo Data Present\n");
 
   if (xex.has_header(XEX_HEADER_PE_IMPORTS))
@@ -239,119 +273,6 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   auto addt_mem = xex.opt_header(XEX_HEADER_ADDITIONAL_TITLE_MEM);
   if (addt_mem)
     printf("  Requires %dMB Extra Debug Memory\n", addt_mem);
-
-  auto privileges = xex.opt_header(XEX_HEADER_PRIVILEGES);
-  auto privileges32 = xex.opt_header(XEX_HEADER_PRIVILEGES_32);
-  if (privileges || privileges32)
-  {
-    printf("\nXEX Privileges\n");
-    if (privileges)
-    {
-      auto* privs = (xex_opt::XexPrivileges*)&privileges;
-      if (privs->NoForceReboot)
-        printf("  0x00: No Force Reboot\n");
-      if (privs->ForegroundTasks)
-        printf("  0x01: Foreground Tasks\n");
-      if (privs->NoOddMapping)
-        printf("  0x02: No ODD Mapping\n");
-      if (privs->HandleMceInput)
-        printf("  0x03: Handles MCE Input\n");
-      if (privs->RestrictHudFeatures)
-        printf("  0x04: Restricted HUD Features\n");
-      if (privs->HandleGamepadDisconnect)
-        printf("  0x05: Handles Gamepad Disconnect\n");
-      if (privs->InsecureSockets)
-        printf("  0x06: Has Insecure Sockets\n");
-      if (privs->Xbox1XspInterop)
-        printf("  0x07: Xbox1 XSP Interoperability\n");
-      if (privs->SetDashContext)
-        printf("  0x08: Can Set Dash Context\n");
-      if (privs->TitleUsesGameVoiceChannel)
-        printf("  0x09: Uses Game Voice Channel\n");
-      if (privs->TitlePal50Incompatible)
-        printf("  0x0A: PAL-50 Incompatible\n");
-      if (privs->TitleInsecureUtilityDrive)
-        printf("  0x0B: Supports Insecure Utility Drive\n");
-      if (privs->TitleXamHooks)
-        printf("  0x0C: Xam Hooks\n");
-      if (privs->TitlePii)
-        printf("  0x0D: PII\n");
-      if (privs->CrossplatformSystemLink)
-        printf("  0x0E: Crossplatform System Link\n");
-      if (privs->MultidiscSwap)
-        printf("  0x0F: Multidisc Swap\n");
-      if (privs->MultidiscInsecureMedia)
-        printf("  0x10: Supports Insecure Multidisc Media\n");
-      if (privs->Ap25Media)
-        printf("  0x11: AP25 Media\n");
-      if (privs->NoConfirmExit)
-        printf("  0x12: No Confirm Exit\n");
-      if (privs->AllowBackgroundDownload)
-        printf("  0x13: Allows Background Downloads\n");
-      if (privs->CreatePersistableRamdrive)
-        printf("  0x14: Creates Persistable Ramdrive\n");
-      if (privs->InheritPersistedRamdrive)
-        printf("  0x15: Inherits Persisted Ramdrive\n");
-      if (privs->AllowHudVibration)
-        printf("  0x16: Allows HUD Vibration\n");
-      if (privs->TitleBothUtilityPartitions)
-        printf("  0x17: Can Use Both Utility Partitions\n");
-      if (privs->HandleIPTVInput)
-        printf("  0x18: Handles IPTV Input\n");
-      if (privs->PreferBigButtonInput)
-        printf("  0x19: Prefers Big Button Input\n");
-      if (privs->AllowXsamReservation)
-        printf("  0x1A: Allow Xsam Reservation\n");
-      if (privs->MultidiscCrossTitle)
-        printf("  0x1B: Multidisc Cross Title\n");
-      if (privs->TitleInstallIncompatible)
-        printf("  0x1C: Title Install Incompatible\n");
-      if (privs->AllowAvatarGetMetadataByXUID)
-        printf("  0x1D: Allow Avatar Get Metadata By XUID\n");
-      if (privs->AllowControllerSwapping)
-        printf("  0x1E: Allow Controller Swapping\n");
-      if (privs->DashExtensibilityModule)
-        printf("  0x1F: Dash Extensibility Module\n");
-    }
-
-    if (privileges32)
-    {
-      auto* privs = (xex_opt::XexPrivileges32*)&privileges32;
-      if (privs->AllowNetworkReadCancel)
-        printf("  0x20: Allow Network Read Cancel\n");
-      if (privs->UninterruptableReads)
-        printf("  0x21: Uninterruptable Reads\n");
-      if (privs->RequireExperienceFull)
-        printf("  0x22: Requires NXE\n");
-      if (privs->GameVoiceRequiredUI)
-        printf("  0x23: Game Voice Required UI\n");
-      if (privs->TitleSetPresenceString)
-        printf("  0x24: Sets Presence String\n");
-      if (privs->NatalTiltControl)
-        printf("  0x25: Natal Tilt Control\n");
-      if (privs->TitleRequiresSkeletalTracking)
-        printf("  0x26: Requires Skeletal Tracking\n");
-      if (privs->TitleSupportsSkeletalTracking)
-        printf("  0x27: Supports Skeletal Tracking\n");
-      if (privs->UseLargeHDsFileCache)
-        printf("  0x28: Uses Large HDs File Cache\n");
-      if (privs->TitleSupportsDeepLink)
-        printf("  0x29: Supports Deep Link\n");
-      if (privs->TitleBodyProfile)
-        printf("  0x2A: Supports Body Profile\n");
-      if (privs->TitleWinUSB)
-        printf("  0x2B: Supports WinUSB\n");
-      if (privs->TitleSupportsDeepLinkRefresh)
-        printf("  0x2C: Supports Deep Link Refresh\n");
-      if (privs->LocalOnlySockets)
-        printf("  0x2D: Local Only Sockets\n");
-      if (privs->TitleContentAcquireAndDownload)
-        printf("  0x2E: Title Content Acquire And Download\n");
-      if (privs->AllowSystemForeground)
-        printf("  0x2F: Allow System Foreground\n");
-    }
-  }
-
 
   printf("\nBasefile Info\n");
   auto& pe_name = xex.pe_module_name();
@@ -485,6 +406,119 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
         if (sec_info.AllowedMediaTypes.XboxPlatformPackage)
           printf("  Xbox Platform Package (\"PIRS\")\n");
       }
+    }
+  }
+
+
+  auto privileges = xex.opt_header(XEX_HEADER_PRIVILEGES);
+  auto privileges32 = xex.opt_header(XEX_HEADER_PRIVILEGES_32);
+  if (privileges || privileges32)
+  {
+    printf("\nXEX Privileges\n");
+    if (privileges)
+    {
+      auto* privs = (xex_opt::XexPrivileges*)&privileges;
+      if (privs->NoForceReboot)
+        printf("   0x0: No Force Reboot\n");
+      if (privs->ForegroundTasks)
+        printf("   0x1: Foreground Tasks\n");
+      if (privs->NoOddMapping)
+        printf("   0x2: No ODD Mapping\n");
+      if (privs->HandleMceInput)
+        printf("   0x3: Handles MCE Input\n");
+      if (privs->RestrictHudFeatures)
+        printf("   0x4: Restricted HUD Features\n");
+      if (privs->HandleGamepadDisconnect)
+        printf("   0x5: Handles Gamepad Disconnect\n");
+      if (privs->InsecureSockets)
+        printf("   0x6: Has Insecure Sockets\n");
+      if (privs->Xbox1XspInterop)
+        printf("   0x7: Xbox1 XSP Interoperability\n");
+      if (privs->SetDashContext)
+        printf("   0x8: Can Set Dash Context\n");
+      if (privs->TitleUsesGameVoiceChannel)
+        printf("   0x9: Uses Game Voice Channel\n");
+      if (privs->TitlePal50Incompatible)
+        printf("   0xA: PAL-50 Incompatible\n");
+      if (privs->TitleInsecureUtilityDrive)
+        printf("   0xB: Supports Insecure Utility Drive\n");
+      if (privs->TitleXamHooks)
+        printf("   0xC: Xam Hooks\n");
+      if (privs->TitlePii)
+        printf("   0xD: PII\n");
+      if (privs->CrossplatformSystemLink)
+        printf("   0xE: Crossplatform System Link\n");
+      if (privs->MultidiscSwap)
+        printf("   0xF: Multidisc Swap\n");
+      if (privs->MultidiscInsecureMedia)
+        printf("  0x10: Supports Insecure Multidisc Media\n");
+      if (privs->Ap25Media)
+        printf("  0x11: AP25 Media\n");
+      if (privs->NoConfirmExit)
+        printf("  0x12: No Confirm Exit\n");
+      if (privs->AllowBackgroundDownload)
+        printf("  0x13: Allows Background Downloads\n");
+      if (privs->CreatePersistableRamdrive)
+        printf("  0x14: Creates Persistable Ramdrive\n");
+      if (privs->InheritPersistedRamdrive)
+        printf("  0x15: Inherits Persisted Ramdrive\n");
+      if (privs->AllowHudVibration)
+        printf("  0x16: Allows HUD Vibration\n");
+      if (privs->TitleBothUtilityPartitions)
+        printf("  0x17: Can Use Both Utility Partitions\n");
+      if (privs->HandleIPTVInput)
+        printf("  0x18: Handles IPTV Input\n");
+      if (privs->PreferBigButtonInput)
+        printf("  0x19: Prefers Big Button Input\n");
+      if (privs->AllowXsamReservation)
+        printf("  0x1A: Allow Xsam Reservation\n");
+      if (privs->MultidiscCrossTitle)
+        printf("  0x1B: Multidisc Cross Title\n");
+      if (privs->TitleInstallIncompatible)
+        printf("  0x1C: Title Install Incompatible\n");
+      if (privs->AllowAvatarGetMetadataByXUID)
+        printf("  0x1D: Allow Avatar Get Metadata By XUID\n");
+      if (privs->AllowControllerSwapping)
+        printf("  0x1E: Allow Controller Swapping\n");
+      if (privs->DashExtensibilityModule)
+        printf("  0x1F: Dash Extensibility Module\n");
+    }
+
+    if (privileges32)
+    {
+      auto* privs = (xex_opt::XexPrivileges32*)&privileges32;
+      if (privs->AllowNetworkReadCancel)
+        printf("  0x20: Allow Network Read Cancel\n");
+      if (privs->UninterruptableReads)
+        printf("  0x21: Uninterruptable Reads\n");
+      if (privs->RequireExperienceFull)
+        printf("  0x22: Requires NXE\n");
+      if (privs->GameVoiceRequiredUI)
+        printf("  0x23: Game Voice Required UI\n");
+      if (privs->TitleSetPresenceString)
+        printf("  0x24: Sets Presence String\n");
+      if (privs->NatalTiltControl)
+        printf("  0x25: Natal Tilt Control\n");
+      if (privs->TitleRequiresSkeletalTracking)
+        printf("  0x26: Requires Skeletal Tracking\n");
+      if (privs->TitleSupportsSkeletalTracking)
+        printf("  0x27: Supports Skeletal Tracking\n");
+      if (privs->UseLargeHDsFileCache)
+        printf("  0x28: Uses Large HDs File Cache\n");
+      if (privs->TitleSupportsDeepLink)
+        printf("  0x29: Supports Deep Link\n");
+      if (privs->TitleBodyProfile)
+        printf("  0x2A: Supports Body Profile\n");
+      if (privs->TitleWinUSB)
+        printf("  0x2B: Supports WinUSB\n");
+      if (privs->TitleSupportsDeepLinkRefresh)
+        printf("  0x2C: Supports Deep Link Refresh\n");
+      if (privs->LocalOnlySockets)
+        printf("  0x2D: Local Only Sockets\n");
+      if (privs->TitleContentAcquireAndDownload)
+        printf("  0x2E: Title Content Acquire And Download\n");
+      if (privs->AllowSystemForeground)
+        printf("  0x2F: Allow System Foreground\n");
     }
   }
 
@@ -695,6 +729,42 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     }
   }
 
+  auto* patch_info_og = xex.opt_header_ptr<xex_opt::XexDeltaPatchDescriptor>(XEX_HEADER_DELTA_PATCH_DESCRIPTOR);
+  if (patch_info_og) {
+    xex_opt::XexDeltaPatchDescriptor patch_info = *patch_info_og;
+
+    *(uint32_t*)&patch_info.SourceVersion = _byteswap_ulong(*(uint32_t*)&patch_info.SourceVersion);
+    *(uint32_t*)&patch_info.TargetVersion = _byteswap_ulong(*(uint32_t*)&patch_info.TargetVersion);
+
+    uint32_t media_id;
+    media_id = _byteswap_ulong(*(uint32_t*)(&xex.security_info().ImageInfo.MediaID[0xC]));
+
+    printf("\nDelta Patch Descriptor\n");
+    printf("  Media ID:               %08X\n", media_id);
+    printf("  Source Version:         v%d.%d.%d.%d\n", patch_info.SourceVersion.Major, patch_info.SourceVersion.Minor, patch_info.SourceVersion.Build, patch_info.SourceVersion.QFE);
+    printf("  Target Version:         v%d.%d.%d.%d\n", patch_info.TargetVersion.Major, patch_info.TargetVersion.Minor, patch_info.TargetVersion.Build, patch_info.TargetVersion.QFE);
+  
+    printf("  Headers source offset:  %X\n", uint32_t(patch_info.DeltaHeadersSourceOffset));
+    printf("  Headers source size:    %X\n", uint32_t(patch_info.DeltaHeadersSourceSize));
+    printf("  Headers target offset   %X\n", uint32_t(patch_info.DeltaHeadersTargetOffset));
+
+    printf("  Image source offset:    %X\n", uint32_t(patch_info.DeltaImageSourceOffset));
+    printf("  Image source size:      %X\n", uint32_t(patch_info.DeltaImageSourceSize));
+    printf("  Image target offset:    %X\n", uint32_t(patch_info.DeltaImageTargetOffset));
+
+    printf("  Target header size:     %X\n", uint32_t(patch_info.SizeOfTargetHeaders));
+
+    printf("\n  Source Digest\n    ");
+    for (int i = 0; i < 0x14; i++)
+      printf("%02X ", patch_info.DigestSource[i]);
+    printf("\n");
+
+    printf("\n  Source Image Key\n    ");
+    for (int i = 0; i < 0x10; i++)
+      printf("%02X ", patch_info.ImageKeySource[i]);
+    printf("\n");
+  }
+
   // TODO: ratings!
 
   auto* libs = xex.opt_header_ptr<xex_opt::XexImageLibraryVersions>(XEX_HEADER_BUILD_VERSIONS);
@@ -795,9 +865,11 @@ int main(int argc, char* argv[])
   options.add_options()
     ("l,listing", "Print executable info")
     ("m,listmem", "Print executable info & memory pages")
+    ("i,imports", "Print import libraries & functions")
     ("b,basefile", "Dump basefile from XEX", cxxopts::value<std::string>())
     ("d,dumpres", "Dump all resources to a dir (can be '.')", cxxopts::value<std::string>())
     ("v,verbose", "Enables verbose XEXFile debug output")
+    ("a,address", "Convert a virtual memory address to file offset, or vice-versa", cxxopts::value<uint32_t>())
     ("positional", "Positional parameters",
       cxxopts::value<std::vector<std::string>>())
     ;
@@ -843,8 +915,60 @@ int main(int argc, char* argv[])
 
   if (!loadresult)
   {
-    printf("Error loading XEX file %s\n", filepath.c_str());
-    return 0;
+    printf("Error %d while loading XEX file %s\n", xex.load_error(), filepath.c_str());
+    return xex.load_error();
+  }
+
+  if (result.count("a"))
+  {
+    uint32_t rva = result["a"].as<uint32_t>();
+    printf("\n");
+
+    bool convert = true;
+    auto* data_descriptor = xex.data_descriptor();
+    if (!data_descriptor)
+      convert = false;
+    else
+    {
+      xex_opt::XexDataFormat comp_format = (xex_opt::XexDataFormat)(uint16_t)data_descriptor->Format;
+      convert = comp_format == xex_opt::XexDataFormat::None || comp_format == xex_opt::XexDataFormat::Raw;
+    }
+
+    if (!convert)
+      printf("XEX isn't uncompressed, unable to convert address with -a!\n");
+    else
+    {
+      // TODO: fix these functions to work with older formats
+      if (xex.header().Magic != MAGIC_XEX2)
+        printf("XEX isn't XEX2, addresses might not be correct!\n");
+
+      uint32_t result = 0;
+      if (rva >= xex.base_address())
+      {
+        result = xex.xex_va_to_offset(rva);
+        printf("Virtual Address -> File Offset\n");
+        printf("Virtual Addr: 0x%X\n", rva);
+        printf("File Offset:  0x%X\n", result);
+      }
+      else
+      {
+        result = xex.xex_offset_to_va(rva);
+        printf("File Offset -> Virtual Address\n");
+        printf("File Offset:  0x%X\n", rva);
+        printf("Virtual Addr: 0x%X\n", result);
+      }
+
+      if (!result)
+      {
+        printf("\nThe given address was unable to be converted, either:\n");
+        printf("- The given number is invalid\n");
+        printf("- The address is out-of-bounds\n");
+        printf("- The VA is part of a zero-compressed block in the file\n");
+        printf("(even with uncompressed XEXs, blocks of zeroes are removed from the file to save some space)\n");
+      }
+    }
+
+    printf("\n");
   }
 
   if (result.count("b"))
@@ -883,8 +1007,8 @@ int main(int argc, char* argv[])
       for (auto section : sections)
       {
         char sectname[9];
-        memset(sectname, 0, 9);
-        memcpy(sectname, section.Name, 8);
+        std::copy_n(section.Name, 8, sectname);
+        sectname[8] = '\0';
 
         std::filesystem::path res_path = dump_path / sectname;
         FILE* file;
@@ -905,6 +1029,9 @@ int main(int argc, char* argv[])
       }
     }
   }
+
+  if (result["i"].as<bool>())
+    PrintImports(xex);
 
   if (result["l"].as<bool>() || result["m"].as<bool>())
     PrintInfo(xex, result["m"].as<bool>());

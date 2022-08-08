@@ -13,12 +13,15 @@
 #include <cstdlib>
 
 #include "3rdparty/aes.hpp"
-#include "3rdparty/lzx.hpp"
 #include "3rdparty/sha1.hpp"
 
 #ifndef IDALDR
 #include <excrypt.h>
 #endif
+
+int lzx_decompress(const void* lzx_data, size_t lzx_len, void* dest,
+    size_t dest_len, uint32_t window_size, void* window_data,
+    size_t window_data_len); // lzx.cpp
 
 bool xex_log_verbose = true;
 
@@ -28,6 +31,8 @@ bool XEXFile::load(void* file)
   auto fsize = tell(file);
   seek(file, 0, 0);
 
+  load_error_ = uint32_t(XEXLoadError::Unfinished);
+
   read(&xex_header_, sizeof(xex::XexHeader), 1, file);
   *(uint32_t*)&xex_header_.ModuleFlags =
     _byteswap_ulong(*(uint32_t*)&xex_header_.ModuleFlags);
@@ -35,7 +40,10 @@ bool XEXFile::load(void* file)
   if (xex_header_.Magic != MAGIC_XEX2 && xex_header_.Magic != MAGIC_XEX1 && 
     xex_header_.Magic != MAGIC_XEX25 && xex_header_.Magic != MAGIC_XEX2D && 
     xex_header_.Magic != MAGIC_XEX3F && xex_header_.Magic != MAGIC_XEX0)
+  {
+    load_error_ = uint32_t(XEXLoadError::InvalidMagic);
     return false;
+  }
 
   // Convert XEX0/XEX3F header to XEX2
   int dirHeaderOffset = sizeof(xex::XexHeader);
@@ -159,7 +167,7 @@ bool XEXFile::load(void* file)
   }
 
   auto exec_id_25 = opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
-  if(exec_id_25)
+  if (exec_id_25)
     *(uint32_t*)&exec_id_25->Version = _byteswap_ulong(*(uint32_t*)&exec_id_25->Version);
 
   vital_stats_ = opt_header_ptr<xex_opt::XexVitalStats>(XEX_HEADER_VITAL_STATS);
@@ -187,7 +195,7 @@ bool XEXFile::load(void* file)
     return false;
 
   // Basefile seems to have read fine, try reading the PE headers
-  if(basefile_is_pe())
+  if (basefile_is_pe())
     if (!pe_load(pe_data_.data()))
       return false;
 
@@ -205,7 +213,7 @@ bool XEXFile::load(void* file)
       pe_sec.VirtualAddress = section.VirtualAddress - base_address();
       pe_sec.VirtualSize = section.VirtualSize;
       pe_sec.SizeOfRawData = section.VirtualSize;
-      memcpy(pe_sec.Name, section.SectionName, 8);
+      std::copy_n(section.SectionName, 8, pe_sec.Name);
 
       xex_sections_.push_back(pe_sec);
     }
@@ -216,8 +224,8 @@ bool XEXFile::load(void* file)
   if (sects_beta)
   {
     auto count = (sects_beta->Size - 4) / sizeof(xex_opt::xex3f::XexSectionHeader);
-    int start_index = sections_.size(); // skip PE sections
-    for (uint32_t i = start_index; i < count; i++)
+    auto start_index = sections_.size(); // skip PE sections
+    for (auto i = start_index; i < count; i++)
     {
       auto& section = sects_beta->Sections[i];
 
@@ -241,7 +249,7 @@ bool XEXFile::load(void* file)
       pe_sec.VirtualSize = section.VirtualSize;
       pe_sec.SizeOfRawData = section.SizeOfRawData;
       pe_sec.PointerToRawData = section.PointerToRawData - xex_header_.SizeOfHeaders;
-      memcpy(pe_sec.Name, section.SectionName, 8);
+      std::copy_n(section.SectionName, 8, pe_sec.Name);
 
       xex_sections_.push_back(pe_sec);
     }
@@ -253,7 +261,18 @@ bool XEXFile::load(void* file)
     read_imports(file);
     read_exports(file);
   }
+  else
+  {
+    // No image to hash, treat it as valid...
+    valid_image_hash_ = true;
+  }
 
+  if (!security_info_.ImageInfo.ImportTableCount) {
+    // No import tables to hash, so treat it as valid...
+    valid_imports_hash_ = true;
+  }
+
+  load_error_ = uint32_t(XEXLoadError::Success);
   return true;
 }
 
@@ -309,7 +328,7 @@ bool XEXFile::read_imports(void* file)
   // (Hash is of +4 into the table, ie skipping the TableSize field)
   uint8_t hash_expected[20];
   uint8_t hash[20];
-  memcpy(hash_expected, security_info_.ImageInfo.ImportDigest, 20);
+  std::copy_n(security_info_.ImageInfo.ImportDigest, 20, hash_expected);
 
   valid_imports_hash_ = true;
 
@@ -333,7 +352,7 @@ bool XEXFile::read_imports(void* file)
       valid_imports_hash_ = ExCryptMemDiff(hash, hash_expected, 20) == 0;
 
       // Copy the next tables hash from NextImportDigest
-      memcpy(hash_expected, table_data.get(), 20);
+      std::copy_n(table_data.get(), 20, hash_expected);
     }
 #endif
 
@@ -348,7 +367,7 @@ bool XEXFile::read_imports(void* file)
 
       // Copy over to normal table header
       table_header.TableSize = table_header_2d.TableSize;
-      memcpy(table_header.NextImportDigest, table_header_2d.NextImportDigest, 0x14);
+      std::copy_n(table_header_2d.NextImportDigest, 0x14, table_header.NextImportDigest);
       table_header.ModuleNumber = table_header_2d.ModuleNumber;
       *(uint32_t*)&table_header.Version = _byteswap_ulong(*(uint32_t*)&table_header_2d.Version);
       *(uint32_t*)&table_header.VersionMin = 0;
@@ -422,13 +441,16 @@ bool XEXFile::read_imports(void* file)
   if (directory_entries_.count(XEX_HEADER_CALLCAP_IMPORTS))
   {
     xex_opt::XexCallcapImports callcap;
-    seek(file, directory_entries_[XEX_HEADER_CALLCAP_IMPORTS], 0);
-    read(&callcap, sizeof(xex_opt::XexCallcapImports), 1, file);
+
+    std::copy_n(
+      reinterpret_cast<xex_opt::XexCallcapImports*>(xex_headers_.data() + directory_entries_[XEX_HEADER_CALLCAP_IMPORTS]),
+      1,
+      &callcap);
 
     if (!callcap.BeginFunctionThunkAddress || !callcap.EndFunctionThunkAddress)
       return true;
 
-    dbgmsg("[+] Naming callcap imports... (0x%X - 0x%X)\n", callcap.BeginFunctionThunkAddress, callcap.EndFunctionThunkAddress);
+    dbgmsg("[+] Naming callcap imports... (%X-%X)\n", uint32_t(callcap.BeginFunctionThunkAddress), uint32_t(callcap.EndFunctionThunkAddress));
     for (uint32_t i = callcap.BeginFunctionThunkAddress; i < callcap.EndFunctionThunkAddress + 0x10; i += 0x10)
     {
       uint32_t import_offset = pe_rva_to_offset(i);
@@ -482,8 +504,11 @@ bool XEXFile::read_exports(void* file)
     return false;
 
   auto export_table_offset = pe_rva_to_offset(security_info_.ImageInfo.ExportTableAddress);
+
   xex_opt::HvImageExportTable export_table;
-  memcpy(&export_table, pe_data() + export_table_offset, sizeof(xex_opt::HvImageExportTable));
+  std::copy_n(
+    reinterpret_cast<const xex_opt::HvImageExportTable*>(pe_data() + export_table_offset), 1, 
+    &export_table);
 
   if (export_table.Magic[0] != XEX_EXPORT_MAGIC_0 ||
     export_table.Magic[1] != XEX_EXPORT_MAGIC_1 ||
@@ -581,7 +606,7 @@ uint32_t XEXFile::verify_secinfo(void* file)
       ExCryptBn_BeToLeKey((EXCRYPT_RSA*)&pubKey, pubkey_bytes[pubkey_idx], 0x110);
 
       EXCRYPT_SIG tmp;
-      memcpy(&tmp, (EXCRYPT_SIG*)imageinfo.get(), sizeof(EXCRYPT_SIG));
+      std::copy_n(reinterpret_cast<EXCRYPT_SIG*>(imageinfo.get()), 1, &tmp);
 
       valid_signature_ = ExCryptBnQwBeSigVerify(&tmp, hash, (uint8_t*)salt, (EXCRYPT_RSA*)&pubKey);
       if (valid_signature_)
@@ -642,9 +667,9 @@ bool XEXFile::read_secinfo(void* file)
     memset(&security_info_, 0, sizeof(xex2::SecurityInfo));
 
     security_info_.Size = secInfo2D.Size;
-    memcpy(security_info_.ImageInfo.Signature, secInfo2D.Signature, 0x100);
+    std::copy_n(secInfo2D.Signature, 0x100, security_info_.ImageInfo.Signature);
     // HeaderHash
-    memcpy(security_info_.ImageInfo.ImageHash, secInfo2D.ImageHash, 0x14);
+    std::copy_n(secInfo2D.ImageHash, 0x14, security_info_.ImageInfo.ImageHash);
     security_info_.ImageInfo.LoadAddress = secInfo2D.LoadAddress;
     security_info_.ImageSize = secInfo2D.ImageSize;
     // CurrentVersion
@@ -729,13 +754,18 @@ bool XEXFile::read_basefile_raw(void* file, bool encrypted)
 bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
 {
   if (!data_descriptor_)
+  {
+    load_error_ = uint32_t(XEXLoadError::MissingDataDescriptor);
     return false;
+  }
 
   int num_blocks = (data_descriptor_->Size - 8) / 8;
   auto xex_blocks = std::make_unique<xex_opt::XexRawDataDescriptor[]>(num_blocks);
 
-  seek(file, directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8, 0);
-  read(xex_blocks.get(), sizeof(xex_opt::XexRawDataDescriptor), num_blocks, file);
+  std::copy_n(
+    reinterpret_cast<xex_opt::XexRawDataDescriptor*>(xex_headers_.data() + directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8),
+    num_blocks,
+    xex_blocks.get());
 
   AES_ctx aes;
   uint8_t iv[] = {
@@ -760,12 +790,16 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
       read(pe_data_.data(), 1, 0x10, file);
       AES_ECB_decrypt(&aes, pe_data_.data());
 
-      // Check basefile header
+#ifdef IDALDR
+      // Check basefile header - needed for IDALDR since we don't compute image hash for that
       if (!basefile_is_valid())
       {
         pe_data_.clear();
+
+        load_error_ = uint32_t(XEXLoadError::InvalidBaseFile);
         return false;
       }
+#endif
 
       // Reinit AES & seek back to start of block
       AES_init_ctx_iv(&aes, session_key_, iv);
@@ -800,9 +834,9 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   }
 
   // read windowsize & first block from file_data_descriptor header
-  xex_opt::XexCompressedDataDescriptor compression_info;
-  seek(file, directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8, 0);
-  read(&compression_info, sizeof(xex_opt::XexCompressedDataDescriptor), 1, file);
+  xex_opt::XexCompressedDataDescriptor compression_info = 
+      *reinterpret_cast<xex_opt::XexCompressedDataDescriptor*>(
+          xex_headers_.data() + directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8);
 
   auto* cur_block = &compression_info.FirstDescriptor;
 
@@ -810,16 +844,16 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   pe_data_.resize(image_size());
 
   // LZX init...
-  LZXinit(compression_info.WindowSize);
-  uint8_t* comp_buffer = (uint8_t*)malloc(0x9800); // 0x9800 = max comp. block size (0x8000) + MAX_GROWTH (0x1800)
-  if (!comp_buffer)
+  std::unique_ptr<uint8_t[]> comp_buffer = std::make_unique<uint8_t[]>(data_length_);
+  if (!comp_buffer || !comp_buffer.get())
   {
+    load_error_ = uint32_t(XEXLoadError::AllocFailed);
     dbgmsg("[!] Error: failed to allocate decompression buffer!?\n");
     return false;
   }
 
-  uint32_t size_left = image_size();
-  uint32_t size_done = 0;
+  uint8_t* d = comp_buffer.get();
+
   int retcode = 0;
 
   // Start decompressing
@@ -844,10 +878,11 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
     if (memcmp(sha_hash, cur_block->DataDigest, 0x14) != 0)
     {
       retcode = 2;
+      load_error_ = uint32_t(XEXLoadError::BadBlockHash);
       goto end;
     }
 
-    memcpy(&next_block, block_data, sizeof(xex_opt::XexDataDescriptor));
+    std::copy_n(reinterpret_cast<xex_opt::XexDataDescriptor*>(block_data), 1, &next_block);
     uint8_t* p = block_data + sizeof(xex_opt::XexDataDescriptor);
     while (true)
     {
@@ -860,39 +895,122 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
       if (comp_size > 0x9800) // sanity check: shouldn't be above 0x9800
       {
         retcode = 1;
+        load_error_ = uint32_t(XEXLoadError::BadBlockSize);
         goto end;
       }
       // Read in LZX buffer
-      memcpy(comp_buffer, p, comp_size);
+      std::copy_n(p, comp_size, d);
       p += comp_size;
-      if (comp_size < 0x9800) // if comp. size is below buffer size 0x9800, zero out the remainder of the buffer
-        memset(comp_buffer + comp_size, 0, 0x9800 - comp_size);
-
-      // Decompress!
-      auto dec_size = size_left < 0x8000 ? size_left : 0x8000;
-      retcode = LZXdecompress(comp_buffer, pe_data_.data() + size_done, comp_size, dec_size);
-      if (retcode != 0)
-        goto end;
-
-      size_done += dec_size;
-      size_left -= dec_size;
+      d += comp_size;
     }
-    memcpy(cur_block, &next_block, sizeof(xex_opt::XexDataDescriptor));
+    std::copy_n(reinterpret_cast<xex_opt::XexDataDescriptor*>(&next_block), 1, cur_block);
 
     free(block_data);
     block_data = 0;
   }
 
+  retcode = lzx_decompress(comp_buffer.get(), d - comp_buffer.get(), pe_data_.data(), pe_data_.size(), compression_info.WindowSize, nullptr, 0);
+
 end:
   if (block_data)
     free(block_data);
 
-  free(comp_buffer);
-
   if (retcode != 0)
+  {
+    load_error_ = retcode;
     dbgmsg("[!] read_basefile_decompressed error code = %d!\n", retcode);
+  }
 
   return retcode == 0;
+}
+
+// TODO: fix this to work with older XEX formats
+uint32_t XEXFile::xex_va_to_offset(uint32_t va)
+{
+  if (!data_descriptor_)
+    return false;
+
+  auto comp_format = data_descriptor_->DataFormat();
+
+  // convert VA to RVA if necessary
+  if (va >= base_address())
+    va -= base_address();
+
+  if (comp_format == xex_opt::XexDataFormat::None)
+    return xex_header_.SizeOfHeaders + va;
+
+  if (comp_format != xex_opt::XexDataFormat::Raw)
+    return 0; // can't get offset for compressed XEXs
+
+  int num_blocks = (data_descriptor_->Size - 8) / 8;
+  auto xex_blocks = std::make_unique<xex_opt::XexRawDataDescriptor[]>(num_blocks);
+
+  std::copy_n(
+    reinterpret_cast<xex_opt::XexRawDataDescriptor*>(xex_headers_.data() + directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8),
+    num_blocks,
+    xex_blocks.get());
+
+  // Uncompressed blocks can have any number of zeroes appended to them, instead of these zeroes being stored in the XEX
+  // To locate the RVA just track the block size + zero size together, and then return its proper address without zeroes.
+  uint32_t position = 0;
+  uint32_t real_position = 0;
+  for (int i = 0; i < num_blocks; i++)
+  {
+    const auto& block = xex_blocks[i];
+    auto block_end = position + block.DataSize;
+    if (va >= position && va < block_end)
+      return xex_header_.SizeOfHeaders + real_position + (va - position);
+
+    position += block.DataSize + block.ZeroSize;
+    real_position += block.DataSize;
+  }
+
+  return 0;
+}
+
+// TODO: fix this to work with older XEX formats
+uint32_t XEXFile::xex_offset_to_va(uint32_t offset)
+{
+  if (!data_descriptor_)
+    return false;
+
+  auto comp_format = data_descriptor_->DataFormat();
+
+  if (xex_header_.SizeOfHeaders > offset)
+    return 0;
+
+  offset -= xex_header_.SizeOfHeaders;
+
+  if (comp_format == xex_opt::XexDataFormat::None)
+    return base_address() + offset;
+
+  if (comp_format != xex_opt::XexDataFormat::Raw)
+    return 0; // can't get offset for compressed XEXs
+
+  int num_blocks = (data_descriptor_->Size - 8) / 8;
+  auto xex_blocks = std::make_unique<xex_opt::XexRawDataDescriptor[]>(num_blocks);
+
+  std::copy_n(
+    reinterpret_cast<xex_opt::XexRawDataDescriptor*>(xex_headers_.data() + directory_entries_[XEX_FILE_DATA_DESCRIPTOR_HEADER] + 8),
+    num_blocks,
+    xex_blocks.get());
+
+  // Uncompressed blocks can have any number of zeroes appended to them, instead of these zeroes being stored in the XEX
+  // To locate the RVA just track the block size + zero size together, and then return its proper address without zeroes.
+  uint32_t position = 0;
+  uint32_t real_position = 0;
+  for (int i = 0; i < num_blocks; i++)
+  {
+    const auto& block = xex_blocks[i];
+    auto block_end = real_position + block.DataSize;
+    if (offset >= real_position && offset < block_end)
+      return base_address() + position + (offset - real_position);
+
+    position += block.DataSize + block.ZeroSize;
+    real_position += block.DataSize;
+  }
+
+  return 0;
 }
 
 // Reads import libraries & function info from PE headers
@@ -1000,11 +1118,17 @@ bool XEXFile::pe_load(const uint8_t* data)
 {
   IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)data;
   if (dos_header->MZSignature != EXE_MZ_SIGNATURE)
+  {
+    load_error_ = uint32_t(XEXLoadError::PEMissingMZ);
     return false;
+  }
 
   IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(data + dos_header->AddressOfNewExeHeader);
   if (nt_header->Signature != EXE_NT_SIGNATURE)
+  {
+    load_error_ = uint32_t(XEXLoadError::PEMissingNTHeaders);
     return false;
+  }
 
   // Get base address/entrypoint from optionalheader if we don't already have them
   if (!base_address())
@@ -1084,7 +1208,7 @@ bool XEXFile::read_basefile(void* file, int key_index)
   // Read compression/encryption info from data descriptor header if we have one
   if (data_descriptor_)
   {
-    comp_format = (xex_opt::XexDataFormat)(uint16_t)data_descriptor_->Format;
+    comp_format = data_descriptor_->DataFormat();
     enc_flag = data_descriptor_->Flags;
   }
 
@@ -1107,7 +1231,7 @@ bool XEXFile::read_basefile(void* file, int key_index)
   if (enc_flag)
   {
     dbgmsg("[+] Attempting decrypt with %s key...\n", key_names[key_index]);
-    memcpy(session_key_, security_info_.ImageInfo.ImageKey, 0x10);
+    std::copy_n(security_info_.ImageInfo.ImageKey, 0x10, session_key_);
     AES_ctx key_ctx;
     AES_init_ctx(&key_ctx, key_bytes[key_index]);
     AES_ECB_decrypt(&key_ctx, session_key_);
@@ -1120,8 +1244,11 @@ bool XEXFile::read_basefile(void* file, int key_index)
     result = read_basefile_uncompressed(file, enc_flag);
   else if (comp_format == xex_opt::XexDataFormat::Compressed)
     result = read_basefile_compressed(file, enc_flag);
+  else if (comp_format == xex_opt::XexDataFormat::DeltaCompressed)
+    return true; // TODO: any way to validate this?
   else
   {
+    load_error_ = uint32_t(XEXLoadError::InvalidCompression);
     dbgmsg("[!] Error: XEX uses invalid compression format %hd!\n", (uint16_t)comp_format);
     result = false;
   }
@@ -1135,7 +1262,14 @@ bool XEXFile::read_basefile(void* file, int key_index)
 #endif
 
   if (result)
-    return basefile_is_valid();
+  {
+    if (!basefile_is_valid())
+    {
+      load_error_ = uint32_t(XEXLoadError::InvalidBaseFile);
+      return false;
+    }
+    return true;
+  }
 
   return result;
 }
@@ -1160,7 +1294,7 @@ bool XEXFile::basefile_verify()
 
     uint8_t hash[20];
     uint8_t expected_hash[20];
-    memcpy(expected_hash, security_info_.ImageInfo.ImageHash, 20);
+    std::copy_n(security_info_.ImageInfo.ImageHash, 20, expected_hash);
 
     auto* data = pe_data();
     xex::HvPageInfo tmp_page;
@@ -1178,7 +1312,7 @@ bool XEXFile::basefile_verify()
         break;
 
       // descriptor contains the hash of the next page
-      memcpy(expected_hash, tmp_page.DataDigest, 20);
+      std::copy_n(tmp_page.DataDigest, 20, expected_hash);
       data += size;
     }
   }

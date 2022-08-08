@@ -24,13 +24,19 @@
     <ClCompile Include="idaloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\lzx.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="3rdparty\aes.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="3rdparty\sha1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\mspack\lzxd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\mspack\system.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lzx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -48,15 +54,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="xex.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="3rdparty\lzx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="3rdparty\lzx.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="3rdparty\lzx_int.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="3rdparty\aes.h">

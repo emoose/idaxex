@@ -9,6 +9,7 @@
 
 #include "../idaldr.h"
 #include "xex.hpp"
+#include "xex_headerids.hpp"
 #include <typeinf.hpp>
 #include <bytes.hpp>
 
@@ -17,7 +18,7 @@
 
 bool exclude_unneeded_sections = true;
 
-std::string DoNameGen(const std::string& libName, int id); // namegen.cpp
+std::string DoNameGen(const std::string& libName, int id, int version); // namegen.cpp
 
 void label_regsaveloads(ea_t start, ea_t end)
 {
@@ -72,25 +73,24 @@ void label_regsaveloads(ea_t start, ea_t end)
 
 void pe_add_sections(XEXFile& file)
 {
-  for (auto section : file.sections())
+  for (const auto& section : file.sections())
   {
     // New buffer for section name so we can null-terminate it
     char name[9];
-    memset(name, 0, 9);
-    memcpy(name, section.Name, 8);
+    std::copy_n(section.Name, 8, name);
+    name[8] = '\0';
 
     // Exclude some sections from being added - don't know the reason, but xorlosers loader seems to
     // they don't seem important anyway, so i guess it's a good idea?
+    // TODO: actually this probably wasn't a good idea, will need to figure out a better way of excluding sections
     if (exclude_unneeded_sections)
     {
       if (!strcmp(name, ".edata"))
-        return;
-      if (!strcmp(name, ".idata"))
-        return;
+        continue;
       if (!strcmp(name, ".XBLD"))
-        return;
+        continue;
       if (!strcmp(name, ".reloc"))
-        return;
+        continue;
     }
 
     uint32 sec_addr = section.VirtualAddress;
@@ -138,13 +138,71 @@ void pe_add_sections(XEXFile& file)
     if (has_code)
       label_regsaveloads(seg_addr, seg_addr + section.VirtualSize);
   }
+
+  // Try reading & marking functions from .pdata section
+  for (const auto& section : file.sections())
+  {
+    // New buffer for section name so we can null-terminate it
+    char name[9];
+    std::copy_n(section.Name, 8, name);
+    name[8] = '\0';
+
+    if (strcmp(name, ".pdata"))
+      continue;
+
+    uint32 sec_addr = section.VirtualAddress;
+    uint32 sec_size = section.VirtualSize;
+
+    if (file.header().Magic == MAGIC_XEX3F || file.header().Magic == MAGIC_XEX0)
+    {
+      sec_addr = section.PointerToRawData;
+      sec_size = section.SizeOfRawData; // TODO: verify this?
+    }
+
+    ea_t seg_addr = (ea_t)file.base_address() + (ea_t)section.VirtualAddress;
+
+    // Size could be beyond file bounds, if so fix the size to what we can fit
+    if (sec_addr + sec_size > file.image_size())
+      sec_size = file.image_size() - sec_addr;
+
+    // Store function addrs from .pdata inside a std::vector, so we can iterate over them in reverse
+    std::vector<uint32_t> funcs;
+    int offset = 0;
+    while (offset < sec_size)
+    {
+      create_data(seg_addr + offset, dword_flag(), 4, BADNODE);
+      create_data(seg_addr + offset + 4, dword_flag(), 4, BADNODE);
+
+      auto* fn_ptr = reinterpret_cast<const xe::be<uint32_t>*>(file.pe_data() + sec_addr + offset);
+      ea_t fn = *fn_ptr;
+
+      funcs.push_back(fn);
+
+      // Delete useless .pdata -> fn xref
+      del_dref(seg_addr + offset, fn);
+
+      offset += 8;
+    }
+
+    // TODO: loop below can take a while with no output to user, need some way to let them know IDA hasn't crashed...
+    // IDA sadly doesn't get a chance to update output window with msg below before the loop below is ran
+    // request_refresh() etc doesn't seem to help :(
+    msg("[+] Marking %lld functions from .pdata...\n", funcs.size());
+
+    // Iterate over functions in reverse, so hopefully they'll be marked with correct lengths
+    for (std::vector<uint32_t>::reverse_iterator i = funcs.rbegin(); i != funcs.rend(); ++i)
+    {
+      create_insn(*i);
+      add_func(*i);
+    }
+  }
 }
 
 //------------------------------------------------------------------------------
 void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
 {
   // Set processor to PPC
-  set_processor_type("ppc", SETPROC_LOADER);
+  set_processor_type("ppc:vmx128", SETPROC_LOADER);
 
   // Set PPC_LISOFF to true
   // should help analyzer convert "lis r11, -0x7C46" to "lis r11, unk_83BA5600@h"
@@ -154,15 +212,16 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   // Set compiler info
   compiler_info_t comp;
   comp.id = COMP_MS;
-  comp.defalign = 0;
+  comp.cm = CM_N32_F48 | CM_CC_FASTCALL;
   comp.size_i = 4;
-  comp.size_b = 4;
+  comp.size_b = 1;
   comp.size_e = 4;
+  comp.defalign = 0;
   comp.size_s = 2;
   comp.size_l = 4;
   comp.size_ll = 8;
-  comp.cm = CM_N32_F48;
-  set_compiler(comp, 0, "xbox");
+  comp.size_ldbl = 0;
+  set_compiler(comp, SETCOMP_OVERRIDE);
 
   inf.baseaddr = 0;
 
@@ -173,6 +232,10 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   bool result = file.load(li);
   if (result)
   {
+    // If this is XEX2 try loading in x360.til, in case we have one
+    if (file.header().Magic == MAGIC_XEX2)
+      add_til("x360.til", 0);
+
     pe_add_sections(file);
 
     if (file.entry_point())
@@ -210,9 +273,39 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       }
     }
 
-    for (auto exp : file.exports())
+    auto exports_version = file.min_kernel_version();
+    if (file.header().Magic != MAGIC_XEX2D)
     {
-      auto exp_name = DoNameGen(exports_libname, exp.first);
+      auto* exec_info = file.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+      if (exec_info)
+      {
+        exports_version = exec_info->Version.Build;
+      }
+    }
+    else
+    {
+      auto* exec_info = file.opt_header_ptr<xex_opt::xex2d::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+      if (exec_info)
+      {
+        exports_version = exec_info->Version.Build;
+      }
+    }
+
+    auto* exec_info25 = file.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
+    if (exec_info25)
+    {
+      exports_version = exec_info25->Version.Build;
+    }
+
+    auto* exec_info3f = file.opt_header_ptr<xex_opt::xex3f::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA3F);
+    if (exec_info3f)
+    {
+      exports_version = exec_info3f->Version.Build;
+    }
+
+    for (auto& exp : file.exports())
+    {
+      auto exp_name = DoNameGen(exports_libname, exp.first, exports_version);
       auto exp_addr = exp.second.FuncAddr;
 
       // Mark as func export if inside a code section
@@ -236,9 +329,17 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
       // Track lowest record addr so we can add import module comment to it later
       ea_t lowest_addr = BADADDR;
 
-      for (auto imp : lib.second)
+      int lib_version = file.min_kernel_version();
+
+      auto& tables = file.import_tables();
+      if (tables.count(libname))
       {
-        auto imp_name = DoNameGen(libname, imp.first);
+        lib_version = tables.at(libname).Version.Build;
+      }
+
+      for (auto& imp : lib.second)
+      {
+        auto imp_name = DoNameGen(libname, imp.first, lib_version);
         auto imp_addr = imp.second.ThunkAddr;
 
         if (imp.second.ThunkAddr && imp.second.ThunkAddr != imp.second.FuncAddr)
@@ -278,7 +379,6 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
       if (lowest_addr != BADADDR)
       {
-        auto& tables = file.import_tables();
         if (tables.count(libname))
         {
           auto& table_header = tables.at(libname);

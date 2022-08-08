@@ -21,13 +21,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -58,7 +58,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>3rdparty/excrypt</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>3rdparty/excrypt;3rdparty/mspack</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -78,7 +78,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>3rdparty/excrypt</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>3rdparty/excrypt;3rdparty/mspack</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -91,8 +91,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="3rdparty\aes.c" />
-    <ClCompile Include="3rdparty\lzx.c" />
+    <ClCompile Include="3rdparty\mspack\lzxd.c" />
+    <ClCompile Include="3rdparty\mspack\system.c">
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="3rdparty\sha1.c" />
+    <ClCompile Include="lzx.cpp" />
+    <ClCompile Include="namegen.cpp" />
     <ClCompile Include="xdbf\xdbf.cc" />
     <ClCompile Include="xex.cpp" />
     <ClCompile Include="xex1tool.cpp" />
@@ -103,9 +109,6 @@
     <ClInclude Include="3rdparty\byte_order.hpp" />
     <ClInclude Include="3rdparty\cxxopts.hpp" />
     <ClInclude Include="3rdparty\date.hpp" />
-    <ClInclude Include="3rdparty\lzx.h" />
-    <ClInclude Include="3rdparty\lzx.hpp" />
-    <ClInclude Include="3rdparty\lzx_int.h" />
     <ClInclude Include="3rdparty\sha1.h" />
     <ClInclude Include="3rdparty\sha1.hpp" />
     <ClInclude Include="pe_structs.hpp" />

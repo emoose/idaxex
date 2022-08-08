@@ -32,6 +32,22 @@ struct XEXFunction
   uint32_t FuncAddr = 0;
 };
 
+enum class XEXLoadError
+{
+  Success,
+  Unfinished,
+  InvalidMagic,
+  InvalidCompression,
+  InvalidBaseFile,
+  MissingDataDescriptor,
+  AllocFailed,
+  BadBlockHash,
+  BadBlockSize,
+  PEMissingMZ,
+  PEMissingNTHeaders,
+  Count
+};
+
 class XEXFile
 {
   // IO function pointers
@@ -85,6 +101,8 @@ class XEXFile
   // Sections from PE headers (includes XEX sections above)
   std::vector<IMAGE_SECTION_HEADER> sections_;
 
+  int load_error_ = 0;
+
   // Note: "void* file" below is a pointer to a FILE object, not to raw file data!
   bool read_imports(void* file);
   bool read_exports(void* file);
@@ -110,6 +128,8 @@ public:
 #endif
   }
 
+  int load_error() { return load_error_; }
+
   // Sets our IO function pointers to use IDA's IO functions
   void use_ida_io();
 
@@ -125,8 +145,11 @@ public:
 
   uint32_t pe_rva_to_offset(uint32_t rva);
 
+  uint32_t xex_va_to_offset(uint32_t va);
+  uint32_t xex_offset_to_va(uint32_t offset);
+
   // Length of the pe_data member, not the same as image_size!
-  uint32_t pe_data_length() { return pe_data_.size(); }
+  size_t pe_data_length() { return pe_data_.size(); }
 
   bool basefile_is_pe() {
     return pe_data_length() > 4 && *(uint16_t*)pe_data() == EXE_MZ_SIGNATURE;
@@ -184,4 +207,16 @@ public:
   const std::string& pe_module_name() { return pe_module_name_; }
   const xex_opt::XexVitalStats* vital_stats() { return vital_stats_; }
   const xex_opt::XexFileDataDescriptor* data_descriptor() { return data_descriptor_; }
+
+  uint32_t min_kernel_version() {
+    switch (xex_header_.Magic) {
+      case MAGIC_XEX0:  return 1332;
+      case MAGIC_XEX3F: return 1529;
+      case MAGIC_XEX2D: return 1640;
+      case MAGIC_XEX25: return 1746;
+      case MAGIC_XEX1:  return 1838;
+      case MAGIC_XEX2:  return 1861;
+    }
+    return 0;
+  }
 };

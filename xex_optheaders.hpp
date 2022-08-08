@@ -246,6 +246,11 @@ namespace xex_opt {
     xe::be<uint32_t> Size;
     xe::be<uint16_t> Flags;
     xe::be<uint16_t> Format;
+
+    XexDataFormat DataFormat()
+    {
+      return static_cast<XexDataFormat>((uint16_t)Format);
+    }
   };
   static_assert(sizeof(XexFileDataDescriptor) == 8, "xex_opt::XexFileDataDescriptor");
 
@@ -329,8 +334,8 @@ namespace xex_opt {
 
   struct XexDeltaPatchDescriptor {
     xe::be<uint32_t> Size;
-    xe::be<uint32_t> TargetVersion;
-    xe::be<uint32_t> SourceVersion;
+    xex::Version TargetVersion;
+    xex::Version SourceVersion;
     uint8_t DigestSource[20];
     uint8_t ImageKeySource[16];
     xe::be<uint32_t> SizeOfTargetHeaders;
