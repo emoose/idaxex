@@ -29,7 +29,7 @@ Builds for IDA 7.2-7.5, both 32-bit and 64-bit, are available in the releases se
 
 To install the loader just extract the contents of the folder for your IDA version (eg. ida75_win) into IDA's install folder (eg. C:\Program Files\IDA 7.5\)
 
-I recommend pairing this loader with the PPCAltivec plugin, an updated version for IDA 7 is available at yui-konnu's repo here: https://github.com/yui-konnu/PPC-Altivec-IDA
+I recommend pairing this loader with the PPCAltivec plugin, an updated version for IDA 7 is available at hayleyxyz's repo here: https://github.com/hayleyxyz/PPC-Altivec-IDA
 
 ## Building
 You'll need to copy this repo into your idasdk\ldr\ folder, eg. for me I have it at C:\idasdk\ldr\xex\idaxex.sln
