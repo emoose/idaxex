@@ -996,7 +996,8 @@ int main(int argc, char* argv[])
     }
   }
 
-  if (result.count("d")) {
+  if (result.count("d"))
+  {
     auto& sections = xex.xex_sections();
     if (sections.size())
     {
@@ -1004,11 +1005,21 @@ int main(int argc, char* argv[])
       if (dump_path_s != ".")
         std::filesystem::create_directory(dump_path_s);
       std::filesystem::path dump_path = dump_path_s;
+
+      std::vector<std::string> dumped_names;
       for (auto section : sections)
       {
-        char sectname[9];
-        std::copy_n(section.Name, 8, sectname);
-        sectname[8] = '\0';
+        char sectname_safe[9];
+        std::copy_n(section.Name, 8, sectname_safe);
+        sectname_safe[8] = '\0';
+
+        // Check if we've dumped the same filename before, try adding a number if we have
+        std::string sectname = sectname_safe;
+        int i = 0;
+        while (std::find(dumped_names.begin(), dumped_names.end(), sectname) != dumped_names.end())
+            sectname = std::string(sectname_safe) + "_" + std::to_string(++i);
+
+        dumped_names.push_back(sectname);
 
         std::filesystem::path res_path = dump_path / sectname;
         FILE* file;
