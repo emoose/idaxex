@@ -62,7 +62,7 @@ void label_regsaveloads(ea_t start, ea_t end)
         del_items(addr, 0, 8);
         create_insn(addr);
 
-        set_name(addr, qstring().sprnt(pattern_labels[pat_idx], i).c_str());
+        set_name(addr, qstring().sprnt(pattern_labels[pat_idx], i).c_str(), SN_FORCE);
         add_func(addr, addr + size);
 
         addr += size;
@@ -184,17 +184,34 @@ void pe_add_sections(XEXFile& file)
       offset += 8;
     }
 
-    // TODO: loop below can take a while with no output to user, need some way to let them know IDA hasn't crashed...
-    // IDA sadly doesn't get a chance to update output window with msg below before the loop below is ran
-    // request_refresh() etc doesn't seem to help :(
-    msg("[+] Marking %lld functions from .pdata...\n", funcs.size());
+    // display messagebox prompt to user, since pdata labelling can take a little while
+
+    // ida printf formatter tends to crash, too bad, use sprintf to rewrite just the number portion
+    char msg_text[256] = "Marking functions from .pdata... (";
+    int num_pos = strlen(msg_text);
+    char* msg_text_write = &msg_text[num_pos];
+    sprintf_s(msg_text_write, 256 - num_pos, "0/%lld)", funcs.size());
+
+    show_wait_box(msg_text);
 
     // Iterate over functions in reverse, so hopefully they'll be marked with correct lengths
+    size_t num = 0;
     for (std::vector<uint32_t>::reverse_iterator i = funcs.rbegin(); i != funcs.rend(); ++i)
     {
       create_insn(*i);
       add_func(*i);
+      if (user_cancelled())
+        break;
+
+      // update every few funcs
+      if (++num % 10 == 0)
+      {
+        sprintf_s(msg_text_write, 256 - num_pos, "%lld/%lld)", num, funcs.size());
+        replace_wait_box(msg_text);
+      }
     }
+
+    hide_wait_box();
   }
 }
 
@@ -348,7 +365,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
           if (!imp.second.FuncAddr)
             thunk_name = imp_name;
 
-          set_name(imp.second.ThunkAddr, thunk_name.c_str());
+          set_name(imp.second.ThunkAddr, thunk_name.c_str(), SN_FORCE);
           create_data(imp.second.ThunkAddr, FF_WORD, 2 * 2, BADADDR);
 
           if (lowest_addr == BADADDR || lowest_addr > imp.second.ThunkAddr)
@@ -358,7 +375,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
         if (imp.second.FuncAddr)
         {
           imp_addr = imp.second.FuncAddr;
-          set_name(imp_addr, imp_name.c_str());
+          set_name(imp_addr, imp_name.c_str(), SN_FORCE);
 
           // add comment to thunk like xorloser's loader
           set_cmt(imp_addr + 4, qstring().sprnt("%s :: %s", libname.c_str(), imp_name.c_str()).c_str(), 1);
