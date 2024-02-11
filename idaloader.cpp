@@ -7,18 +7,52 @@
 // - fix XEX1 exports
 // - test!
 
-#include "../idaldr.h"
+//----------------------------------------------------------------------
+// Feb 2024 - Dwack - added external XML support using PugiXML
+// added idaxex.xml, based on xorlosers Xbox360.xml format
+//----------------------------------------------------------------------
+// 
+/** https://github.com/zeux/pugixml
+ * Copyright (c) 2006-2023 Arseny Kapoulkine
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+ //----------------------------------------------------------------------
+
+#include "idaldr.h"// my IDA SDK is setup differently, edit this to point to your header file location
 #include "xex.hpp"
 #include "xex_headerids.hpp"
 #include <typeinf.hpp>
 #include <bytes.hpp>
+//----------------------------------------------------------------------
+#include "3rdparty/pugixml/pugixml.hpp"
+//----------------------------------------------------------------------
 
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
 #define FF_DWORD    0x20000000
 
 bool exclude_unneeded_sections = true;
 
-std::string DoNameGen(const std::string& libName, int id, int version); // namegen.cpp
+std::string DoNameGen(const std::string& libName, int id, int version, pugi::xml_document& doc); // namegen.cpp
 
 void label_regsaveloads(ea_t start, ea_t end)
 {
@@ -91,6 +125,12 @@ void pe_add_sections(XEXFile& file)
         continue;
       if (!strcmp(name, ".reloc"))
         continue;
+      //----------------------------------------------------------------------
+      // .idata section is bugging out in a few XEXs I tried with
+      // don't care to debug why, just move on
+      if (!strcmp(name, ".idata"))
+        continue;
+      //----------------------------------------------------------------------
     }
 
     uint32 sec_addr = section.VirtualAddress;
@@ -102,9 +142,17 @@ void pe_add_sections(XEXFile& file)
       sec_size = section.SizeOfRawData; // TODO: verify this?
     }
 
+    //----------------------------------------------------------------------
     // Size could be beyond file bounds, if so fix the size to what we can fit
+    // This check is causing an error in a few XEXs I am checking, usually with the idata section
+    // bypassing the check, the xex loads properly and displays proper segments
+    //sec_addr = 0x00021000
+    //sec_size = 0x00000280
+    //ImageSize = {value=0x00000200 }
+    //sec_size = 0xffff0000
     if (sec_addr + sec_size > file.image_size())
       sec_size = file.image_size() - sec_addr;
+    //----------------------------------------------------------------------
 
     // Add section as IDA segment
     uint32 seg_perms = 0;
@@ -253,6 +301,17 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
     if (file.header().Magic == MAGIC_XEX2)
       add_til("x360.til", 0);
 
+    //----------------------------------------------------------------------
+    //Let's load our xml file here, alerting the user if we don't find one
+    char new_path[500];
+    sprintf_s(new_path, 500, "%s\\idaxex.xml", idadir(LDR_SUBDIR));
+    // our xml file
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_file(new_path);
+    if (!result)
+        msg("Failed to load import/export names from XML file: %s\n", new_path);
+    //----------------------------------------------------------------------
+
     pe_add_sections(file);
 
     if (file.entry_point())
@@ -322,7 +381,9 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
     for (auto& exp : file.exports())
     {
-      auto exp_name = DoNameGen(exports_libname, exp.first, exports_version);
+      //----------------------------------------------------------------------
+      auto exp_name = DoNameGen(exports_libname, exp.first, exports_version, doc);
+      //----------------------------------------------------------------------
       auto exp_addr = exp.second.FuncAddr;
 
       // Mark as func export if inside a code section
@@ -356,7 +417,9 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
 
       for (auto& imp : lib.second)
       {
-        auto imp_name = DoNameGen(libname, imp.first, lib_version);
+        //----------------------------------------------------------------------
+        auto imp_name = DoNameGen(libname, imp.first, lib_version, doc);
+        //----------------------------------------------------------------------
         auto imp_addr = imp.second.ThunkAddr;
 
         if (imp.second.ThunkAddr && imp.second.ThunkAddr != imp.second.FuncAddr)

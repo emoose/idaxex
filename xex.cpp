@@ -1,5 +1,5 @@
 #ifdef IDALDR
-#include "../idaldr.h"
+#include "idaldr.h"// my IDA SDK is setup differently, edit this to point to your header file location
 #else
 #include <cstdarg>
 #endif

@@ -28,22 +28,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida32 Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida64 Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida32 Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida64 Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -63,9 +63,22 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida32 Debug|x64'">
+    <IncludePath>E:\IDA SDK\include;E:\IDA SDK\ldr;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida32 Release|x64'">
+    <IncludePath>E:\IDA SDK\include;E:\IDA SDK\ldr;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida64 Debug|x64'">
+    <IncludePath>E:\IDA SDK\include;E:\IDA SDK\ldr;$(IncludePath)</IncludePath>
+    <LibraryPath>E:\IDA SDK\lib\x64_win_vc_64_pro;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ida64 Release|x64'">
+    <IncludePath>E:\IDA SDK\include;E:\IDA SDK\ldr;$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ida32 Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack;3rdparty/pugixml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__NT__;IDALDR;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -75,18 +88,19 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ida64 Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack;3rdparty/pugixml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalOptions>/EXPORT:LDSC %(AdditionalOptions)</AdditionalOptions>
       <OutputFile>$(OutDir)$(TargetName)64$(TargetExt)</OutputFile>
-      <AdditionalDependencies>..\..\lib\x64_win_vc_64\ida.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ida.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <Version>8.3</Version>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ida32 Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack;3rdparty/pugixml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__NT__;IDALDR;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -96,7 +110,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ida64 Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack;3rdparty/pugixml;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -109,6 +123,7 @@
     <ClCompile Include="3rdparty\aes.c" />
     <ClCompile Include="3rdparty\mspack\lzxd.c" />
     <ClCompile Include="3rdparty\mspack\system.c" />
+    <ClCompile Include="3rdparty\pugixml\pugixml.cpp" />
     <ClCompile Include="idaloader.cpp" />
     <ClCompile Include="lzx.cpp" />
     <ClCompile Include="namegen.cpp" />
