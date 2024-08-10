@@ -63,7 +63,10 @@ void label_regsaveloads(ea_t start, ea_t end)
         create_insn(addr);
 
         set_name(addr, qstring().sprnt(pattern_labels[pat_idx], i).c_str(), SN_FORCE);
-        add_func(addr, addr + size);
+
+        func_t fn(addr, addr + size);
+        fn.flags |= FUNC_OUTLINE;
+        add_func_ex(&fn);
 
         addr += size;
       }
