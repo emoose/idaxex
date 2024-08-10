@@ -13,6 +13,8 @@
 #include <typeinf.hpp>
 #include <bytes.hpp>
 
+netnode ignore_micro;
+
 #define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
 #define FF_DWORD    0x20000000
 
@@ -30,17 +32,32 @@ void label_regsaveloads(ea_t start, ea_t end)
   uint8 load_pattern[] = {
     0xE9, 0xC1, 0xFF, 0x68, 0xE9, 0xE1, 0xFF, 0x70
   };
+  // "stfd %f14, -0x90(%r12)" followed by "stfd %f15, -0x88(%r12)"
+  uint8 savef_pattern[] = {
+    0xD9, 0xCC, 0xFF, 0x70, 0xD9, 0xEC, 0xFF, 0x78
+  };
+  // "lfd %f14, -0x90(%r12)" followed by "lfd %f15, -0x88(%r12)"
+  uint8 loadf_pattern[] = {
+    0xC9, 0xCC, 0xFF, 0x70, 0xC9, 0xEC, 0xFF, 0x78
+  };
+
 
   uint8* patterns[] = {
     save_pattern,
-    load_pattern
+    load_pattern,
+    savef_pattern,
+    loadf_pattern
   };
   char* pattern_labels[] = {
     "__savegprlr_%d",
-    "__restgprlr_%d"
+    "__restgprlr_%d",
+    "__savefpr_%d",
+    "__restfpr_%d"
   };
 
-  for (int pat_idx = 0; pat_idx < 2; pat_idx++)
+  init_ignore_micro();
+
+  for (int pat_idx = 0; pat_idx < 4; pat_idx++)
   {
     ea_t addr = start;
 
@@ -55,8 +72,12 @@ void label_regsaveloads(ea_t start, ea_t end)
         int size = 4;
 
         // final one is 0xC bytes when saving, 0x10 when loading
+        // (final fpr pattern is 0x8 when saving/loading)
         if (i == 31)
-          size = (pat_idx == 0) ? 0xC : 0x10;
+        {
+            size = (pat_idx == 0) ? 0xC : 0x10;
+            if (pat_idx > 1) size = 8;
+        }
 
         // reset addr
         del_items(addr, 0, 8);
@@ -65,8 +86,24 @@ void label_regsaveloads(ea_t start, ea_t end)
         set_name(addr, qstring().sprnt(pattern_labels[pat_idx], i).c_str(), SN_FORCE);
 
         func_t fn(addr, addr + size);
-        fn.flags |= FUNC_OUTLINE;
+        fn.flags |= FUNC_OUTLINE | FUNC_HIDDEN;
         add_func_ex(&fn);
+
+        // Mark save/rest functions as prolog/epilog to hide them from decompiler
+        int hide_size = size;
+        if (i == 31)
+            hide_size -= 4; // don't hide last blr
+        for (int insn = 0; insn < hide_size; insn += 4)
+        {
+            if (pat_idx == 0 || pat_idx == 2)
+            {
+                mark_prolog_insn(addr + insn);
+            }
+            else
+            {
+                mark_epilog_insn(addr + insn);
+            }
+        }
 
         addr += size;
       }
