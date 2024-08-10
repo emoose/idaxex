@@ -46,7 +46,7 @@ void label_regsaveloads(ea_t start, ea_t end)
 
     while (addr != BADADDR)
     {
-      addr = bin_search2(addr, end, patterns[pat_idx], NULL, 8, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
+      addr = bin_search3(addr, end, patterns[pat_idx], NULL, 8, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
       if (addr == BADADDR)
         break;
 
@@ -224,7 +224,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   // Set PPC_LISOFF to true
   // should help analyzer convert "lis r11, -0x7C46" to "lis r11, unk_83BA5600@h"
   uint32 val = 1;
-  ph.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &val);
+  PH.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &val);
 
   // Set compiler info
   compiler_info_t comp;
@@ -240,7 +240,8 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   comp.size_ldbl = 0;
   set_compiler(comp, SETCOMP_OVERRIDE);
 
-  inf.baseaddr = 0;
+  inf_set_baseaddr(0);
+  inf_set_64bit(false); // needed for hexppc64 to treat us as 32bit
 
   qlseek(li, 0);
 
