@@ -280,8 +280,9 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   comp.size_ldbl = 0;
   set_compiler(comp, SETCOMP_OVERRIDE);
 
-  inf_set_baseaddr(0);
-  inf_set_64bit(false); // needed for hexppc64 to treat us as 32bit
+  ea_helper_t eah;
+  eah.setup(false);   // file format does not support 64-bit data
+  inf_set_64bit(false);
 
   qlseek(li, 0);
 
@@ -290,6 +291,9 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   bool result = file.load(li);
   if (result)
   {
+    inf_set_baseaddr(file.base_address() >> 4);
+    set_imagebase(file.base_address());
+
     // If this is XEX2 try loading in x360.til, in case we have one
     if (file.header().Magic == MAGIC_XEX2)
       add_til("x360.til", 0);
