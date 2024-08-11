@@ -280,8 +280,7 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   comp.size_ldbl = 0;
   set_compiler(comp, SETCOMP_OVERRIDE);
 
-  ea_helper_t eah;
-  eah.setup(false);   // file format does not support 64-bit data
+  EAH.setup(false);   // file format does not support 64-bit data
   inf_set_64bit(false);
 
   qlseek(li, 0);
