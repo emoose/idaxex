@@ -255,6 +255,185 @@ void pe_add_sections(XEXFile& file)
   }
 }
 
+bool load_application(linput_t* li)
+{
+  qlseek(li, 0);
+
+  XEXFile file;
+  file.use_ida_io();
+  if (!file.load(li))
+    return false;
+
+  inf_set_baseaddr(file.base_address() >> 4);
+  set_imagebase(file.base_address());
+
+  // If this is XEX2 try loading in x360.til, in case we have one
+  if (file.header().Magic == MAGIC_XEX2)
+      add_til("x360.til", ADDTIL_INCOMP);
+
+  pe_add_sections(file);
+
+  if (file.entry_point())
+    add_entry(0, file.entry_point(), "start", 1);
+
+  auto pe_module_name = file.pe_module_name();
+  if (!pe_module_name.empty())
+    add_pgm_cmt("PE module name: %s", pe_module_name.c_str());
+
+  auto vital_stats = file.vital_stats();
+  if (vital_stats)
+  {
+    time_t timestamp = vital_stats->Timestamp;
+    char* timestamp_string = asctime(localtime(&timestamp));
+    if (timestamp_string)
+    {
+      timestamp_string[strlen(timestamp_string) - 1] = 0; // remove newline from timestamp_string
+      add_pgm_cmt("XEX timestamp: %s", timestamp_string);
+    }
+
+    add_pgm_cmt("XEX checksum: %x", vital_stats->Checksum);
+  }
+
+  auto exports_libname = file.exports_libname();
+  if (exports_libname.empty())
+  {
+    exports_libname = pe_module_name;
+    if (exports_libname.empty())
+    {
+      char module_name[256];
+      memset(module_name, 0, 256);
+
+      get_root_filename(module_name, 256);
+      exports_libname = module_name;
+    }
+  }
+
+  auto exports_version = file.min_kernel_version();
+  if (file.header().Magic != MAGIC_XEX2D)
+  {
+    auto* exec_info = file.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+    if (exec_info)
+    {
+      exports_version = exec_info->Version.Build;
+    }
+  }
+  else
+  {
+    auto* exec_info = file.opt_header_ptr<xex_opt::xex2d::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
+    if (exec_info)
+    {
+      exports_version = exec_info->Version.Build;
+    }
+  }
+
+  auto* exec_info25 = file.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
+  if (exec_info25)
+  {
+    exports_version = exec_info25->Version.Build;
+  }
+
+  auto* exec_info3f = file.opt_header_ptr<xex_opt::xex3f::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA3F);
+  if (exec_info3f)
+  {
+    exports_version = exec_info3f->Version.Build;
+  }
+
+  for (auto& exp : file.exports())
+  {
+    auto exp_name = DoNameGen(exports_libname, exp.first, exports_version);
+    auto exp_addr = exp.second.FuncAddr;
+
+    // Mark as func export if inside a code section
+    qstring func_segmclass;
+    get_segm_class(&func_segmclass, getseg(exp_addr));
+
+    bool func_iscode = func_segmclass == "CODE";
+    add_entry(exp.first, exp_addr, exp_name.c_str(), func_iscode);
+
+    if (func_iscode)
+      add_func(exp_addr); // make doubly sure it gets marked as code
+  }
+
+  for (auto lib : file.imports())
+  {
+    auto& libname = lib.first;
+
+    netnode module_node;
+    module_node.create();
+
+    // Track lowest record addr so we can add import module comment to it later
+    ea_t lowest_addr = BADADDR;
+
+    int lib_version = file.min_kernel_version();
+
+    auto& tables = file.import_tables();
+    if (tables.count(libname))
+    {
+      lib_version = tables.at(libname).Version.Build;
+    }
+
+    for (auto& imp : lib.second)
+    {
+      auto imp_name = DoNameGen(libname, imp.first, lib_version);
+      auto imp_addr = imp.second.ThunkAddr;
+
+      if (imp.second.ThunkAddr && imp.second.ThunkAddr != imp.second.FuncAddr)
+      {
+        auto thunk_name = "__imp_" + imp_name;
+        if (!imp.second.FuncAddr)
+          thunk_name = imp_name;
+
+        set_name(imp.second.ThunkAddr, thunk_name.c_str(), SN_FORCE);
+        create_data(imp.second.ThunkAddr, FF_WORD, 2 * 2, BADADDR);
+
+        if (lowest_addr == BADADDR || lowest_addr > imp.second.ThunkAddr)
+          lowest_addr = imp.second.ThunkAddr;
+      }
+
+      if (imp.second.FuncAddr)
+      {
+        imp_addr = imp.second.FuncAddr;
+        set_name(imp_addr, imp_name.c_str(), SN_FORCE);
+
+        // add comment to thunk like xorloser's loader
+        set_cmt(imp_addr + 4, qstring().sprnt("%s :: %s", libname.c_str(), imp_name.c_str()).c_str(), 1);
+
+        // force IDA to recognize addr as code, so we can add it as a library function
+        auto_make_code(imp_addr);
+        auto_recreate_insn(imp_addr);
+        func_t func(imp_addr, imp_addr + 0x10, FUNC_LIB);
+        add_func_ex(&func);
+      }
+
+      // Set imports window name
+      module_node.supset_ea(imp_addr, imp_name.c_str());
+
+      // Set imports window ordinal
+      module_node.altset(imp.first, ea2node(imp_addr));
+    }
+
+    if (lowest_addr != BADADDR)
+    {
+      if (tables.count(libname))
+      {
+        auto& table_header = tables.at(libname);
+
+        add_extra_line(lowest_addr, true, "\n\nImports from %s v%d.%d.%d.%d (minimum v%d.%d.%d.%d)\n", libname.c_str(),
+          table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
+          table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE);
+      }
+    }
+
+    if (lib.second.size())
+    {
+      // Add module to imports window
+      import_module(libname.c_str(), NULL, module_node, NULL, "x360");
+    }
+  }
+
+  return true;
+}
+
 //------------------------------------------------------------------------------
 void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
 {
@@ -280,183 +459,12 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   comp.size_ldbl = 0;
   set_compiler(comp, SETCOMP_OVERRIDE);
 
+  // load in the xex
+  load_application(li);
+
+  // set as 32-bit for hexrays support
   EAH.setup(false);   // file format does not support 64-bit data
-  inf_set_64bit(false);
-
-  qlseek(li, 0);
-
-  XEXFile file;
-  file.use_ida_io();
-  bool result = file.load(li);
-  if (result)
-  {
-    inf_set_baseaddr(file.base_address() >> 4);
-    set_imagebase(file.base_address());
-
-    // If this is XEX2 try loading in x360.til, in case we have one
-    if (file.header().Magic == MAGIC_XEX2)
-      add_til("x360.til", 0);
-
-    pe_add_sections(file);
-
-    if (file.entry_point())
-      add_entry(0, file.entry_point(), "start", 1);
-
-    auto pe_module_name = file.pe_module_name();
-    if (!pe_module_name.empty())
-      add_pgm_cmt("PE module name: %s", pe_module_name.c_str());
-
-    auto vital_stats = file.vital_stats();
-    if (vital_stats)
-    {
-      time_t timestamp = vital_stats->Timestamp;
-      char* timestamp_string = asctime(localtime(&timestamp));
-      if (timestamp_string)
-      {
-        timestamp_string[strlen(timestamp_string) - 1] = 0; // remove newline from timestamp_string
-        add_pgm_cmt("XEX timestamp: %s", timestamp_string);
-      }
-
-      add_pgm_cmt("XEX checksum: %x", vital_stats->Checksum);
-    }
-
-    auto exports_libname = file.exports_libname();
-    if (exports_libname.empty())
-    {
-      exports_libname = pe_module_name;
-      if (exports_libname.empty())
-      {
-        char module_name[256];
-        memset(module_name, 0, 256);
-
-        get_root_filename(module_name, 256);
-        exports_libname = module_name;
-      }
-    }
-
-    auto exports_version = file.min_kernel_version();
-    if (file.header().Magic != MAGIC_XEX2D)
-    {
-      auto* exec_info = file.opt_header_ptr<xex_opt::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
-      if (exec_info)
-      {
-        exports_version = exec_info->Version.Build;
-      }
-    }
-    else
-    {
-      auto* exec_info = file.opt_header_ptr<xex_opt::xex2d::XexExecutionId>(XEX_HEADER_EXECUTION_ID);
-      if (exec_info)
-      {
-        exports_version = exec_info->Version.Build;
-      }
-    }
-
-    auto* exec_info25 = file.opt_header_ptr<xex_opt::xex25::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA);
-    if (exec_info25)
-    {
-      exports_version = exec_info25->Version.Build;
-    }
-
-    auto* exec_info3f = file.opt_header_ptr<xex_opt::xex3f::XexExecutionId>(XEX_HEADER_EXECUTION_ID_BETA3F);
-    if (exec_info3f)
-    {
-      exports_version = exec_info3f->Version.Build;
-    }
-
-    for (auto& exp : file.exports())
-    {
-      auto exp_name = DoNameGen(exports_libname, exp.first, exports_version);
-      auto exp_addr = exp.second.FuncAddr;
-
-      // Mark as func export if inside a code section
-      qstring func_segmclass;
-      get_segm_class(&func_segmclass, getseg(exp_addr));
-
-      bool func_iscode = func_segmclass == "CODE";
-      add_entry(exp.first, exp_addr, exp_name.c_str(), func_iscode);
-
-      if (func_iscode)
-        add_func(exp_addr); // make doubly sure it gets marked as code
-    }
-
-    for (auto lib : file.imports())
-    {
-      auto& libname = lib.first;
-
-      netnode module_node;
-      module_node.create();
-
-      // Track lowest record addr so we can add import module comment to it later
-      ea_t lowest_addr = BADADDR;
-
-      int lib_version = file.min_kernel_version();
-
-      auto& tables = file.import_tables();
-      if (tables.count(libname))
-      {
-        lib_version = tables.at(libname).Version.Build;
-      }
-
-      for (auto& imp : lib.second)
-      {
-        auto imp_name = DoNameGen(libname, imp.first, lib_version);
-        auto imp_addr = imp.second.ThunkAddr;
-
-        if (imp.second.ThunkAddr && imp.second.ThunkAddr != imp.second.FuncAddr)
-        {
-          auto thunk_name = "__imp_" + imp_name;
-          if (!imp.second.FuncAddr)
-            thunk_name = imp_name;
-
-          set_name(imp.second.ThunkAddr, thunk_name.c_str(), SN_FORCE);
-          create_data(imp.second.ThunkAddr, FF_WORD, 2 * 2, BADADDR);
-
-          if (lowest_addr == BADADDR || lowest_addr > imp.second.ThunkAddr)
-            lowest_addr = imp.second.ThunkAddr;
-        }
-
-        if (imp.second.FuncAddr)
-        {
-          imp_addr = imp.second.FuncAddr;
-          set_name(imp_addr, imp_name.c_str(), SN_FORCE);
-
-          // add comment to thunk like xorloser's loader
-          set_cmt(imp_addr + 4, qstring().sprnt("%s :: %s", libname.c_str(), imp_name.c_str()).c_str(), 1);
-
-          // force IDA to recognize addr as code, so we can add it as a library function
-          auto_make_code(imp_addr);
-          auto_recreate_insn(imp_addr);
-          func_t func(imp_addr, imp_addr + 0x10, FUNC_LIB);
-          add_func_ex(&func);
-        }
-
-        // Set imports window name
-        module_node.supset_ea(imp_addr, imp_name.c_str());
-
-        // Set imports window ordinal
-        module_node.altset(imp.first, ea2node(imp_addr));
-      }
-
-      if (lowest_addr != BADADDR)
-      {
-        if (tables.count(libname))
-        {
-          auto& table_header = tables.at(libname);
-
-          add_extra_line(lowest_addr, true, "\n\nImports from %s v%d.%d.%d.%d (minimum v%d.%d.%d.%d)\n", libname.c_str(),
-            table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
-            table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE);
-        }
-      }
-
-      if (lib.second.size())
-      {
-        // Add module to imports window
-        import_module(libname.c_str(), NULL, module_node, NULL, "x360");
-      }
-    }
-  }
+  inf_set_app_bitness(32);
 }
 
 //--------------------------------------------------------------------------
