@@ -63,7 +63,7 @@ void label_regsaveloads(ea_t start, ea_t end)
 
     while (addr != BADADDR)
     {
-      addr = bin_search3(addr, end, patterns[pat_idx], NULL, 8, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
+      addr = bin_search(addr, end, patterns[pat_idx], NULL, 8, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
       if (addr == BADADDR)
         break;
 
