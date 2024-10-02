@@ -162,3 +162,26 @@ typedef struct _IMAGE_EXPORT_DIRECTORY
   uint32_t AddressOfNames;
   uint32_t AddressOfNameOrdinals;
 } IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+
+typedef struct _IMAGE_DEBUG_DIRECTORY {
+  uint32_t Characteristics;
+  uint32_t TimeDateStamp;
+  uint16_t MajorVersion;
+  uint16_t MinorVersion;
+  uint32_t Type;
+  uint32_t SizeOfData;
+  uint32_t AddressOfRawData;
+  uint32_t PointerToRawData;
+} IMAGE_DEBUG_DIRECTORY, * PIMAGE_DEBUG_DIRECTORY;
+static_assert(sizeof(IMAGE_DEBUG_DIRECTORY) == 0x1C, "IMAGE_DEBUG_DIRECTORY");
+
+#define CV_INFO_RSDS_SIGNATURE 0x53445352
+struct CV_INFO_PDB70
+{
+  uint32_t CvSignature;
+  uint8_t Signature[0x10];
+  uint32_t Age;
+  // followed by filename
+  //BYTE PdbFileName[];
+};
+static_assert(sizeof(CV_INFO_PDB70) == 0x18, "CV_INFO_PDB70");

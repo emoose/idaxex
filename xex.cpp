@@ -1154,6 +1154,54 @@ bool XEXFile::pe_load(const uint8_t* data)
       pe_load_exports(data);
   }
 
+  // Read in debug directory if exists (and valid)
+  auto& debug_directory = nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
+  if (debug_directory.Size)
+  {
+    int num_directories = debug_directory.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
+
+    if (pe_data_.size() > debug_directory.VirtualAddress)
+    {
+      IMAGE_DEBUG_DIRECTORY* dir_ptr = (IMAGE_DEBUG_DIRECTORY*)(data + debug_directory.VirtualAddress);
+      for (int i = 0; i < num_directories; i++)
+      {
+        auto dir = *dir_ptr;
+        dir_ptr++;
+
+        debug_directories_.push_back(dir);
+
+        if (dir.Type != 2 /* CODEVIEW */ || dir.SizeOfData == 0)
+          continue;
+
+        // Both AddressOfRawData & PointerToRawData usually seem to point to same offset, but not sure if that's always the case
+        // Check if either of them point to valid CV_INFO
+        CV_INFO_PDB70* cv_ptr = nullptr;
+        for(auto& addr : { dir.AddressOfRawData, dir.PointerToRawData })
+        {
+          if (addr > 0 && pe_data_.size() > (addr + dir.SizeOfData))
+          {
+            auto* test_ptr = (CV_INFO_PDB70*)(data + addr);
+            if (test_ptr->CvSignature == CV_INFO_RSDS_SIGNATURE)
+            {
+              cv_ptr = test_ptr;
+              break;
+            }
+          }
+        }
+
+        // Bail out if neither are valid
+        if (!cv_ptr)
+          continue;
+
+        std::vector<uint8_t> data;
+        data.resize(dir.SizeOfData);
+        std::copy_n((uint8_t*)cv_ptr, dir.SizeOfData, data.data());
+
+        codeview_data_.push_back(data);
+      }
+    }
+  }
+
   return true;
 }
 

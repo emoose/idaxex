@@ -77,6 +77,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalOptions>/EXPORT:LDSC %(AdditionalOptions)</AdditionalOptions>
@@ -98,6 +99,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>..\..\include;3rdparty/excrypt;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalOptions>/EXPORT:LDSC %(AdditionalOptions)</AdditionalOptions>

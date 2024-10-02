@@ -100,6 +100,8 @@ class XEXFile
 
   // Sections from PE headers (includes XEX sections above)
   std::vector<IMAGE_SECTION_HEADER> sections_;
+  std::vector<IMAGE_DEBUG_DIRECTORY> debug_directories_;
+  std::vector<std::vector<uint8_t>> codeview_data_;
 
   int load_error_ = 0;
 
@@ -207,6 +209,16 @@ public:
   const std::string& pe_module_name() { return pe_module_name_; }
   const xex_opt::XexVitalStats* vital_stats() { return vital_stats_; }
   const xex_opt::XexFileDataDescriptor* data_descriptor() { return data_descriptor_; }
+
+  const uint8_t* codeview_data(int idx, size_t* size = nullptr) {
+    if (codeview_data_.size() > idx)
+    {
+      if (size)
+        *size = codeview_data_[idx].size();
+      return codeview_data_[idx].data();
+    }
+    return nullptr;
+  }
 
   uint32_t min_kernel_version() {
     switch (xex_header_.Magic) {

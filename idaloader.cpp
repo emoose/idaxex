@@ -12,6 +12,7 @@
 #include "xex_headerids.hpp"
 #include <typeinf.hpp>
 #include <bytes.hpp>
+#include <filesystem>
 
 netnode ignore_micro;
 
@@ -48,7 +49,7 @@ void label_regsaveloads(ea_t start, ea_t end)
     savef_pattern,
     loadf_pattern
   };
-  char* pattern_labels[] = {
+  const char* pattern_labels[] = {
     "__savegprlr_%d",
     "__restgprlr_%d",
     "__savefpr_%d",
@@ -158,7 +159,7 @@ void pe_add_sections(XEXFile& file)
     bool has_code = (section.Characteristics & IMAGE_SCN_CNT_CODE);
     bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
 
-    char* seg_class = has_code ? "CODE" : "DATA";
+    const char* seg_class = has_code ? "CODE" : "DATA";
     ea_t seg_addr = (ea_t)file.base_address() + (ea_t)section.VirtualAddress;
 
     segment_t segm;
@@ -224,8 +225,9 @@ void pe_add_sections(XEXFile& file)
       offset += 8;
     }
 
-    // display messagebox prompt to user, since pdata labelling can take a little while
+    msg("Parsing .pdata and creating %lld functions...\n", funcs.size());
 
+    // display messagebox prompt to user, since pdata labelling can take a little while
     // ida printf formatter tends to crash, too bad, use sprintf to rewrite just the number portion
     char msg_text[256] = "Marking functions from .pdata... (";
     int num_pos = strlen(msg_text);
@@ -244,7 +246,7 @@ void pe_add_sections(XEXFile& file)
         break;
 
       // update every few funcs
-      if (++num % 10 == 0)
+      if (++num % 50 == 0)
       {
         sprintf_s(msg_text_write, 256 - num_pos, "%lld/%lld)", num, funcs.size());
         replace_wait_box(msg_text);
@@ -252,6 +254,56 @@ void pe_add_sections(XEXFile& file)
     }
 
     hide_wait_box();
+  }
+}
+
+#define PE_NODE "$ PE header" // netnode name for PE header
+// value()        -> peheader_t
+// altval(segnum) -> s->start_ea
+#define PE_ALT_DBG_FPOS   nodeidx_t(-1)  // altval() -> translated fpos of debuginfo
+#define PE_ALT_IMAGEBASE  nodeidx_t(-2)  // altval() -> loading address (usually pe.imagebase)
+#define PE_ALT_PEHDR_OFF  nodeidx_t(-3)  // altval() -> offset of PE header
+#define PE_ALT_NEFLAGS    nodeidx_t(-4)  // altval() -> neflags
+#define PE_ALT_TDS_LOADED nodeidx_t(-5)  // altval() -> tds already loaded(1) or invalid(-1)
+#define PE_ALT_PSXDLL     nodeidx_t(-6)  // altval() -> if POSIX(x86) imports from PSXDLL netnode
+#define PE_ALT_OVRVA      nodeidx_t(-7)  // altval() -> overlay rva (if present)
+#define PE_ALT_OVRSZ      nodeidx_t(-8)  // altval() -> overlay size (if present)
+#define PE_SUPSTR_PDBNM   nodeidx_t(-9)  // supstr() -> pdb file name
+                              // supval(segnum) -> pesection_t
+                              // blob(0, PE_NODE_RELOC)  -> relocation info
+                              // blob(0, RSDS_TAG)  -> rsds_t structure
+                              // blob(0, NB10_TAG)  -> cv_info_pdb20_t structure
+#define PE_ALT_NTAPI      nodeidx_t(-10) // altval() -> uses Native API
+#define PE_EMBED_PDB_OFF  nodeidx_t(-11) // altval() -> offset of embedded PDB file
+#define PE_NODE_RELOC 'r'
+#define RSDS_TAG 's'
+#define NB10_TAG 'n'
+#define UTDS_TAG 't'
+
+void pe_setup_netnode(XEXFile& file)
+{
+  netnode penode;
+  penode.create(PE_NODE);
+
+  penode.altset(PE_ALT_IMAGEBASE, file.base_address());
+
+  size_t cv_length = 0;
+  auto* cv_data = file.codeview_data(0, &cv_length);
+  if (cv_data)
+  {
+    // Set PDB filename to whatever cv_data[0] says
+    // (only use filename instead of full path, else it may fail to load it)
+    char* pdb_path_ptr = (char*)(cv_data + sizeof(CV_INFO_PDB70));
+    std::filesystem::path pdb_path = pdb_path_ptr;
+    penode.supset(PE_SUPSTR_PDBNM, pdb_path.filename().string().c_str());
+
+    // Copy cv_data into RSDS tag
+    penode.setblob(cv_data, cv_length, 0, RSDS_TAG);
+
+    // Prompt for PDB load
+    msg("Prompting for PDB load...\n(full X360 type loading may require pdb.cfg PDB_PROVIDER = PDB_PROVIDER_MSDIA !)\n");
+    auto* plugin = find_plugin("pdb", 1LL);
+    run_plugin(plugin, 1LL);
   }
 }
 
@@ -264,6 +316,7 @@ bool load_application(linput_t* li)
   if (!file.load(li))
     return false;
 
+  inf_set_filetype(f_PE);
   inf_set_baseaddr(file.base_address() >> 4);
   set_imagebase(file.base_address());
 
@@ -430,6 +483,8 @@ bool load_application(linput_t* li)
       import_module(libname.c_str(), NULL, module_node, NULL, "x360");
     }
   }
+
+  pe_setup_netnode(file);
 
   return true;
 }
