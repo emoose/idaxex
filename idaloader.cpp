@@ -170,7 +170,7 @@ void pe_add_sections(XEXFile& file)
     segm.perm = seg_perms;
     add_segm_ex(&segm, name, seg_class, 0);
 
-    if (sec_size <= 0)
+    if (sec_size <= 0 || sec_addr >= file.pe_data_length())
       continue;
 
     // Load data into IDA
