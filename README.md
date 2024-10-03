@@ -19,33 +19,36 @@ Includes support for the following XEX formats:
 ## Features
 
 - Can handle compressed/uncompressed images, and encrypted/decrypted (with support for retail, devkit & pre-release encryption keys)
-- Reads in imported functions & libraries into IDA's "imports" window, and also reads exports from the loaded module into the "exports" window.
+- Reads in imports & exports into the appropriate IDA import/export views.
 - Automatically names imports that are well-known, such as imports from the kernel & XAM, just like xorloser's loader would.
 - PE sections are created & marked with the appropriate permissions as given by the PE headers.
-- Hardware-accelerated AES-NI support which should allow loading encrypted XEXs pretty quickly!
+- AES-NI support to help improve load times of larger XEXs.
 
 ## Install
-Builds for IDA 7.2-7.5, both 32-bit and 64-bit, are available in the releases section.
+Builds for IDA 9 are available in the releases section.
 
-To install the loader just extract the contents of the folder for your IDA version (eg. ida75_win) into IDA's install folder (eg. C:\Program Files\IDA 7.5\)
+To install the loader just extract the contents of the folder for your IDA version into IDA's install folder (eg. C:\Program Files\IDA Professional 9.0\)
 
 I recommend pairing this loader with the PPCAltivec plugin, an updated version for IDA 7 is available at hayleyxyz's repo here: https://github.com/hayleyxyz/PPC-Altivec-IDA
 
 ## Building
-You'll need to copy this repo into your idasdk\ldr\ folder, eg. for me I have it at C:\idasdk\ldr\xex\idaxex.sln
 
-With that done you should be able to just build the solution, ida32 will build a DLL for 32-bit IDA while ida64 will build for 64-bit.
+**Windows**
 
-This project is designed for IDA on Windows but maybe it could work on other OS's too, I've tried to make sure not to include any Windows-specific things, so hopefully there's a good chance for it to work. If you try it out please let me know how it goes!
+Clone the repo into your idasdk\ldr\ folder and then build idaxex.sln with VS2022.
 
-## Todo
+**Linux**
 
-I've been using this loader for a few months now and it's worked pretty well, but no doubt there's probably bugs to be found in it - if you encounter anything strange please don't hesitate to make a bug report on the issue tracker!
+- Setup [ida-cmake](https://github.com/allthingsida/ida-cmake) in your idasdk folder
+- Make sure IDASDK env var points to your idasdk folder
+- Clone idaxex repo
+- Run `cmake . -DEA64=YES` inside idaxex folder
+- Run `make`
 
-- Right now known-import-names are hardcoded inside the loader, it'd be nice if we can make them external somehow... xorloser's loader seems to read them from Xbox360.xml - maybe we can do something similar?
+On newest IDA you may need to edit ida-cmake common.cmake and change `libida64.so` to `libida.so` for build to link properly.
 
 ## Credits
-idaxex is based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name!
+Based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name!
 
 Thanks to everyone involved in the Xbox 360 modding/reverse-engineering community!
 

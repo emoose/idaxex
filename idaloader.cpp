@@ -371,7 +371,7 @@ bool load_application(linput_t* li)
     {
       set_name(tls_directory.AddressOfCallBacks, "_tls_callbacks"); // not actual name, usually something useless like __xl_b
       if(tls_callbacks.size())
-        create_dword(tls_directory.AddressOfCallBacks, tls_callbacks.size() * 4); // todo: set to IMAGE_TLS_DIRECTORY32 struct
+        create_dword(tls_directory.AddressOfCallBacks, tls_callbacks.size() * 4);
     }
 
     for (size_t i = 0; i < tls_callbacks.size(); i++)
