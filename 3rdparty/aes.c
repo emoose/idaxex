@@ -42,6 +42,7 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 
 #ifdef _MSC_VER
 #include <intrin.h> // cpuid
+#define AESNI_SUPPORT 1
 #endif
 
 /*****************************************************************************/
@@ -237,7 +238,7 @@ static void InvCipher_AESNI(state_t* state, const uint8_t* RoundKey);
 AESCipher_fn var_CipherFn = Cipher;
 AESCipher_fn var_InvCipherFn = InvCipher;
 
-#ifdef _MSC_VER
+#ifdef AESNI_SUPPORT
 
 static int supports_aesni = 0;
 int cpu_aesni_support()
@@ -295,7 +296,7 @@ void aesni128_load_key(uint8_t* RoundKey, const int8_t *enc_key) {
 
 void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key)
 {
-#ifdef _MSC_VER
+#ifdef AESNI_SUPPORT
   if(cpu_aesni_support())
     aesni128_load_key(ctx->RoundKey, key);
   else
@@ -305,7 +306,7 @@ void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key)
 #if (defined(CBC) && (CBC == 1)) || (defined(CTR) && (CTR == 1))
 void AES_init_ctx_iv(struct AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
 {
-#ifdef _MSC_VER
+#ifdef AESNI_SUPPORT
   if (cpu_aesni_support())
     aesni128_load_key(ctx->RoundKey, key);
   else
@@ -488,7 +489,7 @@ static void InvShiftRows(state_t* state)
 }
 #endif // #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
-#ifdef _MSC_VER
+#ifdef AESNI_SUPPORT
 #define DO_ENC_BLOCK(m,k) \
   do{\
     m = _mm_xor_si128       (m, k[ 0]); \
@@ -543,7 +544,7 @@ static void Cipher(state_t* state, const uint8_t* RoundKey)
 
 #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
-#ifdef _MSC_VER
+#ifdef AESNI_SUPPORT
 #define DO_DEC_BLOCK(m,k) \
   do{\
     m = _mm_xor_si128       (m, k[10+0]); \
