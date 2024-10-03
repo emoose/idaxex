@@ -327,7 +327,10 @@ bool load_application(linput_t* li)
   pe_add_sections(file);
 
   if (file.entry_point())
+  {
     add_entry(0, file.entry_point(), "start", 1);
+    inf_set_main(file.entry_point());
+  }
 
   auto pe_module_name = file.pe_module_name();
   if (!pe_module_name.empty())
@@ -458,11 +461,8 @@ bool load_application(linput_t* li)
         add_func_ex(&func);
       }
 
-      // Set imports window name
-      module_node.supset_ea(imp_addr, imp_name.c_str());
-
-      // Set imports window ordinal
-      module_node.altset(imp.first, ea2node(imp_addr));
+      set_import_name(module_node, imp_addr, imp_name.c_str());
+      set_import_ordinal(module_node, imp_addr, imp.first);
     }
 
     if (lowest_addr != BADADDR)
