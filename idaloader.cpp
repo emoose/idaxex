@@ -4,12 +4,18 @@
 // - test XEX2D / XEX3F
 // - fix XEX1 exports
 
-#include "../idaldr.h"
-#include "xex.hpp"
-#include "xex_headerids.hpp"
+#include <ida.hpp>
+#include <loader.hpp>
+#include <auto.hpp>
+#include <diskio.hpp>
+#include <entry.hpp>
 #include <typeinf.hpp>
 #include <bytes.hpp>
+
 #include <filesystem>
+
+#include "xex.hpp"
+#include "xex_headerids.hpp"
 
 netnode ignore_micro;
 
@@ -346,6 +352,32 @@ bool load_application(linput_t* li)
   if (!pe_module_name.empty())
     add_pgm_cmt("PE module name: %s", pe_module_name.c_str());
 
+  auto tls_directory_va = file.tls_directory_va();
+  if (tls_directory_va)
+  {
+    auto tls_directory = file.tls_directory();
+    auto& tls_callbacks = file.tls_callbacks();
+
+    set_name(tls_directory_va, "_tls_used");
+    create_dword(tls_directory_va, 6 * 4); // todo: set to IMAGE_TLS_DIRECTORY32 struct
+
+    if (tls_directory.StartAddressOfRawData)
+      set_name(tls_directory.StartAddressOfRawData, "_tls_start");
+    if (tls_directory.EndAddressOfRawData)
+      set_name(tls_directory.EndAddressOfRawData, "_tls_end");
+    if (tls_directory.AddressOfIndex)
+      set_name(tls_directory.AddressOfIndex, "_tls_index");
+    if (tls_directory.AddressOfCallBacks)
+    {
+      set_name(tls_directory.AddressOfCallBacks, "_tls_callbacks"); // not actual name, usually something useless like __xl_b
+      if(tls_callbacks.size())
+        create_dword(tls_directory.AddressOfCallBacks, tls_callbacks.size() * 4); // todo: set to IMAGE_TLS_DIRECTORY32 struct
+    }
+
+    for (size_t i = 0; i < tls_callbacks.size(); i++)
+      set_name(tls_callbacks[i], qstring().sprnt("TlsCallback_%d", i).c_str());
+  }
+
   auto vital_stats = file.vital_stats();
   if (vital_stats)
   {
@@ -581,6 +613,8 @@ static int idaapi accept_file(
 
   return valid;
 }
+
+idaman loader_t ida_module_data LDSC;
 
 //--------------------------------------------------------------------------
 loader_t LDSC =

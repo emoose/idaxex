@@ -1,5 +1,7 @@
 #ifdef IDALDR
-#include "../idaldr.h"
+#include <ida.hpp>
+#include <diskio.hpp>
+#include <typeinf.hpp>
 #else
 #include <cstdarg>
 #endif
@@ -1040,7 +1042,6 @@ bool XEXFile::pe_load_imports(const uint8_t* data)
       imports_addr = pe_rva_to_offset(import_desc->FirstThunk);
       if (imports_addr)
       {
-
         if (!imports_.count(libname))
           imports_[libname] = std::map<uint32_t, XEXFunction>();
 
@@ -1154,15 +1155,43 @@ bool XEXFile::pe_load(const uint8_t* data)
       pe_load_exports(data);
   }
 
+  // Read in callbacks from TLS directory if exists
+  auto& tls_directory = nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
+  if (tls_directory.Size)
+  {
+    auto tls_dir_offset = pe_rva_to_offset(tls_directory.VirtualAddress);
+    if (pe_data_.size() >= (tls_dir_offset + sizeof(IMAGE_TLS_DIRECTORY32)))
+    {
+      tls_directory_va_ = base_address() + tls_dir_offset;
+      tls_directory_ = *(IMAGE_TLS_DIRECTORY32*)(data + tls_dir_offset);
+      if (tls_directory_.AddressOfCallBacks)
+      {
+        auto callback_offset = pe_rva_to_offset(tls_directory_.AddressOfCallBacks);
+        dbgmsg("[+] Reading TLS callbacks from 0x%X (directory: 0x%X)\n", base_address() + callback_offset, base_address() + tls_dir_offset);
+
+        if (pe_data_.size() >= (callback_offset + sizeof(uint32_t)))
+        {
+          auto* callbacks = reinterpret_cast<const xe::be<uint32_t>*>(data + callback_offset);
+          while (*callbacks)
+          {
+            uint32_t callback = *callbacks;
+            tls_callbacks_.push_back(*callbacks);
+            callbacks++;
+          }
+        }
+      }
+    }
+  };
+
   // Read in debug directory if exists (and valid)
   auto& debug_directory = nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
   if (debug_directory.Size)
   {
     int num_directories = debug_directory.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
-
-    if (pe_data_.size() > debug_directory.VirtualAddress)
+    auto debug_dir_offset = pe_rva_to_offset(debug_directory.VirtualAddress);
+    if (pe_data_.size() >= (debug_dir_offset + (sizeof(IMAGE_DEBUG_DIRECTORY) * num_directories)))
     {
-      IMAGE_DEBUG_DIRECTORY* dir_ptr = (IMAGE_DEBUG_DIRECTORY*)(data + debug_directory.VirtualAddress);
+      IMAGE_DEBUG_DIRECTORY* dir_ptr = (IMAGE_DEBUG_DIRECTORY*)(data + debug_dir_offset);
       for (int i = 0; i < num_directories; i++)
       {
         auto dir = *dir_ptr;
@@ -1176,9 +1205,9 @@ bool XEXFile::pe_load(const uint8_t* data)
         // Both AddressOfRawData & PointerToRawData usually seem to point to same offset, but not sure if that's always the case
         // Check if either of them point to valid CV_INFO
         CV_INFO_PDB70* cv_ptr = nullptr;
-        for(auto& addr : { dir.AddressOfRawData, dir.PointerToRawData })
+        for (auto& addr : { dir.AddressOfRawData, dir.PointerToRawData, pe_rva_to_offset(dir.AddressOfRawData), pe_rva_to_offset(dir.PointerToRawData) })
         {
-          if (addr > 0 && pe_data_.size() > (addr + dir.SizeOfData))
+          if (addr > 0 && pe_data_.size() >= (addr + dir.SizeOfData))
           {
             auto* test_ptr = (CV_INFO_PDB70*)(data + addr);
             if (test_ptr->CvSignature == CV_INFO_RSDS_SIGNATURE)
@@ -1213,7 +1242,7 @@ uint32_t XEXFile::pe_rva_to_offset(uint32_t rva)
   if (xex_header_.Magic != MAGIC_XEX3F && xex_header_.Magic != MAGIC_XEX0)
     return rva; // all formats besides XEX3F/XEX0 seem to keep raw data lined up with in-memory PE?
 
-  for (auto section : sections_)
+  for (const auto& section : sections_)
   {
     if (rva >= section.VirtualAddress && rva < section.VirtualAddress + section.VirtualSize)
       return rva - section.VirtualAddress + section.PointerToRawData;
@@ -1346,7 +1375,7 @@ bool XEXFile::basefile_verify()
 
     auto* data = pe_data();
     xex::HvPageInfo tmp_page;
-    for (auto page : page_descriptors_)
+    for (const auto& page : page_descriptors_)
     {
       int size = page_size * page.Size;
 

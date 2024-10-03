@@ -187,3 +187,14 @@ struct CV_INFO_PDB70
   //BYTE PdbFileName[];
 };
 static_assert(sizeof(CV_INFO_PDB70) == 0x18, "CV_INFO_PDB70");
+
+typedef struct _IMAGE_TLS_DIRECTORY32 {
+  xe::be<uint32_t> StartAddressOfRawData;
+  xe::be<uint32_t> EndAddressOfRawData;
+  xe::be<uint32_t> AddressOfIndex;             // PDWORD
+  xe::be<uint32_t> AddressOfCallBacks;         // PIMAGE_TLS_CALLBACK *
+  xe::be<uint32_t> SizeOfZeroFill;
+  xe::be<uint32_t> Characteristics;
+} IMAGE_TLS_DIRECTORY32;
+typedef IMAGE_TLS_DIRECTORY32* PIMAGE_TLS_DIRECTORY32;
+static_assert(sizeof(IMAGE_TLS_DIRECTORY32) == 0x18, "IMAGE_TLS_DIRECTORY32");

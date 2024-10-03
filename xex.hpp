@@ -102,6 +102,9 @@ class XEXFile
   std::vector<IMAGE_SECTION_HEADER> sections_;
   std::vector<IMAGE_DEBUG_DIRECTORY> debug_directories_;
   std::vector<std::vector<uint8_t>> codeview_data_;
+  uint32_t tls_directory_va_ = 0;
+  IMAGE_TLS_DIRECTORY32 tls_directory_{};
+  std::vector<uint32_t> tls_callbacks_;
 
   int load_error_ = 0;
 
@@ -219,6 +222,10 @@ public:
     }
     return nullptr;
   }
+
+  uint32_t tls_directory_va() { return tls_directory_va_; }
+  IMAGE_TLS_DIRECTORY32 tls_directory() { return tls_directory_; }
+  const std::vector<uint32_t>& tls_callbacks() { return tls_callbacks_; }
 
   uint32_t min_kernel_version() {
     switch (xex_header_.Magic) {
