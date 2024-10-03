@@ -147,6 +147,7 @@ typedef struct _IMAGE_IMPORT_DESCRIPTOR {
   uint32_t Name; // Module name
   uint32_t FirstThunk; // RVA to IAT (if bound this IAT has actual addresses)
 } IMAGE_IMPORT_DESCRIPTOR, *PIMAGE_IMPORT_DESCRIPTOR;
+static_assert(sizeof(IMAGE_IMPORT_DESCRIPTOR) == 0x14, "IMAGE_IMPORT_DESCRIPTOR");
 
 typedef struct _IMAGE_EXPORT_DIRECTORY
 {
@@ -162,6 +163,7 @@ typedef struct _IMAGE_EXPORT_DIRECTORY
   uint32_t AddressOfNames;
   uint32_t AddressOfNameOrdinals;
 } IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+static_assert(sizeof(IMAGE_EXPORT_DIRECTORY) == 0x28, "IMAGE_EXPORT_DIRECTORY");
 
 typedef struct _IMAGE_DEBUG_DIRECTORY {
   uint32_t Characteristics;

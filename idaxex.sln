@@ -10,35 +10,15 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
-		ida32 Debug|x64 = ida32 Debug|x64
-		ida32 Release|x64 = ida32 Release|x64
-		ida64 Debug|x64 = ida64 Debug|x64
-		ida64 Release|x64 = ida64 Release|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Debug|x64.ActiveCfg = ida64 Debug|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Debug|x64.Build.0 = ida64 Debug|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida32 Debug|x64.ActiveCfg = ida32 Debug|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida32 Debug|x64.Build.0 = ida32 Debug|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida32 Release|x64.ActiveCfg = ida32 Release|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida32 Release|x64.Build.0 = ida32 Release|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Debug|x64.ActiveCfg = ida64 Debug|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Debug|x64.Build.0 = ida64 Debug|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Release|x64.ActiveCfg = ida64 Release|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.ida64 Release|x64.Build.0 = ida64 Release|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Release|x64.ActiveCfg = ida64 Release|x64
-		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Release|x64.Build.0 = ida64 Release|x64
+		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Debug|x64.ActiveCfg = Debug|x64
+		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Debug|x64.Build.0 = Debug|x64
+		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Release|x64.ActiveCfg = Release|x64
+		{6104AB02-F465-4FBA-B66E-232EF0925C65}.Release|x64.Build.0 = Release|x64
 		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.Debug|x64.ActiveCfg = Debug|x64
 		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.Debug|x64.Build.0 = Debug|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida32 Debug|x64.ActiveCfg = Debug|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida32 Debug|x64.Build.0 = Debug|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida32 Release|x64.ActiveCfg = Release|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida32 Release|x64.Build.0 = Release|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida64 Debug|x64.ActiveCfg = Debug|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida64 Debug|x64.Build.0 = Debug|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida64 Release|x64.ActiveCfg = Release|x64
-		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.ida64 Release|x64.Build.0 = Release|x64
 		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.Release|x64.ActiveCfg = Release|x64
 		{67F256A0-C7FB-448F-9B8F-362AE793C5B4}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection

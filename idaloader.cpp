@@ -1,11 +1,8 @@
 // TODO:
 // - fix export loading so that a segment isn't required (read from linput_t instead of reading thru IDA?)
-// - improve speed of file load & analysis?
-// - add more checks to things
-// - find fix for XEX25/Crackdown alpha build (need to re-extract OS files for XEX25...)
+// - add validate_array_count checks
 // - test XEX2D / XEX3F
 // - fix XEX1 exports
-// - test!
 
 #include "../idaldr.h"
 #include "xex.hpp"
@@ -15,9 +12,6 @@
 #include <filesystem>
 
 netnode ignore_micro;
-
-#define FF_WORD     0x10000000 // why doesn't this get included from ida headers?
-#define FF_DWORD    0x20000000
 
 bool exclude_unneeded_sections = true;
 
@@ -241,13 +235,13 @@ void pe_add_sections(XEXFile& file)
     size_t num = 0;
     for (auto& kvp : funcs)
     {
-      if (!get_fchunk(kvp.first))
+      if (kvp.second.FunctionLength && !get_fchunk(kvp.first))
       {
         if (create_insn(kvp.first))
         {
           show_auto(kvp.first);
 
-          // Don't create function for savevmx/restvmx
+          // Don't create function for savevmx/restvmx, we handle it in label_regsaveloads
           auto fn_type = kvp.second.RuntimeFunctionType();
           if (fn_type != xex::RuntimeFunctionType::SaveMillicode && fn_type != xex::RuntimeFunctionType::RestoreMillicode)
           {
@@ -272,6 +266,7 @@ void pe_add_sections(XEXFile& file)
   }
 }
 
+// from ldr/pe/pe.h
 #define PE_NODE "$ PE header" // netnode name for PE header
 // value()        -> peheader_t
 // altval(segnum) -> s->start_ea
@@ -455,7 +450,7 @@ bool load_application(linput_t* li)
           thunk_name = imp_name;
 
         set_name(imp.second.ThunkAddr, thunk_name.c_str(), SN_FORCE);
-        create_data(imp.second.ThunkAddr, FF_WORD, 2 * 2, BADADDR);
+        create_word(imp.second.ThunkAddr, 2 * 2);
 
         if (lowest_addr == BADADDR || lowest_addr > imp.second.ThunkAddr)
           lowest_addr = imp.second.ThunkAddr;
