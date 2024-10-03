@@ -228,10 +228,10 @@ void pe_add_sections(XEXFile& file)
       offset += 8;
     }
 
-    msg("Parsing .pdata and creating %lld functions...\n", funcs.size());
+    msg("Parsing .pdata and creating %d functions...\n", int(funcs.size()));
 
     // display messagebox prompt to user so they can cancel if needed
-    show_wait_box("Marking functions from .pdata... (0/%lld)", funcs.size());
+    show_wait_box("Marking functions from .pdata... (0/%d)", int(funcs.size()));
 
     size_t num = 0;
     for (auto& kvp : funcs)
@@ -258,7 +258,7 @@ void pe_add_sections(XEXFile& file)
       // update every few funcs
       if (++num % 50 == 0)
       {
-        replace_wait_box("Marking functions from .pdata... (%lld/%lld)", num, funcs.size());
+        replace_wait_box("Marking functions from .pdata... (%d/%d)", int(num), int(funcs.size()));
       }
     }
 
