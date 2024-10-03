@@ -4,7 +4,7 @@
 #include "3rdparty/byte_order.hpp"
 
 namespace xex {
-  struct ModuleFlags {
+  struct XexModuleFlags {
     uint32_t TitleProcess               : 1; //= 0x00000001
     uint32_t TitleImports               : 1; //= 0x00000002
     uint32_t Debugger                   : 1; //= 0x00000004
@@ -17,11 +17,11 @@ namespace xex {
     uint32_t BoundPath                  : 1; //= 0x40000000
     uint32_t SilentLoad                 : 1; //= 0x80000000
   };
-  static_assert(sizeof(ModuleFlags) == 4, "xex::ModuleFlags");
+  static_assert(sizeof(XexModuleFlags) == 4, "xex::XexModuleFlags");
 
   struct XexHeader {
     xe::be<uint32_t> Magic; // 0x0 sz:0x4
-    ModuleFlags ModuleFlags; // 0x4 sz:0x4
+    XexModuleFlags ModuleFlags; // 0x4 sz:0x4
     xe::be<uint32_t> SizeOfHeaders; // 0x8 sz:0x4
     xe::be<uint32_t> SizeOfDiscardableHeaders; // 0xC sz:0x4
     xe::be<uint32_t> SecurityInfo; // 0x10 sz:0x4

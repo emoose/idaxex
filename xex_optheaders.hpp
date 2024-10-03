@@ -48,10 +48,12 @@ namespace xex_opt {
     xex::Version BaseVersion; // 0x8 sz:0x4
     union {
       xe::be<uint32_t> TitleID; // 0xC sz:0x4
+#ifdef _MSC_VER // clang doesn't like these being in union...
       struct {
         xe::be<uint16_t> PublisherID; // 0xC sz:0x2
         xe::be<uint16_t> GameID; // 0xE sz:0x2
       };
+#endif
     };
     uint8_t Platform; // 0x10 sz:0x1
     uint8_t ExecutableType; // 0x11 sz:0x1
@@ -69,10 +71,12 @@ namespace xex_opt {
       xex::Version Version;
       union {
         xe::be<uint32_t> TitleID;
+#ifdef _MSC_VER
         struct {
           xe::be<uint16_t> PublisherID;
           xe::be<uint16_t> GameID;
         };
+#endif
       };
       xe::be<uint32_t> Platform;
       xe::be<uint32_t> ExecutableType;
@@ -90,10 +94,12 @@ namespace xex_opt {
       xex::Version Version;
       union {
         xe::be<uint32_t> TitleID;
+#ifdef _MSC_VER
         struct {
           xe::be<uint16_t> PublisherID;
           xe::be<uint16_t> GameID;
         };
+#endif
       };
       xe::be<uint16_t> UpdatedVersion;
       xe::be<uint16_t> Region;
@@ -112,10 +118,12 @@ namespace xex_opt {
       xex::Version Version;
       union {
         xe::be<uint32_t> TitleID;
+#ifdef _MSC_VER
         struct {
           xe::be<uint16_t> PublisherID;
           xe::be<uint16_t> GameID;
         };
+#endif
       };
       xe::be<uint16_t> UpdatedVersion;
       xe::be<uint16_t> Region;
@@ -133,10 +141,12 @@ namespace xex_opt {
       xex::Version Version;
       union {
         xe::be<uint32_t> TitleID;
+#ifdef _MSC_VER
         struct {
           xe::be<uint16_t> PublisherID;
           xe::be<uint16_t> GameID;
         };
+#endif
       };
       xe::be<uint16_t> UpdatedVersion;
       xe::be<uint16_t> Region;

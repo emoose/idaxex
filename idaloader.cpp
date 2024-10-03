@@ -13,6 +13,7 @@
 #include <bytes.hpp>
 
 #include <filesystem>
+#include <list>
 
 #include "xex.hpp"
 #include "xex_headerids.hpp"
@@ -229,14 +230,8 @@ void pe_add_sections(XEXFile& file)
 
     msg("Parsing .pdata and creating %lld functions...\n", funcs.size());
 
-    // display messagebox prompt to user, since pdata labelling can take a little while
-    // ida printf formatter tends to crash, too bad, use sprintf to rewrite just the number portion
-    char msg_text[256] = "Marking functions from .pdata... (";
-    int num_pos = strlen(msg_text);
-    char* msg_text_write = &msg_text[num_pos];
-    sprintf_s(msg_text_write, 256 - num_pos, "0/%lld)", funcs.size());
-
-    show_wait_box(msg_text);
+    // display messagebox prompt to user so they can cancel if needed
+    show_wait_box("Marking functions from .pdata... (0/%lld)", funcs.size());
 
     size_t num = 0;
     for (auto& kvp : funcs)
@@ -263,8 +258,7 @@ void pe_add_sections(XEXFile& file)
       // update every few funcs
       if (++num % 50 == 0)
       {
-        sprintf_s(msg_text_write, 256 - num_pos, "%lld/%lld)", num, funcs.size());
-        replace_wait_box(msg_text);
+        replace_wait_box("Marking functions from .pdata... (%lld/%lld)", num, funcs.size());
       }
     }
 
@@ -308,10 +302,16 @@ void pe_setup_netnode(XEXFile& file)
   if (cv_data)
   {
     // Set PDB filename to whatever cv_data[0] says
-    // (only use filename instead of full path, else it may fail to load it)
-    char* pdb_path_ptr = (char*)(cv_data + sizeof(CV_INFO_PDB70));
-    std::filesystem::path pdb_path = pdb_path_ptr;
-    penode.supset(PE_SUPSTR_PDBNM, pdb_path.filename().string().c_str());
+    const char* pdb_path = (const char*)(cv_data + sizeof(CV_INFO_PDB70));
+
+    // Try using filename instead of full path, else it may fail to load in
+    const char* pdb_name = strrchr(pdb_path, '\\');
+    if (pdb_name)
+      pdb_name++; // get name past the backslash
+    else
+      pdb_name = pdb_path;
+
+    penode.supset(PE_SUPSTR_PDBNM, pdb_name);
 
     // Copy cv_data into RSDS tag
     penode.setblob(cv_data, cv_length, 0, RSDS_TAG);
@@ -375,7 +375,7 @@ bool load_application(linput_t* li)
     }
 
     for (size_t i = 0; i < tls_callbacks.size(); i++)
-      set_name(tls_callbacks[i], qstring().sprnt("TlsCallback_%d", i).c_str());
+      set_name(tls_callbacks[i], qstring().sprnt("TlsCallback_%d", int(i)).c_str());
   }
 
   auto vital_stats = file.vital_stats();
@@ -389,7 +389,7 @@ bool load_application(linput_t* li)
       add_pgm_cmt("XEX timestamp: %s", timestamp_string);
     }
 
-    add_pgm_cmt("XEX checksum: %x", vital_stats->Checksum);
+    add_pgm_cmt("XEX checksum: %x", (uint32_t)vital_stats->Checksum);
   }
 
   auto exports_libname = file.exports_libname();

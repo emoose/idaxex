@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstdint>
+#include <cstring>
 
 #include "3rdparty/mspack/lzx.h"
 #include "3rdparty/mspack/mspack.h"

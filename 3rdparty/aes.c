@@ -38,8 +38,11 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 #include <stdint.h>
 #include <string.h> // CBC mode, for memset
 #include <wmmintrin.h>  //for intrinsics for AES-NI
-#include <intrin.h> // cpuid
 #include "aes.h"
+
+#ifdef _MSC_VER
+#include <intrin.h> // cpuid
+#endif
 
 /*****************************************************************************/
 /* Defines:                                                                  */
@@ -234,6 +237,8 @@ static void InvCipher_AESNI(state_t* state, const uint8_t* RoundKey);
 AESCipher_fn var_CipherFn = Cipher;
 AESCipher_fn var_InvCipherFn = InvCipher;
 
+#ifdef _MSC_VER
+
 static int supports_aesni = 0;
 int cpu_aesni_support()
 {
@@ -286,20 +291,25 @@ void aesni128_load_key(uint8_t* RoundKey, const int8_t *enc_key) {
   key_schedule[18] = _mm_aesimc_si128(key_schedule[2]);
   key_schedule[19] = _mm_aesimc_si128(key_schedule[1]);
 }
+#endif
 
 void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key)
 {
+#ifdef _MSC_VER
   if(cpu_aesni_support())
     aesni128_load_key(ctx->RoundKey, key);
   else
+#endif
     KeyExpansion(ctx->RoundKey, key);
 }
 #if (defined(CBC) && (CBC == 1)) || (defined(CTR) && (CTR == 1))
 void AES_init_ctx_iv(struct AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
 {
+#ifdef _MSC_VER
   if (cpu_aesni_support())
     aesni128_load_key(ctx->RoundKey, key);
   else
+#endif
     KeyExpansion(ctx->RoundKey, key);
   memcpy(ctx->Iv, iv, AES_BLOCKLEN);
 }
@@ -478,6 +488,7 @@ static void InvShiftRows(state_t* state)
 }
 #endif // #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
+#ifdef _MSC_VER
 #define DO_ENC_BLOCK(m,k) \
   do{\
     m = _mm_xor_si128       (m, k[ 0]); \
@@ -502,6 +513,7 @@ static void Cipher_AESNI(state_t* state, const uint8_t* RoundKey)
 
   _mm_storeu_si128((__m128i *) state, m);
 }
+#endif
 
 // Cipher is the main function that encrypts the PlainText.
 static void Cipher(state_t* state, const uint8_t* RoundKey)
@@ -531,6 +543,7 @@ static void Cipher(state_t* state, const uint8_t* RoundKey)
 
 #if (defined(CBC) && CBC == 1) || (defined(ECB) && ECB == 1)
 
+#ifdef _MSC_VER
 #define DO_DEC_BLOCK(m,k) \
   do{\
     m = _mm_xor_si128       (m, k[10+0]); \
@@ -555,6 +568,7 @@ static void InvCipher_AESNI(state_t* state, const uint8_t* RoundKey)
 
   _mm_storeu_si128((__m128i *) state, m);
 }
+#endif
 
 static void InvCipher(state_t* state, const uint8_t* RoundKey)
 {

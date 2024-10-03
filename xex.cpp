@@ -21,6 +21,14 @@
 #include <excrypt.h>
 #endif
 
+#ifndef _MSC_VER
+#define _byteswap_ulong __builtin_bswap32
+inline int16_t _byteswap_ushort(int16_t val)
+{
+  return (val << 8) | ((val >> 8) & 0xFF);
+}
+#endif
+
 int lzx_decompress(const void* lzx_data, size_t lzx_len, void* dest,
     size_t dest_len, uint32_t window_size, void* window_data,
     size_t window_data_len); // lzx.cpp
@@ -698,7 +706,7 @@ bool XEXFile::read_secinfo(void* file)
     {MAGIC_XEX25, offsetof(xex25::SecurityInfo, n)}, \
   }; \
   seek(file, xex_header_.SecurityInfo + offsets[magic], 0); \
-  read(&security_info_.##n, sz, 1, file);
+  read(&security_info_.n, sz, 1, file);
     READ_FIELD(ImageInfo.Signature, 0x100);
     READ_FIELD(ImageInfo.ImageFlags, sizeof(uint32_t));
     READ_FIELD(ImageInfo.LoadAddress, sizeof(uint32_t));
