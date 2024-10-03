@@ -23,68 +23,56 @@ bool exclude_unneeded_sections = true;
 
 std::string DoNameGen(const std::string& libName, int id, int version); // namegen.cpp
 
+struct saverest_pattern
+{
+  const char* name;
+  const std::vector<uint8_t> pattern;
+  bool is_prolog;
+  int start_reg;
+  int end_reg;
+  int fn_size;
+  int final_size;
+};
+
+std::list<saverest_pattern> patterns =
+{
+  { "__savegprlr_%d", {0xF9, 0xC1, 0xFF, 0x68, 0xF9, 0xE1, 0xFF, 0x70}, true, 14, 32, 4, 12 },
+  { "__restgprlr_%d", {0xE9, 0xC1, 0xFF, 0x68, 0xE9, 0xE1, 0xFF, 0x70}, false, 14, 32, 4, 16 },
+
+  { "__savefpr_%d", {0xD9, 0xCC, 0xFF, 0x70, 0xD9, 0xEC, 0xFF, 0x78}, true, 14, 32, 4, 8 },
+  { "__restfpr_%d", {0xC9, 0xCC, 0xFF, 0x70, 0xC9, 0xEC, 0xFF, 0x78}, false, 14, 32, 4, 8 },
+
+  { "__savevmx_%d", {0x39, 0x60, 0xFE, 0xE0, 0x7D, 0xCB, 0x61, 0xCE}, true, 14, 32, 8, 12 },
+  { "__restvmx_%d", {0x39, 0x60, 0xFE, 0xE0, 0x7D, 0xCB, 0x60, 0xCE}, false, 14, 32, 8, 12 },
+
+  // vmx128, same name as above
+  { "__savevmx_%d", {0x39, 0x60, 0xFC, 0x00, 0x10, 0x0B, 0x61, 0xCB}, true, 64, 128, 8, 12 },
+  { "__restvmx_%d", {0x39, 0x60, 0xFC, 0x00, 0x10, 0x0B, 0x60, 0xCB}, false, 64, 128, 8, 12 },
+};
+
 void label_regsaveloads(ea_t start, ea_t end)
 {
-  // "std %r14, -0x98(%sp)" followed by "std %r15, -0x90(%sp)"
-  uint8 save_pattern[] = {
-    0xF9, 0xC1, 0xFF, 0x68, 0xF9, 0xE1, 0xFF, 0x70
-  };
-  // "ld %r14, -0x98(%sp)" followed by "ld %r15, -0x90(%sp)"
-  uint8 load_pattern[] = {
-    0xE9, 0xC1, 0xFF, 0x68, 0xE9, 0xE1, 0xFF, 0x70
-  };
-  // "stfd %f14, -0x90(%r12)" followed by "stfd %f15, -0x88(%r12)"
-  uint8 savef_pattern[] = {
-    0xD9, 0xCC, 0xFF, 0x70, 0xD9, 0xEC, 0xFF, 0x78
-  };
-  // "lfd %f14, -0x90(%r12)" followed by "lfd %f15, -0x88(%r12)"
-  uint8 loadf_pattern[] = {
-    0xC9, 0xCC, 0xFF, 0x70, 0xC9, 0xEC, 0xFF, 0x78
-  };
-
-
-  uint8* patterns[] = {
-    save_pattern,
-    load_pattern,
-    savef_pattern,
-    loadf_pattern
-  };
-  const char* pattern_labels[] = {
-    "__savegprlr_%d",
-    "__restgprlr_%d",
-    "__savefpr_%d",
-    "__restfpr_%d"
-  };
-
-  init_ignore_micro();
-
-  for (int pat_idx = 0; pat_idx < 4; pat_idx++)
+  for (auto& pattern : patterns)
   {
     ea_t addr = start;
 
     while (addr != BADADDR)
     {
-      addr = bin_search(addr, end, patterns[pat_idx], NULL, 8, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
+      addr = bin_search(addr, end, pattern.pattern.data(), NULL, 8, BIN_SEARCH_CASE | BIN_SEARCH_FORWARD);
       if (addr == BADADDR)
         break;
 
-      for (int i = 14; i < 32; i++)
+      for (int i = pattern.start_reg; i < pattern.end_reg; i++)
       {
-        int size = 4;
-
-        // final one is 0xC bytes when saving, 0x10 when loading
-        // (final fpr pattern is 0x8 when saving/loading)
-        if (i == 31)
-        {
-            size = (pat_idx == 0) ? 0xC : 0x10;
-            if (pat_idx > 1) size = 8;
-        }
+        int size = pattern.fn_size;
+        if (i + 1 == pattern.end_reg)
+          size = pattern.final_size;
 
         // reset addr
         del_items(addr, 0, 8);
         create_insn(addr);
 
-        set_name(addr, qstring().sprnt(pattern_labels[pat_idx], i).c_str(), SN_FORCE);
+        set_name(addr, qstring().sprnt(pattern.name, i).c_str(), SN_FORCE);
 
         func_t fn(addr, addr + size);
         fn.flags |= FUNC_OUTLINE | FUNC_HIDDEN;
@@ -92,18 +80,14 @@ void label_regsaveloads(ea_t start, ea_t end)
 
         // Mark save/rest functions as prolog/epilog to hide them from decompiler
         int hide_size = size;
-        if (i == 31)
-            hide_size -= 4; // don't hide last blr
+        if (i + 1 == pattern.end_reg)
+          hide_size -= 4; // don't hide last blr
         for (int insn = 0; insn < hide_size; insn += 4)
         {
-            if (pat_idx == 0 || pat_idx == 2)
-            {
-                mark_prolog_insn(addr + insn);
-            }
-            else
-            {
-                mark_epilog_insn(addr + insn);
-            }
+          if (pattern.is_prolog)
+            mark_prolog_insn(addr + insn);
+          else
+            mark_epilog_insn(addr + insn);
         }
 
         addr += size;
@@ -114,6 +98,8 @@ void label_regsaveloads(ea_t start, ea_t end)
 
 void pe_add_sections(XEXFile& file)
 {
+  init_ignore_micro();
+
   for (const auto& section : file.sections())
   {
     // New buffer for section name so we can null-terminate it
@@ -206,8 +192,19 @@ void pe_add_sections(XEXFile& file)
     if (sec_addr + sec_size > file.image_size())
       sec_size = file.image_size() - sec_addr;
 
-    // Store function addrs from .pdata inside a std::vector, so we can iterate over them in reverse
-    std::vector<uint32_t> funcs;
+    struct RUNTIME_FUNCTION_INFO // bitfield portion of RUNTIME_FUNCTION
+    {
+      uint32_t PrologLength : 8;
+      uint32_t FunctionLength : 22;
+      uint32_t FunctionType : 2;
+
+      inline xex::RuntimeFunctionType RuntimeFunctionType() {
+        return (xex::RuntimeFunctionType)FunctionType;
+      }
+    };
+
+    // Read function addrs from .pdata into vector so we can get a count before asking IDA to create functions for them
+    std::unordered_map<uint32_t, RUNTIME_FUNCTION_INFO> funcs;
     int offset = 0;
     while (offset < sec_size)
     {
@@ -215,12 +212,17 @@ void pe_add_sections(XEXFile& file)
       create_data(seg_addr + offset + 4, dword_flag(), 4, BADNODE);
 
       auto* fn_ptr = reinterpret_cast<const xe::be<uint32_t>*>(file.pe_data() + sec_addr + offset);
-      ea_t fn = *fn_ptr;
+      uint32_t fn_ea = fn_ptr[0];
 
-      funcs.push_back(fn);
+      if (fn_ea)
+      {
+        uint32_t fn_info_raw = fn_ptr[1]; // endian-swap the field for us
+        RUNTIME_FUNCTION_INFO fn_info = *(RUNTIME_FUNCTION_INFO*)&fn_info_raw; // and then convert to RUNTIME_FUNCTION_INFO
+        funcs.insert({ fn_ea, fn_info });
 
-      // Delete useless .pdata -> fn xref
-      del_dref(seg_addr + offset, fn);
+        // Delete useless .pdata -> fn xref
+        del_dref(seg_addr + offset, fn_ea);
+      }
 
       offset += 8;
     }
@@ -236,12 +238,25 @@ void pe_add_sections(XEXFile& file)
 
     show_wait_box(msg_text);
 
-    // Iterate over functions in reverse, so hopefully they'll be marked with correct lengths
     size_t num = 0;
-    for (std::vector<uint32_t>::reverse_iterator i = funcs.rbegin(); i != funcs.rend(); ++i)
+    for (auto& kvp : funcs)
     {
-      create_insn(*i);
-      add_func(*i);
+      if (!get_fchunk(kvp.first))
+      {
+        if (create_insn(kvp.first))
+        {
+          show_auto(kvp.first);
+
+          // Don't create function for savevmx/restvmx
+          auto fn_type = kvp.second.RuntimeFunctionType();
+          if (fn_type != xex::RuntimeFunctionType::SaveMillicode && fn_type != xex::RuntimeFunctionType::RestoreMillicode)
+          {
+            func_t fn(kvp.first, kvp.first + (kvp.second.FunctionLength * 4));
+            add_func_ex(&fn);
+          }
+        }
+      }
+
       if (user_cancelled())
         break;
 

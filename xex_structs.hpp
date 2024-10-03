@@ -147,6 +147,15 @@ namespace xex {
     uint8_t DataDigest[0x14]; // Digest of the next page + next page descriptor
   };
   static_assert(sizeof(HvPageInfo) == 0x18, "xex:HvPageInfo");
+
+  // FunctionType inside RUNTIME_FUNCTION
+  enum class RuntimeFunctionType
+  {
+    SaveMillicode = 0x0,
+    NoHandler = 0x1,
+    RestoreMillicode = 0x2,
+    Handler = 0x3,
+  };
 };
 
 namespace xex2 {
