@@ -10,6 +10,7 @@
 #include "xex_headerids.hpp"
 #include "xex_keys.hpp"
 
+#include <cstring>
 #include <cstdio>
 #include <memory>
 #include <cstdlib>
@@ -19,14 +20,6 @@
 
 #ifndef IDALDR
 #include <excrypt.h>
-#endif
-
-#ifndef _MSC_VER
-#define _byteswap_ulong __builtin_bswap32
-inline int16_t _byteswap_ushort(int16_t val)
-{
-  return (val << 8) | ((val >> 8) & 0xFF);
-}
 #endif
 
 int lzx_decompress(const void* lzx_data, size_t lzx_len, void* dest,

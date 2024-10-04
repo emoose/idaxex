@@ -16,6 +16,20 @@
 extern const char* key_names[4];
 extern bool xex_log_verbose;
 
+#ifndef _MSC_VER
+inline int fopen_s(FILE** pFile, const char* filename, const char* mode)
+{
+  if (pFile == nullptr)
+    return EINVAL;
+
+  *pFile = fopen(filename, mode);
+  if (*pFile == nullptr)
+    return errno;
+
+  return 0;
+}
+#endif
+
 std::string time2str(uint32_t time)
 {
   date::sys_seconds tp{ std::chrono::seconds{time} };
@@ -26,9 +40,9 @@ std::string titleid2str(uint32_t tid, bool id_only = false)
 {
   char str[64];
   if (id_only || (((tid >> 24) & 0xFF) - 0x21 > 0x59) || (((tid >> 16) & 0xFF) - 0x21 > 0x59))
-    sprintf_s(str, "%08X", tid);
+    snprintf(str, sizeof(str), "%08X", tid);
   else
-    sprintf_s(str, "%08X (%c%c-%d)", tid, ((tid >> 24) & 0xFF), ((tid >> 16) & 0xFF), (tid & 0xFFFF));
+    snprintf(str, sizeof(str), "%08X (%c%c-%d)", tid, ((tid >> 24) & 0xFF), ((tid >> 16) & 0xFF), (tid & 0xFFFF));
 
   return str;
 }
@@ -778,7 +792,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
       auto& lib = libs->Libraries[i];
 
       char details[256];
-      sprintf_s(details, "%3d) %-14.8s v%d.%d.%d.%d", i, lib.LibraryName, (uint16_t)lib.Version.Major, (uint16_t)lib.Version.Minor, (uint16_t)lib.Version.Build, (uint16_t)lib.Version.QFE);
+      snprintf(details, sizeof(details), "%3d) %-14.8s v%d.%d.%d.%d", i, lib.LibraryName, (uint16_t)lib.Version.Major, (uint16_t)lib.Version.Minor, (uint16_t)lib.Version.Build, (uint16_t)lib.Version.QFE);
     
       printf("  %-32s  (", details);
 
@@ -809,7 +823,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     int i = 0;
     for (auto kvp : import_tables) {
       char details[256];
-      sprintf_s(details, "%3d) %-14s v%d.%d.%d.%d", i, kvp.first.c_str(), kvp.second.Version.Major, kvp.second.Version.Minor, kvp.second.Version.Build, kvp.second.Version.QFE);
+      snprintf(details, sizeof(details), "%3d) %-14s v%d.%d.%d.%d", i, kvp.first.c_str(), kvp.second.Version.Major, kvp.second.Version.Minor, kvp.second.Version.Build, kvp.second.Version.QFE);
 
       printf("  %-32s  (min v%d.%d.%d.%d, %d imports)\n", details, 
         kvp.second.VersionMin.Major, kvp.second.VersionMin.Minor, kvp.second.VersionMin.Build, kvp.second.VersionMin.QFE, (uint32_t)(imports.at(kvp.first).size()));

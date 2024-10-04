@@ -8,6 +8,14 @@
 #include "xex_optheaders.hpp"
 #include "pe_structs.hpp"
 
+#ifndef _MSC_VER
+#define _byteswap_ulong __builtin_bswap32
+inline int16_t _byteswap_ushort(int16_t val)
+{
+  return (val << 8) | ((val >> 8) & 0xFF);
+}
+#endif
+
 // XEX header magic values
 #define MAGIC_XEX0 0x58455830  // 'XEX0'
 #define MAGIC_XEX3F 0x5845583F // 'XEX?'
@@ -129,7 +137,11 @@ class XEXFile
 public:
   XEXFile() { 
 #ifndef IDALDR
+#ifdef _MSC_VER
     read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64; dbgmsg = stdio_msg;
+#else
+    read = (read_fn)fread; seek = (seek_fn)fseeko64; tell = (tell_fn)ftello64; dbgmsg = stdio_msg;
+#endif
 #endif
   }
 

@@ -7,6 +7,7 @@
  ******************************************************************************
  */
 
+#include <cstring>
 #include "../xex.hpp"
 #include "xdbf.hpp"
 #include "xdbf_xbox.hpp"
