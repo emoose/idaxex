@@ -33,6 +33,8 @@ I recommend pairing this loader with the PPCAltivec plugin, an updated version f
 
 ## Building
 
+For xex1tool make sure to clone repo recursively for excrypt submodule to get pulled in.
+
 **Windows**
 
 Clone the repo into your idasdk\ldr\ folder and then build idaxex.sln with VS2022.
@@ -44,6 +46,7 @@ Clone the repo into your idasdk\ldr\ folder and then build idaxex.sln with VS202
 - Clone idaxex repo
 - Run `cmake . -DEA64=YES` inside idaxex folder
 - Run `make`
+- To build xex1tool run cmake/make inside the xex1tool folder
 
 On newest IDA you may need to edit ida-cmake common.cmake and change `libida64.so` to `libida.so` for build to link properly.
 
