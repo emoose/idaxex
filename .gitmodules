@@ -1,0 +1,3 @@
+[submodule "3rdparty/excrypt"]
+	path = 3rdparty/excrypt
+	url = https://github.com/emoose/ExCrypt.git
