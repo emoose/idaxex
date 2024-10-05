@@ -24,9 +24,6 @@
     <ClCompile Include="3rdparty\aes.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\sha1.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="xdbf\xdbf.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -60,10 +57,10 @@
     <ClCompile Include="3rdparty\excrypt\src\excrypt_rc4.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_rotsum.c">
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_mem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_mem.cpp">
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_rotsum.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

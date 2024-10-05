@@ -307,11 +307,9 @@ void pe_setup_netnode(XEXFile& file)
     // Try using filename instead of full path, else it may fail to load in
     const char* pdb_name = strrchr(pdb_path, '\\');
     if (pdb_name)
-      pdb_name++; // get name past the backslash
-    else
-      pdb_name = pdb_path;
+      pdb_path = pdb_name + 1; // get name past the backslash
 
-    penode.supset(PE_SUPSTR_PDBNM, pdb_name);
+    penode.supset(PE_SUPSTR_PDBNM, pdb_path);
 
     // Copy cv_data into RSDS tag
     penode.setblob(cv_data, cv_length, 0, RSDS_TAG);

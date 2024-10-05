@@ -16,11 +16,7 @@
 #include <cstdlib>
 
 #include "3rdparty/aes.hpp"
-#include "3rdparty/sha1.hpp"
-
-#ifndef IDALDR
 #include <excrypt.h>
-#endif
 
 int lzx_decompress(const void* lzx_data, size_t lzx_len, void* dest,
     size_t dest_len, uint32_t window_size, void* window_data,
@@ -860,7 +856,6 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
   int retcode = 0;
 
   // Start decompressing
-  SHA1Context sha_state;
   seek(file, xex_header_.SizeOfHeaders, 0);
   xex_opt::XexDataDescriptor next_block;
   uint8_t* block_data = 0;
@@ -874,9 +869,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
 
     // Check hash of the block - don't want to attempt decompressing invalid data!
     uint8_t sha_hash[0x14];
-    SHA1Reset(&sha_state);
-    SHA1Input(&sha_state, block_data, cur_block->Size);
-    SHA1Result(&sha_state, sha_hash);
+    ExCryptSha(block_data, cur_block->Size, nullptr, 0, nullptr, 0, sha_hash, sizeof(sha_hash));
 
     if (memcmp(sha_hash, cur_block->DataDigest, 0x14) != 0)
     {

@@ -27,9 +27,6 @@
     <ClCompile Include="3rdparty\aes.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\sha1.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="3rdparty\mspack\lzxd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -37,6 +34,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="lzx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
