@@ -5,12 +5,17 @@
 // - fix XEX1 exports
 
 #include <ida.hpp>
+#include <idp.hpp>
 #include <loader.hpp>
 #include <auto.hpp>
 #include <diskio.hpp>
 #include <entry.hpp>
 #include <typeinf.hpp>
 #include <bytes.hpp>
+
+struct exehdr {}; // needed for pe.h
+#include <pe.h>
+#include <common.h>
 
 #include <filesystem>
 #include <list>
@@ -168,36 +173,70 @@ void pe_add_sections(XEXFile& file)
   }
 }
 
-// from ldr/pe/pe.h
-#define PE_NODE "$ PE header" // netnode name for PE header
-// value()        -> peheader_t
-// altval(segnum) -> s->start_ea
-#define PE_ALT_DBG_FPOS   nodeidx_t(-1)  // altval() -> translated fpos of debuginfo
-#define PE_ALT_IMAGEBASE  nodeidx_t(-2)  // altval() -> loading address (usually pe.imagebase)
-#define PE_ALT_PEHDR_OFF  nodeidx_t(-3)  // altval() -> offset of PE header
-#define PE_ALT_NEFLAGS    nodeidx_t(-4)  // altval() -> neflags
-#define PE_ALT_TDS_LOADED nodeidx_t(-5)  // altval() -> tds already loaded(1) or invalid(-1)
-#define PE_ALT_PSXDLL     nodeidx_t(-6)  // altval() -> if POSIX(x86) imports from PSXDLL netnode
-#define PE_ALT_OVRVA      nodeidx_t(-7)  // altval() -> overlay rva (if present)
-#define PE_ALT_OVRSZ      nodeidx_t(-8)  // altval() -> overlay size (if present)
-#define PE_SUPSTR_PDBNM   nodeidx_t(-9)  // supstr() -> pdb file name
-                              // supval(segnum) -> pesection_t
-                              // blob(0, PE_NODE_RELOC)  -> relocation info
-                              // blob(0, RSDS_TAG)  -> rsds_t structure
-                              // blob(0, NB10_TAG)  -> cv_info_pdb20_t structure
-#define PE_ALT_NTAPI      nodeidx_t(-10) // altval() -> uses Native API
-#define PE_EMBED_PDB_OFF  nodeidx_t(-11) // altval() -> offset of embedded PDB file
-#define PE_NODE_RELOC 'r'
-#define RSDS_TAG 's'
-#define NB10_TAG 'n'
-#define UTDS_TAG 't'
+// marked virtual but not pure virtual, grr
+bool pe_loader_t::vseek(linput_t* li, uint32 rva)
+{
+  qlseek(li, rva, 0);
+  return true;
+}
 
 void pe_setup_netnode(XEXFile& file)
 {
   netnode penode;
   penode.create(PE_NODE);
 
+  const uint8_t* pe_data = file.pe_data();
+  IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)pe_data;
+
+  // Set PE header node data
+  // Make a copy of PE header and update with correct values first, since IDA/eh_parse reads some info from this
+  IMAGE_NT_HEADERS nt_header = *(IMAGE_NT_HEADERS*)(pe_data + dos_header->AddressOfNewExeHeader);
+  nt_header.OptionalHeader.ImageBase = file.base_address();
+
+  penode.set(&nt_header, sizeof(IMAGE_NT_HEADERS));
+
+  // Update imagebase
   penode.altset(PE_ALT_IMAGEBASE, file.base_address());
+
+  // Ask eh_parse to parse .pdata for us
+  // IDA itself seems to handle parsing .pdata if PE header is set above, but only at end of autoanalysis, which could take a while on large games
+  // Requesting eh_parse after we've loaded in should allow the funcs there to be marked earlier
+  {
+    auto* plugin = find_plugin("eh_parse", true);
+    if (plugin)
+    {
+      run_plugin(plugin, 0);
+
+      // TODO: Why isn't this included in IDASDK ;_; may cause breakage if eh_parse is ever updated!
+      struct eh_parse_t
+      {
+        virtual bool idaapi _0() = 0;
+        virtual bool idaapi _8() = 0;
+        virtual bool idaapi _10() = 0;
+        virtual bool idaapi _18() = 0;
+        virtual bool idaapi _20() = 0;
+        virtual bool idaapi read_pdata_28(pe_loader_t* a2, linput_t* a3, char a4) = 0;
+
+        uint64_t unk_8;
+        uint64_t unk_10;
+        uint64_t unk_18;
+        uint64_t imagebase_20;
+      };
+
+      eh_parse_t* eh_parse = (eh_parse_t*)processor_t::notify(processor_t::event_t::ev_broadcast, 0x45485F5041525345, 0);
+      if (eh_parse)
+      {
+        eh_parse->imagebase_20 = file.base_address();
+
+        pe_loader_t pe;
+        pe.set_imagebase(file.base_address());
+
+        linput_t* memory = create_memory_linput(file.base_address(), file.image_size());
+        eh_parse->read_pdata_28(&pe, memory, 0);
+        close_linput(memory);
+      }
+    }
+  }
 
   size_t cv_length = 0;
   auto* cv_data = file.codeview_data(0, &cv_length);
@@ -218,7 +257,7 @@ void pe_setup_netnode(XEXFile& file)
 
     // Prompt for PDB load
     msg("Prompting for PDB load...\n(full X360 type loading may require pdb.cfg PDB_PROVIDER = PDB_PROVIDER_MSDIA !)\n");
-    auto* plugin = find_plugin("pdb", 1LL);
+    auto* plugin = find_plugin("pdb", true);
     run_plugin(plugin, 1LL);
   }
 }
