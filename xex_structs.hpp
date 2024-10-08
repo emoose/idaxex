@@ -195,14 +195,14 @@ namespace xex1 {
     uint8_t MediaID[0x10];
     xe::be<xex::GameRegion> GameRegion;
     xex::ImageFlags ImageFlags;
-    xe::be<uint32_t> ExportTableAddress;
   };
-  static_assert(sizeof(HvImageInfo) == 0x158, "xex1::HvImageInfo");
+  static_assert(sizeof(HvImageInfo) == 0x154, "xex1::HvImageInfo");
 
   struct SecurityInfo {
     xe::be<uint32_t> Size;
     xe::be<uint32_t> ImageSize;
     HvImageInfo ImageInfo;
+    xe::be<uint32_t> RootImportAddress; // points to "HVI" import table (xex_opt::xex1::HvImageRootImport)
     xex::AllowedMediaTypes AllowedMediaTypes;
     xe::be<uint32_t> PageDescriptorCount;
   };

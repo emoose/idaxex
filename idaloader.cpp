@@ -230,6 +230,7 @@ void pe_setup_netnode(XEXFile& file)
 
         pe_loader_t pe;
         pe.set_imagebase(file.base_address());
+        memcpy(&pe.pe, &nt_header, sizeof(peheader_t));
 
         linput_t* memory = create_memory_linput(file.base_address(), file.image_size());
         eh_parse->read_pdata_28(&pe, memory, 0);

@@ -290,11 +290,12 @@ namespace xex_opt {
   };
   static_assert(sizeof(XexVitalStats) == 8, "xex_opt::XexVitalStats");
 
-#define XEX_EXPORT_MAGIC_0      0x48000000
-#define XEX_EXPORT_MAGIC_1      0x00485645
-#define XEX_EXPORT_MAGIC_2      0x48000000
+#define XEX_HV_MAGIC_0      0x48000000
+#define XEX_HV_MAGIC_HVE      0x00485645
+#define XEX_HV_MAGIC_HVI      0x00485649
+#define XEX_HV_MAGIC_2      0x48000000
 
-  struct HvImageExportTable {
+  struct HvImageExportTable { // XEX_HV_MAGIC_HVE magic
     xe::be<uint32_t> Magic[3];
     xe::be<uint32_t> ModuleNumber[2];
     xe::be<uint32_t> Version[3];
@@ -303,6 +304,16 @@ namespace xex_opt {
     xe::be<uint32_t> Base;
   };
   static_assert(sizeof(HvImageExportTable) == 0x2C, "xex_opt::HvImageExportTable");
+
+  namespace xex1 {
+    struct HvImageRootImport { // XEX_HV_MAGIC_HVI magic, only used in XEX1, offset from ImageInfo.RootImportAddress
+      xe::be<uint32_t> Magic[3];
+      xe::be<uint32_t> ImageBaseAddress;
+      xe::be<uint32_t> ImportTableCount;
+      uint32_t FirstImportDigest[7]; // contains 0x14 byte hash + 2 uint32s?
+    };
+    static_assert(sizeof(HvImageRootImport) == 0x30, "xex_opt::xex1::HvImageRootImport");
+  }
 
   struct XexServiceIdList {
     xe::be<uint32_t> Size;

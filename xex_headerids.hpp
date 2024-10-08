@@ -34,6 +34,7 @@
 #define XEX_HEADER_IMPORTS_BETA           XEX_HEADER_SIZEDSTRUCT (0x0102) // XEX25
 #define XEX_HEADER_IMPORTS                XEX_HEADER_SIZEDSTRUCT (0x0103)
 #define XEX_HEADER_STACK_SIZE_BETA        XEX_HEADER_FLAG        (0x0104) // XEX25
+#define XEX_HEADER_EXPORTS_XEX1           XEX_HEADER_FLAG        (0x0104) // XEX1
 #define XEX_HEADER_TLS_DATA_BETA          XEX_HEADER_STRUCT      (0x0105, xex_opt::XexTlsData) // XEX25
 
 #define XEX_HEADER_VITAL_STATS            XEX_HEADER_STRUCT      (0x0180, xex_opt::XexVitalStats)

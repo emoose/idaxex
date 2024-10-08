@@ -499,19 +499,23 @@ bool XEXFile::read_imports(void* file)
 // Reads function info defined inside XEX export table
 bool XEXFile::read_exports(void* file)
 {
-  if (!security_info_.ImageInfo.ExportTableAddress)
+  uint32_t exports_va = security_info_.ImageInfo.ExportTableAddress;
+  if (xex_header_.Magic == MAGIC_XEX1 && directory_entries_.count(XEX_HEADER_EXPORTS_XEX1))
+    exports_va = directory_entries_[XEX_HEADER_EXPORTS_XEX1];
+
+  if (!exports_va)
     return false;
 
-  auto export_table_offset = pe_rva_to_offset(security_info_.ImageInfo.ExportTableAddress);
+  auto export_table_offset = pe_rva_to_offset(exports_va);
 
   xex_opt::HvImageExportTable export_table;
   std::copy_n(
     reinterpret_cast<const xex_opt::HvImageExportTable*>(pe_data() + export_table_offset), 1, 
     &export_table);
 
-  if (export_table.Magic[0] != XEX_EXPORT_MAGIC_0 ||
-    export_table.Magic[1] != XEX_EXPORT_MAGIC_1 ||
-    export_table.Magic[2] != XEX_EXPORT_MAGIC_2)
+  if (export_table.Magic[0] != XEX_HV_MAGIC_0 ||
+    export_table.Magic[1] != XEX_HV_MAGIC_HVE ||
+    export_table.Magic[2] != XEX_HV_MAGIC_2)
   {
     dbgmsg("[+] Export table magic is invalid! (0x%X 0x%X 0x%X)\n", export_table.Magic[0], export_table.Magic[1], export_table.Magic[2]);
     return false;
@@ -523,7 +527,7 @@ bool XEXFile::read_exports(void* file)
   get_root_filename(module_name, 256);
 #endif
 
-  auto ordinal_addrs_va = security_info_.ImageInfo.ExportTableAddress + sizeof(xex_opt::HvImageExportTable);
+  auto ordinal_addrs_va = exports_va + sizeof(xex_opt::HvImageExportTable);
   auto ordinal_addrs_offset = export_table_offset + sizeof(xex_opt::HvImageExportTable);
   for (uint32_t i = 0; i < export_table.Count; i++)
   {
@@ -702,7 +706,6 @@ bool XEXFile::read_secinfo(void* file)
     READ_FIELD(ImageInfo.ImageHash, 0x14);
     READ_FIELD(ImageInfo.ImportDigest, 0x14);
     READ_FIELD(ImageInfo.ImageKey, 0x10);
-    READ_FIELD(ImageInfo.ExportTableAddress, sizeof(uint32_t));
 
     READ_FIELD(AllowedMediaTypes, sizeof(xex::AllowedMediaTypes));
     READ_FIELD(PageDescriptorCount, sizeof(uint32_t));
@@ -711,9 +714,16 @@ bool XEXFile::read_secinfo(void* file)
 #undef READ_FIELD
   }
 
-  // Read fields only shared between XEX1 & XEX2
-  if (magic == MAGIC_XEX1)
+  if (magic == MAGIC_XEX25)
   {
+    // Read fields shared between XEX2 and XEX25
+    auto offset_exportTable = offsetof(xex25::SecurityInfo, ImageInfo.ExportTableAddress);
+    seek(file, xex_header_.SecurityInfo + offset_exportTable, 0);
+    read(&security_info_.ImageInfo.ExportTableAddress, 1, sizeof(uint32_t), file);
+  }
+  else if (magic == MAGIC_XEX1)
+  {
+    // Read fields shared between XEX2 and XEX1
     auto offset_mediaId = offsetof(xex1::SecurityInfo, ImageInfo.MediaID);
     seek(file, xex_header_.SecurityInfo + offset_mediaId, 0);
     read(&security_info_.ImageInfo.MediaID, 0x10, 1, file);
