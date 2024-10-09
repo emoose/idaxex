@@ -173,6 +173,119 @@ void pe_add_sections(XEXFile& file)
   }
 }
 
+void pe_parse_pdata(XEXFile& file)
+{
+  // Hybrid pdata parser:
+  // - our code will first read from pdata and create functions based on it
+  // - then defer to eh_parse which will create .pdata dwords & set up exception handlers
+  // From testing this results in more functions getting created, and allows autoanalysis to parse functions much earlier
+
+  bool has_pdata = false;
+
+  // Try reading & marking functions from .pdata section
+  for (const auto& section : file.sections())
+  {
+    // New buffer for section name so we can null-terminate it
+    char name[9];
+    std::copy_n(section.Name, 8, name);
+    name[8] = '\0';
+    if (strcmp(name, ".pdata"))
+      continue;
+
+    has_pdata = true;
+
+    uint32 sec_addr = section.VirtualAddress;
+    uint32 sec_size = section.VirtualSize;
+    if (file.header().Magic == MAGIC_XEX3F || file.header().Magic == MAGIC_XEX0)
+    {
+      sec_addr = section.PointerToRawData;
+      sec_size = section.SizeOfRawData; // TODO: verify this?
+    }
+    ea_t seg_addr = (ea_t)file.base_address() + (ea_t)section.VirtualAddress;
+    // Size could be beyond file bounds, if so fix the size to what we can fit
+    if (sec_addr + sec_size > file.image_size())
+      sec_size = file.image_size() - sec_addr;
+
+    struct RUNTIME_FUNCTION_INFO // bitfield portion of RUNTIME_FUNCTION
+    {
+      uint32_t PrologLength : 8;
+      uint32_t FunctionLength : 22;
+      uint32_t FunctionType : 2;
+      inline xex::RuntimeFunctionType RuntimeFunctionType() {
+        return (xex::RuntimeFunctionType)FunctionType;
+      }
+    };
+
+    // Read function addrs from .pdata into vector so we can get a count before asking IDA to create functions for them
+    std::unordered_map<uint32_t, RUNTIME_FUNCTION_INFO> funcs;
+    std::vector<uint32_t> func_addrs;
+    int offset = 0;
+    while (offset < sec_size)
+    {
+      auto* fn_ptr = reinterpret_cast<const xe::be<uint32_t>*>(file.pe_data() + sec_addr + offset);
+      uint32_t fn_ea = fn_ptr[0];
+      if (fn_ea)
+      {
+        uint32_t fn_info_raw = fn_ptr[1]; // endian-swap the field for us
+        RUNTIME_FUNCTION_INFO fn_info = *(RUNTIME_FUNCTION_INFO*)&fn_info_raw; // and then convert to RUNTIME_FUNCTION_INFO
+        funcs.insert({ fn_ea, fn_info });
+        func_addrs.push_back(fn_ea);
+      }
+      offset += 8;
+    }
+
+    // Sort addrs in descending order, reduce chances of funcs getting marked as function chunks
+    std::sort(func_addrs.rbegin(), func_addrs.rend());
+
+    msg("Parsing .pdata and creating %d functions...\n", int(funcs.size()));
+
+    // display messagebox prompt to user so they can cancel if needed
+    show_wait_box("Marking functions from .pdata... (0/%d)", int(funcs.size()));
+    size_t num = 0;
+    for (auto& addr : func_addrs)
+    {
+      auto& func_info = funcs[addr];
+      if (func_info.FunctionLength && !get_fchunk(addr))
+      {
+        if (create_insn(addr))
+        {
+          show_auto(addr);
+          // Don't create function for savevmx/restvmx, we handle it in label_regsaveloads
+          auto fn_type = func_info.RuntimeFunctionType();
+          if (fn_type != xex::RuntimeFunctionType::SaveMillicode && fn_type != xex::RuntimeFunctionType::RestoreMillicode)
+          {
+            func_t fn(addr, addr + (func_info.FunctionLength * 4));
+            add_func_ex(&fn);
+          }
+        }
+      }
+
+      if (user_cancelled())
+        break;
+      // update every few funcs
+      if (++num % 50 == 0)
+      {
+        replace_wait_box("Marking functions from .pdata... (%d/%d)", int(num), int(funcs.size()));
+      }
+    }
+
+    hide_wait_box();
+    break;
+  }
+
+  // Ask eh_parse to parse .pdata, for it to mark xrefs & EH
+  // Load it here early so user won't need to wait for autoanalysis to complete
+  if (has_pdata)
+  {
+    auto* plugin = find_plugin("eh_parse", true);
+    if (plugin)
+    {
+      msg("Reading exception directory (.pdata)...\n");
+      run_plugin(plugin, 0);
+    }
+  }
+}
+
 void pe_setup_netnode(XEXFile& file)
 {
   netnode penode;
@@ -191,27 +304,10 @@ void pe_setup_netnode(XEXFile& file)
   // Update imagebase
   penode.altset(PE_ALT_IMAGEBASE, file.base_address());
 
-  bool has_pdata = false;
-  for (const auto& section : file.sections())
-  {
-    if (!strncmp(section.Name, ".pdata", 6)) {
-      has_pdata = true;
-      break;
-    }
-  }
+  // Parse pdata if it exists
+  pe_parse_pdata(file);
 
-  // Ask eh_parse to parse .pdata for us
-  // Load it here early so user won't need to wait for autoanalysis to complete
-  if (has_pdata)
-  {
-    auto* plugin = find_plugin("eh_parse", true);
-    if (plugin)
-    {
-      msg("Reading exception directory (.pdata)...\n");
-      run_plugin(plugin, 0);
-    }
-  }
-
+  // Update IDA with any codeview data
   size_t cv_length = 0;
   auto* cv_data = file.codeview_data(0, &cv_length);
   if (cv_data)
