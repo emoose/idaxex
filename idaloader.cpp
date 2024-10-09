@@ -173,13 +173,6 @@ void pe_add_sections(XEXFile& file)
   }
 }
 
-// marked virtual but not pure virtual, grr
-bool pe_loader_t::vseek(linput_t* li, uint32 rva)
-{
-  qlseek(li, rva, 0);
-  return true;
-}
-
 void pe_setup_netnode(XEXFile& file)
 {
   netnode penode;
@@ -198,44 +191,24 @@ void pe_setup_netnode(XEXFile& file)
   // Update imagebase
   penode.altset(PE_ALT_IMAGEBASE, file.base_address());
 
+  bool has_pdata = false;
+  for (const auto& section : file.sections())
+  {
+    if (!strncmp(section.Name, ".pdata", 6)) {
+      has_pdata = true;
+      break;
+    }
+  }
+
   // Ask eh_parse to parse .pdata for us
-  // IDA itself seems to handle parsing .pdata if PE header is set above, but only at end of autoanalysis, which could take a while on large games
-  // Requesting eh_parse after we've loaded in should allow the funcs there to be marked earlier
+  // Load it here early so user won't need to wait for autoanalysis to complete
+  if (has_pdata)
   {
     auto* plugin = find_plugin("eh_parse", true);
     if (plugin)
     {
+      msg("Reading exception directory (.pdata)...\n");
       run_plugin(plugin, 0);
-
-      // TODO: Why isn't this included in IDASDK ;_; may cause breakage if eh_parse is ever updated!
-      struct eh_parse_t
-      {
-        virtual bool idaapi _0() = 0;
-        virtual bool idaapi _8() = 0;
-        virtual bool idaapi _10() = 0;
-        virtual bool idaapi _18() = 0;
-        virtual bool idaapi _20() = 0;
-        virtual bool idaapi read_pdata_28(pe_loader_t* a2, linput_t* a3, char a4) = 0;
-
-        uint64_t unk_8;
-        uint64_t unk_10;
-        uint64_t unk_18;
-        uint64_t imagebase_20;
-      };
-
-      eh_parse_t* eh_parse = (eh_parse_t*)processor_t::notify(processor_t::event_t::ev_broadcast, 0x45485F5041525345, 0);
-      if (eh_parse)
-      {
-        eh_parse->imagebase_20 = file.base_address();
-
-        pe_loader_t pe;
-        pe.set_imagebase(file.base_address());
-        memcpy(&pe.pe, &nt_header, sizeof(peheader_t));
-
-        linput_t* memory = create_memory_linput(file.base_address(), file.image_size());
-        eh_parse->read_pdata_28(&pe, memory, 0);
-        close_linput(memory);
-      }
     }
   }
 

@@ -450,9 +450,12 @@ bool XEXFile::read_imports(void* file)
       return true;
 
     dbgmsg("[+] Naming callcap imports... (%X-%X)\n", uint32_t(callcap.BeginFunctionThunkAddress), uint32_t(callcap.EndFunctionThunkAddress));
-    for (uint32_t i = callcap.BeginFunctionThunkAddress; i < callcap.EndFunctionThunkAddress + 0x10; i += 0x10)
+    for (auto& addr : { callcap.BeginFunctionThunkAddress, callcap.EndFunctionThunkAddress })
     {
-      uint32_t import_offset = pe_rva_to_offset(i);
+      if (!addr)
+        continue;
+
+      uint32_t import_offset = pe_rva_to_offset(addr);
 
       uint32_t info_1 = *(uint32_t*)(pe_data() + import_offset);
       uint32_t info_2 = *(uint32_t*)(pe_data() + import_offset + 4);
@@ -467,7 +470,7 @@ bool XEXFile::read_imports(void* file)
       // Sanity check the callcap info, values from first dword should match values in second
       if (ordinal_1 != ordinal_2 || moduleidx_1 != moduleidx_2)
       {
-        dbgmsg("[!] Invalid callcap at 0x%X ?", i);
+        dbgmsg("[!] Invalid callcap at 0x%X? (%X %X %X %X)\n", addr, ordinal_1, ordinal_2, moduleidx_1, moduleidx_2);
         continue;
       }
 
@@ -483,8 +486,8 @@ bool XEXFile::read_imports(void* file)
       if (imports_[libname].count(ordinal_1))
         imp = imports_[libname][ordinal_1];
 
-      imp.ThunkAddr = i;
-      imp.FuncAddr = i;
+      imp.ThunkAddr = addr;
+      imp.FuncAddr = addr;
 
       *(uint32_t*)(pe_data() + import_offset + 0) = _byteswap_ulong(0x38600000 | moduleidx_1);
       *(uint32_t*)(pe_data() + import_offset + 4) = _byteswap_ulong(0x38800000 | ordinal_1);
