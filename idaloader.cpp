@@ -360,9 +360,6 @@ bool load_application(linput_t* li)
     auto tls_directory = file.tls_directory();
     auto& tls_callbacks = file.tls_callbacks();
 
-    set_name(tls_directory_va, "_tls_used");
-    create_dword(tls_directory_va, 6 * 4); // todo: set to IMAGE_TLS_DIRECTORY32 struct
-
     if (tls_directory.StartAddressOfRawData)
       set_name(tls_directory.StartAddressOfRawData, "_tls_start");
     if (tls_directory.EndAddressOfRawData)
@@ -378,6 +375,25 @@ bool load_application(linput_t* li)
 
     for (size_t i = 0; i < tls_callbacks.size(); i++)
       set_name(tls_callbacks[i], qstring().sprnt("TlsCallback_%d", int(i)).c_str());
+
+    // Create IMAGE_TLS_DIRECTORY32 and set directory name/type
+    static const char IMAGE_TLS_DIRECTORY32_type[] =
+      R"(#pragma pack(push, 4)
+struct _IMAGE_TLS_DIRECTORY32
+{
+  void *StartAddressOfRawData;
+  void *EndAddressOfRawData;
+  void *AddressOfIndex;
+  void *AddressOfCallBacks;
+  DWORD SizeOfZeroFill;
+  DWORD Characteristics;
+};
+#pragma pack(pop)
+)";
+
+    h2ti(nullptr, nullptr, IMAGE_TLS_DIRECTORY32_type, HTI_DCL, nullptr, nullptr, msg);
+    set_name(tls_directory_va, "_tls_used");
+    apply_cdecl(nullptr, tls_directory_va, "IMAGE_TLS_DIRECTORY32 _tls_used;");
   }
 
   auto vital_stats = file.vital_stats();
