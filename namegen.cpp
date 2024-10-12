@@ -2031,7 +2031,7 @@ const char* xamNameGen(int id, int version)
   if (id == 0x000001D4) return "XamSetHudContext";
   if (id == 0x000001D5) return "XamGetHudContext";
   if (id == 0x000001D6) return "XCustomGetBannerImage";
-  if (id == 0x000001D7) return "Refresh";
+  if (id == 0x000001D7) return "XamCustomSetBannerImage";
   if (id == 0x000001D8) return "XCustomSetAction";
   if (id == 0x000001D9) return "XCustomGetLastActionPress";
   if (id == 0x000001DA) return "XCustomSetDynamicActions";
