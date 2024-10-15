@@ -2344,8 +2344,8 @@ const char* xamNameGen(int id, int version)
   if (id == 0x0000030E) return "XamVoiceSubmitPacket";
   if (id == 0x0000030F) return "XamVoiceClose";
   if (id == 0x00000310) return "XamVoiceGetBatteryStatus";
-  if (id == 0x00000311) return "Refresh_0";
-  if (id == 0x00000312) return "Refresh_1";
+  if (id == 0x00000311) return "XamVoiceDisableTestHook"; // this might be switched with EnableTestHook
+  if (id == 0x00000312) return "XamVoiceEnableTestHook";
   if (id == 0x00000313) return "XamShowJoinSessionByIdInProgressUI";
   if (id == 0x00000314) return "XamShowPartyJoinInProgressUI";
   if (id == 0x00000315) return "XamBuildSharedSystemResourceLocator";
@@ -3154,7 +3154,7 @@ const char* xamNameGen(int id, int version)
   if (id == 0x00000823) return "XamCodeCoverageFileLseek";
   if (id == 0x00000824) return "XamCodeCoverageFileRead";
   if (id == 0x00000825) return "XamCodeCoverageFileWrite";
-  if (id == 0x00000826) return "Refresh_2";
+  if (id == 0x00000826) return "?XamCodeCoverageFcntl@@YAHH@Z";
   if (id == 0x00000827) return "XampHeapGetInfo";
   if (id == 0x00000828) return "XampHeapGetCount";
   if (id == 0x00000829) return "XamShowPamUI";
