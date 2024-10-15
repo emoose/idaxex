@@ -23,6 +23,8 @@ Includes support for the following XEX formats:
 - Automatically names imports that are well-known, such as imports from the kernel & XAM, just like xorloser's loader would.
 - PE sections are created & marked with the appropriate permissions as given by the PE headers.
 - AES-NI support to help improve load times of larger XEXs.
+- Marks functions from .pdata exception directory & allows IDA's eh_parse plugin to read exception information.
+- Passes codeview information over to IDA, allowing it to prompt for & load PDBs without warnings/errors.
 
 ## Install
 Builds for IDA 9 are available in the releases section.
@@ -33,7 +35,7 @@ I recommend pairing this loader with the PPCAltivec plugin, an updated version f
 
 ## Building
 
-For xex1tool make sure to clone repo recursively for excrypt submodule to get pulled in.
+Make sure to clone repo recursively for excrypt submodule to get pulled in.
 
 **Windows**
 
@@ -51,14 +53,16 @@ Clone the repo into your idasdk\ldr\ folder and then build idaxex.sln with VS202
 On newest IDA you may need to edit ida-cmake common.cmake and change `libida64.so` to `libida.so` for build to link properly.
 
 ## Credits
-Based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name!
+Based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name.
 
 Thanks to everyone involved in the Xbox 360 modding/reverse-engineering community!
 
 # xex1tool
-Also included is an attempt at recreating xorloser's XexTool, for working with older pre-XEX2 executables. 
+Also included is an attempt at recreating xorloser's XexTool, for working with older pre-XEX2 executables.  
 (The name is only to differentiate it from the original XexTool - it'll still support XEX2 files fine)
 
-So far it can print info on the various XEX headers (via -l), and extract the basefile (PE/XUIZ) from inside the XEX.
+So far it can print info about the various XEX headers via `-l`, and extract the basefile (PE/XUIZ) from inside the XEX.
+
+For XEX files that are both decrypted & decompressed xex1tool can also convert a VA address to a file offset for you, making file patching a little easier.
 
 Support for other XexTool features may slowly be added over time (of course any help is appreciated!)
