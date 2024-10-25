@@ -22,13 +22,13 @@ struct exehdr {}; // needed for pe.h
 #endif
 
 std::string DoNameGen(const std::string& libName, int id, int version); // namegen.cpp
+std::string DoXTLIDNameGen(uint32_t id); // namegen_xtlid.cpp
 
 std::array<std::string, 7> kDataSectionNames = {
   ".rdata",
   ".data",
   ".data1",
   "DOLBY",
-  "XPP",
   "XON_RD",
   "WMADEC"
 };
@@ -162,6 +162,109 @@ void xbe_setup_netnode(XBEFile& file)
     auto* plugin = find_plugin("pdb", true);
     run_plugin(plugin, 1LL);
 #endif
+  }
+}
+
+void xbe_parse_xtlid(XBEFile& file)
+{
+  for (const auto& section : file.sections())
+  {
+    if (section.Name != ".XTLID")
+      continue;
+
+    uint32_t* xtlid = (uint32_t*)section.Data.data();
+
+    // xtlid header
+    uint32_t unk0 = *(xtlid++);
+    uint32_t lib_version = *(xtlid++);
+
+    uint32_t num_fns = (section.Data.size() - 8) / 8;
+
+    if (unk0 != 0 || (lib_version == 0 || lib_version > 5933))
+    {
+      msg("[XTLID] Failed to parse XTLID, unexpected header values: %x %x\n", unk0, lib_version);
+      return;
+    }
+
+    add_extra_line(section.Info.VirtualAddress, true, "XTLID function count: %d\nXTLID library version: %d", num_fns, lib_version);
+
+    msg("[XTLID] Library version from XTLID: %d\n", lib_version);
+    msg("[XTLID] Naming %d library functions from XTLID data...\n", num_fns);
+    uint32_t named_fns = 0;
+    for (uint32_t i = 0; i < num_fns; i++)
+    {
+      uint32_t xtlid_ea = section.Info.VirtualAddress + 8 + (i * 8);
+      create_dword(xtlid_ea, 4, true);
+      set_op_type(xtlid_ea, hex_flag(), 0); // force the ID to be hex number without creating random xrefs
+      create_dword(xtlid_ea + 4, 4, true);
+
+      uint32_t fn_id = *(xtlid++);
+      uint32_t fn_addr = *(xtlid++);
+
+      auto fn_name = DoXTLIDNameGen(fn_id);
+      if (fn_name.empty())
+      {
+        msg("[XTLID] Name for XTLID 0x%x not found\n", fn_id);
+      }
+      else
+      {
+        set_name(fn_addr, fn_name.c_str(), SN_FORCE);
+        named_fns++;
+
+        // Check if we should create func for this XTLID
+        // List of some known non-function XTLIDs
+        static std::vector<uint32_t> kDataXTLIDs = {
+          0xb0033, // g_dwDirectSoundDebugBreakLevel
+          0xb0034, // g_dwDirectSoundDebugLevel
+          0xb0035, // g_pfnDirectSoundDebugCallback
+          0x60001, // XDEVICE_TYPE_KEYBOARD_TABLE
+          0x1007b, // XDEVICE_TYPE_DEBUG_MOUSE_TABLE
+          0x1007c, // XDEVICE_TYPE_GAMEPAD_TABLE
+          0x1007d, // XDEVICE_TYPE_IR_REMOTE_TABLE
+          0x1007e, // XDEVICE_TYPE_MEMORY_UNIT_TABLE
+          0x1007b, // XDEVICE_TYPE_DEBUG_MOUSE_TABLE
+          0x50001, // XDEVICE_TYPE_DEBUG_KEYBOARD_TABLE
+          0x80001, // D3D__Device
+          0x80002, // D3D__NullHardware
+          0x80003, // D3D__pDevice
+          0x80004, // D3D__SingleStepPusher
+          0x70001, // XDEVICE_TYPE_HIGHFIDELITY_MICROPHONE_TABLE
+          0x70002, // XDEVICE_TYPE_VOICE_HEADPHONE_TABLE
+          0x70003, // XDEVICE_TYPE_VOICE_MICROPHONE_TABLE
+        };
+
+        bool isDSoundData =
+          (fn_id >= 0xb0005 && fn_id <= 0xb000e) ||
+          (fn_id >= 0xb0012 && fn_id <= 0xb002c) ||
+          (fn_id >= 0xb002d && fn_id <= 0xb0035); // todo: is 0xb002c/DirectSoundOverrideSpeakerConfig also data?
+
+        if (!isDSoundData &&
+          std::find(kDataXTLIDs.begin(), kDataXTLIDs.end(), fn_id) == kDataXTLIDs.end())
+        {
+          // Make sure func is inside a code segment
+          auto* seg = getseg(fn_addr);
+          qstring name;
+          get_segm_class(&name, seg);
+          if (name == "CODE")
+          {
+            func_t* existing = get_func(fn_addr);
+            if (existing)
+            {
+              existing->flags |= FUNC_LIB;
+              update_func(existing);
+            }
+            else
+            {
+              func_t func(fn_addr, BADADDR, FUNC_LIB);
+              add_func_ex(&func);
+            }
+          }
+        }
+      }
+    }
+    msg("[XTLID] XTLID naming finished, %d names added\n", named_fns);
+
+    break;
   }
 }
 
@@ -303,6 +406,8 @@ bool load_application_xbe(linput_t* li)
   import_module("xboxkrnl", NULL, kernel_node, NULL, "xbox");
 
   xbe_setup_netnode(file);
+
+  xbe_parse_xtlid(file);
 
   return true;
 }

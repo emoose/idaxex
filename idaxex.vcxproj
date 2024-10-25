@@ -68,6 +68,7 @@
     <ClCompile Include="idaloader_xbe.cpp" />
     <ClCompile Include="lzx.cpp" />
     <ClCompile Include="namegen.cpp" />
+    <ClCompile Include="namegen_xtlid.cpp" />
     <ClCompile Include="xbe.cpp" />
     <ClCompile Include="xex.cpp" />
   </ItemGroup>

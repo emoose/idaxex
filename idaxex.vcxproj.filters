@@ -45,6 +45,9 @@
     <ClCompile Include="idaloader_xbe.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="namegen_xtlid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xex_structs.hpp">
