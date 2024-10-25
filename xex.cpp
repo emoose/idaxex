@@ -419,14 +419,13 @@ bool XEXFile::read_imports(void* file)
         imp.FuncAddr = record_addr;
 
         // have to rewrite code to set r3 & r4 like xorlosers loader does
-        // r3 = module index afaik
+        // r3 = module index
         // r4 = ordinal
         // important to note that basefiles extracted via xextool have this rewrite done already, but raw basefile from XEX doesn't!
-        // todo: find out how to add to imports window like xorloser loader...
         *(uint32_t*)(pe_data() + record_offset + 0) = _byteswap_ulong(0x38600000 | table_header.ModuleIndex);
         *(uint32_t*)(pe_data() + record_offset + 4) = _byteswap_ulong(0x38800000 | ordinal);
       }
-      else // todo: fix this
+      else // todo: does this ever appear?
         dbgmsg("[+] %s import %d (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, record_addr, record_type);
 
       imports_[libname][ordinal] = imp;
@@ -1188,7 +1187,7 @@ bool XEXFile::pe_load(const uint8_t* data)
         }
       }
     }
-  };
+  }
 
   // Read in debug directory if exists (and valid)
   auto& debug_directory = nt_header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];

@@ -39,6 +39,12 @@
     <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="xbe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="idaloader_xbe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xex_structs.hpp">
@@ -72,6 +78,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="xex_keys.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xbe.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xbe_structs.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

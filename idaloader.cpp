@@ -23,6 +23,7 @@ struct exehdr {}; // needed for pe.h
 #include "xex.hpp"
 #include "xex_headerids.hpp"
 
+#include "xbe.hpp"
 netnode ignore_micro;
 
 bool exclude_unneeded_sections = true;
@@ -126,18 +127,19 @@ void pe_add_sections(XEXFile& file)
         continue;
     }
 
-    uint32 sec_addr = section.VirtualAddress;
-    uint32 sec_size = section.VirtualSize;
+    ea_t seg_addr = (ea_t)file.base_address() + (ea_t)section.VirtualAddress;
+    uint32 seg_offset = section.VirtualAddress;
+    uint32 seg_size = section.VirtualSize;
 
     if (file.header().Magic == MAGIC_XEX3F || file.header().Magic == MAGIC_XEX0)
     {
-      sec_addr = section.PointerToRawData;
-      sec_size = section.SizeOfRawData; // TODO: verify this?
+      seg_offset = section.PointerToRawData;
+      seg_size = section.SizeOfRawData; // TODO: verify this?
     }
 
     // Size could be beyond file bounds, if so fix the size to what we can fit
-    if (sec_addr + sec_size > file.image_size())
-      sec_size = file.image_size() - sec_addr;
+    if (seg_offset + seg_size > file.image_size())
+      seg_size = file.image_size() - seg_offset;
 
     // Add section as IDA segment
     uint32 seg_perms = 0;
@@ -152,7 +154,6 @@ void pe_add_sections(XEXFile& file)
     bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
 
     const char* seg_class = has_code ? "CODE" : "DATA";
-    ea_t seg_addr = (ea_t)file.base_address() + (ea_t)section.VirtualAddress;
 
     segment_t segm;
     segm.start_ea = seg_addr;
@@ -162,14 +163,14 @@ void pe_add_sections(XEXFile& file)
     segm.perm = seg_perms;
     add_segm_ex(&segm, name, seg_class, 0);
 
-    if (sec_size <= 0 || sec_addr >= file.pe_data_length())
-      continue;
+    if (seg_size > 0 && file.pe_data_length() > seg_offset)
+    {
+      // Load data into IDA
+      mem2base(file.pe_data() + seg_offset, seg_addr, seg_addr + seg_size, -1);
 
-    // Load data into IDA
-    mem2base(file.pe_data() + sec_addr, seg_addr, seg_addr + sec_size, -1);
-
-    if (has_code)
-      label_regsaveloads(seg_addr, seg_addr + section.VirtualSize);
+      if (has_code)
+        label_regsaveloads(seg_addr, seg_addr + section.VirtualSize);
+    }
   }
 }
 
@@ -332,7 +333,10 @@ bool load_application(linput_t* li)
   XEXFile file;
   file.use_ida_io();
   if (!file.load(li))
+  {
+    msg("[+] XEX load failed with XEXLoadError code %d\n", file.load_error());
     return false;
+  }
 
   inf_set_filetype(f_PE);
   inf_set_baseaddr(file.base_address() >> 4);
@@ -350,7 +354,7 @@ bool load_application(linput_t* li)
     inf_set_main(file.entry_point());
   }
 
-  auto pe_module_name = file.pe_module_name();
+  auto& pe_module_name = file.pe_module_name();
   if (!pe_module_name.empty())
     add_pgm_cmt("PE module name: %s", pe_module_name.c_str());
 
@@ -379,15 +383,15 @@ bool load_application(linput_t* li)
     // Create IMAGE_TLS_DIRECTORY32 and set directory name/type
     static const char IMAGE_TLS_DIRECTORY32_type[] =
       R"(#pragma pack(push, 4)
-struct _IMAGE_TLS_DIRECTORY32
+typedef struct _IMAGE_TLS_DIRECTORY32
 {
   void *StartAddressOfRawData;
   void *EndAddressOfRawData;
   void *AddressOfIndex;
   void *AddressOfCallBacks;
-  DWORD SizeOfZeroFill;
-  DWORD Characteristics;
-};
+  unsigned int SizeOfZeroFill;
+  unsigned int Characteristics;
+} IMAGE_TLS_DIRECTORY32;
 #pragma pack(pop)
 )";
 
@@ -470,7 +474,7 @@ struct _IMAGE_TLS_DIRECTORY32
       add_func(exp_addr); // make doubly sure it gets marked as code
   }
 
-  for (auto lib : file.imports())
+  for (auto& lib : file.imports())
   {
     auto& libname = lib.first;
 
@@ -549,9 +553,22 @@ struct _IMAGE_TLS_DIRECTORY32
   return true;
 }
 
+void idaapi load_file_xbe(linput_t* li, ushort _neflags, const char* fileformatname);
+
 //------------------------------------------------------------------------------
-void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileformatname*/)
+void idaapi load_file(linput_t *li, ushort _neflags, const char* fileformatname)
 {
+  uint32 magic;
+  qlseek(li, 0);
+  qlread(li, &magic, sizeof(uint32));
+  qlseek(li, 0);
+
+  if (magic == MAGIC_XBEH)
+  {
+    load_file_xbe(li, _neflags, fileformatname);
+    return;
+  }
+
   // Set processor to PPC
   set_processor_type("ppc:vmx128", SETPROC_LOADER);
 
@@ -575,11 +592,12 @@ void idaapi load_file(linput_t *li, ushort /*_neflags*/, const char * /*fileform
   set_compiler(comp, SETCOMP_OVERRIDE);
 
   // load in the xex
-  load_application(li);
-
-  // set as 32-bit for hexrays support
-  EAH.setup(false);   // file format does not support 64-bit data
-  inf_set_app_bitness(32);
+  if (load_application(li))
+  {
+    // set as 32-bit for hexrays support
+    EAH.setup(false);   // file format does not support 64-bit data
+    inf_set_app_bitness(32);
+  }
 }
 
 //--------------------------------------------------------------------------
@@ -628,6 +646,15 @@ static int idaapi accept_file(
 
   if (valid)
     *processor = "PPC";
+  else
+  {
+    if (magic == MAGIC_XBEH_BE)
+    {
+      *fileformatname = "Xbox XBE file";
+      *processor = "metapc";
+      valid = 1;
+    }
+  }
 
   return valid;
 }

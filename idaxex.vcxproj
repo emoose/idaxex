@@ -65,8 +65,10 @@
     <ClCompile Include="3rdparty\mspack\lzxd.c" />
     <ClCompile Include="3rdparty\mspack\system.c" />
     <ClCompile Include="idaloader.cpp" />
+    <ClCompile Include="idaloader_xbe.cpp" />
     <ClCompile Include="lzx.cpp" />
     <ClCompile Include="namegen.cpp" />
+    <ClCompile Include="xbe.cpp" />
     <ClCompile Include="xex.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -76,6 +78,8 @@
     <ClInclude Include="pe_structs.hpp" />
     <ClInclude Include="3rdparty\sha1.h" />
     <ClInclude Include="3rdparty\sha1.hpp" />
+    <ClInclude Include="xbe.hpp" />
+    <ClInclude Include="xbe_structs.hpp" />
     <ClInclude Include="xex.hpp" />
     <ClInclude Include="xex_headerids.hpp" />
     <ClInclude Include="xex_keys.hpp" />
