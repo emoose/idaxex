@@ -214,6 +214,8 @@ void xbe_parse_xtlid(XBEFile& file)
         // Check if we should create func for this XTLID
         // List of some known non-function XTLIDs
         static std::vector<uint32_t> kDataXTLIDs = {
+          0xb002d, // DirectSoundRequiredMixBins_3D (TODO: verify)
+          0xb002e, // DirectSoundRequiredMixBins_5Channel3D (TODO: verify)
           0xb0033, // g_dwDirectSoundDebugBreakLevel
           0xb0034, // g_dwDirectSoundDebugLevel
           0xb0035, // g_pfnDirectSoundDebugCallback
@@ -235,8 +237,7 @@ void xbe_parse_xtlid(XBEFile& file)
 
         bool isDSoundData =
           (fn_id >= 0xb0005 && fn_id <= 0xb000e) ||
-          (fn_id >= 0xb0012 && fn_id <= 0xb002c) ||
-          (fn_id >= 0xb002d && fn_id <= 0xb0035); // todo: is 0xb002c/DirectSoundOverrideSpeakerConfig also data?
+          (fn_id >= 0xb0012 && fn_id <= 0xb002b); // todo: is 0xb002c/DirectSoundOverrideSpeakerConfig also data?
 
         if (!isDSoundData &&
           std::find(kDataXTLIDs.begin(), kDataXTLIDs.end(), fn_id) == kDataXTLIDs.end())

@@ -1,20 +1,23 @@
 # idaxex
 
-idaxex is a native loader plugin for IDA Pro, adding support for loading in Xbox360 XEX executables.
+idaxex is a native loader plugin for IDA Pro, adding support for loading in Xbox360 XEX & Xbox XBE executables.
 
 Originally started as an [IDAPython loader](https://github.com/emoose/reversing/blob/master/xbox360.py), work was continued as a native DLL to solve the shortcomings of it.
 
-This should hopefully have the same features as xorloser's great Xex Loader (for IDA 6 and older), along with additional support for some early non-XEX2 formats, such as XEX1 used on beta-kits.
+This should have the same features as xorloser's great Xex Loader (for IDA 6 and older), along with additional support for some early non-XEX2 formats, such as XEX1 used on beta-kits.
+
+XBE files are additionally supported, adding a few extra features over the loader included with IDA.
 
 ## Supported formats
 
-Includes support for the following XEX formats:
+Includes support for the following Xbox executables:
 - XEX2 (>= kernel 1861)
 - XEX1 (>= 1838)
 - XEX% (>= 1746)
 - XEX- (>= 1640)
 - XEX? (>= 1529)
 - XEX0 (>= 1332)
+- XBE (>= XboxOG ~3729)
 
 ## Features
 
@@ -25,6 +28,8 @@ Includes support for the following XEX formats:
 - AES-NI support to help improve load times of larger XEXs.
 - Marks functions from .pdata exception directory & allows IDA's eh_parse plugin to read exception information.
 - Passes codeview information over to IDA, allowing it to prompt for & load PDBs without warnings/errors.
+- XBE: adds kernel imports to IDA imports view
+- XBE: parses XTLID section if exists and names most Xbox SDK library functions used by the executable
 
 ## Install
 Builds for IDA 9 are available in the releases section.
@@ -56,6 +61,8 @@ On newest IDA you may need to edit ida-cmake common.cmake and change `libida64.s
 Based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name.
 
 Thanks to everyone involved in the Xbox 360 modding/reverse-engineering community!
+
+XTLID parsing supported thanks to the [XboxDev/xtlid project](https://github.com/XboxDev/xtlid).
 
 # xex1tool
 Also included is an attempt at recreating xorloser's XexTool, for working with older pre-XEX2 executables.  

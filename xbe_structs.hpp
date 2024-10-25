@@ -189,8 +189,8 @@ namespace xe // Xbox alpha, based on 3521 structs
     uint8_t GameRegion;
     uint8_t Reserved2;
     uint32_t AltTitleIds[16];
-    wchar_t TitleName[40];
-    wchar_t PublisherName[32];
+    uint16_t TitleName[40];
+    uint16_t PublisherName[32];
   };
   static_assert(sizeof(XeXboxCert) == 0xE8, "xe::XeXboxCert");
 };

@@ -2,7 +2,7 @@
 #include <sstream>
 #include <iomanip>
 #include <unordered_map>
-#include <functional>
+#include <cstdint>
 
 // Based on https://github.com/XboxDev/xtlid/blob/4c76295326efd4fa16c3298635909c9767c180f2/src/xtlid.xml
 
@@ -1680,14 +1680,10 @@ std::unordered_map<uint32_t, std::string> functions_XVOICE = {
 
 using XTLIDMap = std::unordered_map<uint32_t, std::string>;
 
-// Using type alias to make the code more readable
-using GeneratorFunc = std::function<std::string(uint32_t)>;
-
 std::string DoXTLIDNameGen(uint32_t id) {
   // Extract lib_id from the upper 16 bits
   uint32_t lib_id = id >> 16;
 
-  // Define the mapping of lib_id to generator functions
   static const std::unordered_map<uint32_t, XTLIDMap&> generators = {
       {0x1, functions_XAPILIB},
       {0x2, functions_XAPILIB},
