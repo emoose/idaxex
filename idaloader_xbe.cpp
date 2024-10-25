@@ -186,11 +186,16 @@ void xbe_parse_xtlid(XBEFile& file)
       return;
     }
 
-    add_extra_line(section.Info.VirtualAddress, true, "XTLID function count: %d\nXTLID library version: %d", num_fns, lib_version);
+    add_extra_line(section.Info.VirtualAddress, true, "XTLID function count: %d\nXTLID library version: %d", int(num_fns), int(lib_version));
 
-    msg("[XTLID] Library version from XTLID: %d\n", lib_version);
-    msg("[XTLID] Naming %d library functions from XTLID data...\n", num_fns);
-    uint32_t named_fns = 0;
+    // create dword for version field
+    create_dword(section.Info.VirtualAddress + 4, 4, true);
+    set_op_type(section.Info.VirtualAddress + 4, dec_flag(), 0);
+    set_cmt(section.Info.VirtualAddress + 4, qstring().sprnt("XTLID library version: %d", int(lib_version)).c_str(), false);
+
+    msg("[XTLID] Library version from XTLID: %d\n", int(lib_version));
+    msg("[XTLID] Naming %d library functions from XTLID data...\n", int(num_fns));
+    int named_fns = 0;
     for (uint32_t i = 0; i < num_fns; i++)
     {
       uint32_t xtlid_ea = section.Info.VirtualAddress + 8 + (i * 8);
@@ -214,8 +219,8 @@ void xbe_parse_xtlid(XBEFile& file)
         // Check if we should create func for this XTLID
         // List of some known non-function XTLIDs
         static std::vector<uint32_t> kDataXTLIDs = {
-          0xb002d, // DirectSoundRequiredMixBins_3D (TODO: verify)
-          0xb002e, // DirectSoundRequiredMixBins_5Channel3D (TODO: verify)
+          0xb002d, // DirectSoundRequiredMixBins_3D
+          0xb002e, // DirectSoundRequiredMixBins_5Channel3D
           0xb0033, // g_dwDirectSoundDebugBreakLevel
           0xb0034, // g_dwDirectSoundDebugLevel
           0xb0035, // g_pfnDirectSoundDebugCallback
@@ -237,7 +242,7 @@ void xbe_parse_xtlid(XBEFile& file)
 
         bool isDSoundData =
           (fn_id >= 0xb0005 && fn_id <= 0xb000e) ||
-          (fn_id >= 0xb0012 && fn_id <= 0xb002b); // todo: is 0xb002c/DirectSoundOverrideSpeakerConfig also data?
+          (fn_id >= 0xb0012 && fn_id <= 0xb002b);
 
         if (!isDSoundData &&
           std::find(kDataXTLIDs.begin(), kDataXTLIDs.end(), fn_id) == kDataXTLIDs.end())
@@ -318,6 +323,20 @@ bool load_application_xbe(linput_t* li)
     add_pgm_cmt("XBE timestamp: %s", xbe_timestamp_string);
   }
 
+  const xbe::XbeLibraryVersion* kernel_lib = nullptr;
+  add_pgm_cmt("");
+  for (auto& library : file.libraries())
+  {
+    if (!strncasecmp("XBOXKRNL", library.LibraryName, 8))
+      kernel_lib = &library;
+
+    char name[9];
+    std::copy_n(library.LibraryName, 8, name);
+    name[8] = '\0';
+
+    add_pgm_cmt("%s v%d.%d.%d.%d", name, library.MajorVersion, library.MinorVersion, library.BuildVersion, library.QFEVersion);
+  }
+
   auto tls_directory_va = file.tls_directory_va();
   if (tls_directory_va)
   {
@@ -366,17 +385,16 @@ bool load_application_xbe(linput_t* li)
   // Track lowest record addr so we can add import module comment to it later
   ea_t lowest_addr = BADADDR;
 
-  int lib_version = 5048; // file.min_kernel_version();
-
   for (auto imp : file.kernel_imports())
   {
-    auto imp_name = DoNameGen("xbox1krnl", imp.second, lib_version);
+    auto imp_name = DoNameGen("xbox1krnl", imp.second, 0);
     auto imp_addr = imp.first;
 
     if (imp_addr)
     {
       set_name(imp_addr, imp_name.c_str(), SN_FORCE);
       set_cmt(imp_addr, qstring().sprnt("%s :: %s", "xboxkrnl", imp_name.c_str()).c_str(), 1);
+      create_dword(imp_addr, 4, true);
 
       set_import_name(kernel_node, imp_addr, imp_name.c_str());
       set_import_ordinal(kernel_node, imp_addr, imp.second);
@@ -384,26 +402,17 @@ bool load_application_xbe(linput_t* li)
       if (lowest_addr == BADADDR || lowest_addr > imp_addr)
         lowest_addr = imp_addr;
     }
-
   }
 
   if (lowest_addr != BADADDR)
   {
-    const xbe::XbeLibraryVersion* kernel_lib = nullptr;
-    for (auto& library : file.libraries())
-    {
-      if (!strncasecmp("XBOXKRNL", library.LibraryName, 8))
-      {
-        kernel_lib = &library;
-        break;
-      }
-    }
     if (kernel_lib)
     {
       add_extra_line(lowest_addr, true, "\n\nImports from %s v%d.%d.%d.%d\n", "xboxkrnl",
         kernel_lib->MajorVersion, kernel_lib->MinorVersion, kernel_lib->BuildVersion, kernel_lib->QFEVersion);
     }
   }
+
   import_module("xboxkrnl", NULL, kernel_node, NULL, "xbox");
 
   xbe_setup_netnode(file);
