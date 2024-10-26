@@ -186,6 +186,11 @@ static void reg_cb(const char* library_str,
 
   if (symbol_type == symbol_function)
   {
+    // workaround IDA insisting on creating mainXapiStartup as dword
+    show_auto(address);
+    del_items(address);
+    auto_make_proc(address);
+
     func_t* existing = get_func(address);
     if (existing)
     {
@@ -339,6 +344,10 @@ void xbe_parse_xtlid(XBEFile& file)
           get_segm_class(&name, seg);
           if (name == "CODE")
           {
+            // workaround IDA insisting on creating mainXapiStartup as dword
+            show_auto(fn_addr);
+            del_items(fn_addr);
+            auto_make_proc(fn_addr);
             func_t* existing = get_func(fn_addr);
             if (existing)
             {
