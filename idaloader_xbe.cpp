@@ -202,7 +202,7 @@ static void reg_cb(const char* library_str,
 
 bool xbe_scan_symboldb(XBEFile& file)
 {
-  msg("[XbSymbolDatabase] Scanning for SDK symbols, database version %x\n", XbSymbolDatabase_LibraryVersion());
+  msg("[XbSymbolDatabase] Scanning for library symbols, database version %x\n", XbSymbolDatabase_LibraryVersion());
   num_dbsymbols = 0;
 
   void* xbe_buffer = (void*)file.xbe_data().data();
@@ -231,13 +231,22 @@ bool xbe_scan_symboldb(XBEFile& file)
     lib_header,
     sect_header,
     XbSymbolDatabase_GetKernelThunkAddress(xbe_buffer));
-  assert(status == 1);
-  XbSymbolContext_ScanManual(ctx);
-  XbSymbolContext_ScanAllLibraryFilter(ctx);
-  XbSymbolContext_RegisterXRefs(ctx);
+  if (status)
+  {
+    XbSymbolContext_ScanManual(ctx);
+    XbSymbolContext_ScanAllLibraryFilter(ctx);
+    XbSymbolContext_RegisterXRefs(ctx);
+    msg("[XbSymbolDatabase] Scan complete, %d symbols named\n", num_dbsymbols);
+  }
+  else
+  {
+    msg("[XbSymbolDatabase] CreateXbSymbolContext failed...\n");
+  }
+
   XbSymbolContext_Release(ctx);
 
-  msg("[XbSymbolDatabase] Scan complete, %d symbols named\n", num_dbsymbols);
+  free(sect_header.filters);
+  free(lib_header.filters);
 
   return true;
 }
