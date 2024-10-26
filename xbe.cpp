@@ -10,16 +10,31 @@
 #include "xbe.hpp"
 
 // XOR keys comes from first 4 bytes of public key used to verify the image signature
-std::array<uint32_t, 3> kKernelThunkXORKeys = {
+std::array<uint32_t, 4> kKernelThunkXORKeys = {
   0x5B6D40B6, // Retail
   0xEFB1F152, // Debug
-  0x46437DCD  // Beta
+  0x46437DCD, // XBL Beta
+  0x2290059D, // Chihiro
 };
-std::array<uint32_t, 3> kEntryPointXORKeys = {
+std::array<uint32_t, 4> kEntryPointXORKeys = {
   0xA8FC57AB, // Retail
   0x94859D4B, // Debug
-  0xE682F45B, // Beta
+  0xE682F45B, // XBL Beta
+  0x40B5C16E, // Chihiro
 };
+std::array<const char*, 4> kXORKeyNames = {
+  "Retail",
+  "Debug",
+  "Beta",
+  "Chihiro"
+};
+
+const char* XBEFile::key_name(int xor_key_idx)
+{
+  if (xor_key_idx >= 0 && xor_key_idx < kXORKeyNames.size())
+    return kXORKeyNames[xor_key_idx];
+  return "Unknown";
+}
 
 bool XBEFile::load(void* file)
 {
@@ -162,30 +177,30 @@ bool XBEFile::load(void* file)
   }
 
   // Try figuring out the XOR key to use
-  xorkey_index = -1;
-  for (int i = 0; i < 3; i++)
+  xorkey_index_ = -1;
+  for (int i = 0; i < kKernelThunkXORKeys.size(); i++)
   {
-    auto xorkey = kKernelThunkXORKeys[i];
-    uint32_t decrypted_thunk = xbe_header_.XboxKernelThunkDataOffset ^ xorkey;
+    uint32_t decrypted_thunk = xbe_header_.XboxKernelThunkDataOffset ^ kKernelThunkXORKeys[i];
+    uint32_t decrypted_ep = xbe_header_.AddressOfEntryPoint ^ kEntryPointXORKeys[i];
 
-    // If decrypted_thunk is between baseaddr and sizeofimage it's likely valid
+    // If decrypted_thunk & decrypted_ep are between baseaddr and sizeofimage it's likely valid
     // TODO: should probably verify that ordinals look good though
-    if (decrypted_thunk >= xbe_header_.BaseAddress &&
-      decrypted_thunk < (xbe_header_.BaseAddress + xbe_header_.SizeOfImage))
+    bool valid_thunk = decrypted_thunk >= xbe_header_.BaseAddress && decrypted_thunk < (xbe_header_.BaseAddress + xbe_header_.SizeOfImage);
+    bool valid_ep = decrypted_ep >= xbe_header_.BaseAddress && decrypted_ep < (xbe_header_.BaseAddress + xbe_header_.SizeOfImage);
+    if (valid_thunk && valid_ep)
     {
-      xorkey_index = i;
+      xorkey_index_ = i;
       xbe_header_.XboxKernelThunkDataOffset = decrypted_thunk;
+      xbe_header_.AddressOfEntryPoint = decrypted_ep;
+      break;
     }
   }
 
-  if (xorkey_index == -1)
+  if (xorkey_index_ < 0)
   {
     load_error_ = uint32_t(XBELoadError::UnknownXORKey);
     return false;
   }
-
-  uint32_t decrypted_ep = xbe_header_.AddressOfEntryPoint ^ kEntryPointXORKeys[xorkey_index];
-  xbe_header_.AddressOfEntryPoint = decrypted_ep;
 
   // Read kernel imports
   {

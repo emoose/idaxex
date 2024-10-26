@@ -53,7 +53,7 @@ class XBEFile
 
   int load_error_ = 0;
 
-  int xorkey_index = -1;
+  int xorkey_index_ = -1;
 
   std::string read_null_terminated(void* file, std::size_t maxlen);
 
@@ -68,9 +68,12 @@ public:
 #endif
   }
 
+  static const char* key_name(int xor_key_idx);
+
   uint32_t base_address() { return xbe_header_.BaseAddress; }
   uint32_t entry_point() { return xbe_header_.AddressOfEntryPoint; }
   uint32_t image_size() { return xbe_header_.SizeOfImage; }
+  int xorkey_index() { return xorkey_index_; }
 
   const std::string& pe_module_name() { return pe_module_name_; }
 

@@ -253,7 +253,7 @@ bool xbe_scan_symboldb(XBEFile& file)
     reg_cb,
     lib_header,
     sect_header,
-    XbSymbolDatabase_GetKernelThunkAddress(xbe_buffer));
+    file.header().XboxKernelThunkDataOffset);
   if (status)
   {
     XbSymbolContext_ScanManual(ctx);
@@ -398,6 +398,7 @@ bool load_application_xbe(linput_t* li)
     msg("[+] XBE file load failed with XBELoadError code %d\n", file.load_error());
     return false;
   }
+  msg("[+] XBE encryption key: %s\n", XBEFile::key_name(file.xorkey_index()));
 
   inf_set_filetype(f_PE);
   inf_set_baseaddr(file.base_address() >> 4);
@@ -414,7 +415,7 @@ bool load_application_xbe(linput_t* li)
 
     sel_t cs = 0;
     segment_t* cs_seg = getseg(file.entry_point());
-    if(cs_seg)
+    if (cs_seg)
       cs = cs_seg->sel;
 
     inf_set_start_cs(cs);
