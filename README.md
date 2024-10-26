@@ -29,7 +29,7 @@ Includes support for the following Xbox executables:
 - Marks functions from .pdata exception directory & allows IDA's eh_parse plugin to read exception information.
 - Passes codeview information over to IDA, allowing it to prompt for & load PDBs without warnings/errors.
 - XBE: adds kernel imports to IDA imports view
-- XBE: parses XTLID section if exists and names most Xbox SDK library functions used by the executable
+- XBE: tries naming SDK library functions using [XbSymbolDatabase](https://github.com/Cxbx-Reloaded/XbSymbolDatabase) & data from XTLID section
 
 ## Install
 Builds for IDA 9 are available in the releases section.

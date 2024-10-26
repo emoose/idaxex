@@ -1,3 +1,6 @@
 [submodule "3rdparty/excrypt"]
 	path = 3rdparty/excrypt
 	url = https://github.com/emoose/ExCrypt.git
+[submodule "3rdparty/XbSymbolDatabase"]
+	path = 3rdparty/XbSymbolDatabase
+	url = https://github.com/Cxbx-Reloaded/XbSymbolDatabase.git

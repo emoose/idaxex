@@ -48,6 +48,9 @@
     <ClCompile Include="namegen_xtlid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\lib\libXbSymbolDatabase.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xex_structs.hpp">

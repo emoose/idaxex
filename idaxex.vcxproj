@@ -41,9 +41,10 @@
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\include;..\..\ldr\pe;3rdparty/excrypt/src;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\include;..\..\ldr\pe;3rdparty\XbSymbolDatabase\src\OOVPADatabase;3rdparty\XbSymbolDatabase\include;3rdparty/excrypt/src;3rdparty/mspack;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <AdditionalDependencies>..\..\lib\x64_win_vc_64\ida.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -51,9 +52,10 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\include;..\..\ldr\pe;3rdparty/excrypt/src;3rdparty/mspack%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\include;..\..\ldr\pe;3rdparty\XbSymbolDatabase\src\OOVPADatabase;3rdparty\XbSymbolDatabase\include;3rdparty/excrypt/src;3rdparty/mspack;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__NT__;IDALDR;__EA64__;_WINDLL;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <AdditionalDependencies>..\..\lib\x64_win_vc_64\ida.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -64,6 +66,7 @@
     <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c" />
     <ClCompile Include="3rdparty\mspack\lzxd.c" />
     <ClCompile Include="3rdparty\mspack\system.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\lib\libXbSymbolDatabase.c" />
     <ClCompile Include="idaloader.cpp" />
     <ClCompile Include="idaloader_xbe.cpp" />
     <ClCompile Include="lzx.cpp" />

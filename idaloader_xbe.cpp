@@ -15,6 +15,8 @@ struct exehdr {}; // needed for pe.h
 #include <list>
 #include <array>
 
+#include <libXbSymbolDatabase.h>
+
 #include "xbe.hpp"
 
 #ifdef _WIN32
@@ -163,6 +165,81 @@ void xbe_setup_netnode(XBEFile& file)
     run_plugin(plugin, 1LL);
 #endif
   }
+}
+
+static int num_dbsymbols = 0;
+
+static void reg_cb(const char* library_str,
+  uint32_t library_flag,
+  uint32_t xref_index,
+  const char* symbol_str,
+  xbaddr address,
+  uint32_t build_version,
+  uint32_t symbol_type,
+  uint32_t call_type,
+  uint32_t param_count,
+  const XbSDBSymbolParam* param_list)
+{
+  num_dbsymbols++;
+  const char* symbol_name = XbSymbolDatabase_SymbolReferenceToString(xref_index);
+  set_name(address, symbol_name);
+
+  if (symbol_type == symbol_function)
+  {
+    func_t* existing = get_func(address);
+    if (existing)
+    {
+      existing->flags |= FUNC_LIB;
+      update_func(existing);
+    }
+    else
+    {
+      func_t func(address, BADADDR, FUNC_LIB);
+      add_func_ex(&func);
+    }
+  }
+}
+
+bool xbe_scan_symboldb(XBEFile& file)
+{
+  msg("[XbSymbolDatabase] Scanning for SDK symbols, database version %x\n", XbSymbolDatabase_LibraryVersion());
+  num_dbsymbols = 0;
+
+  void* xbe_buffer = (void*)file.xbe_data().data();
+  XbSDBLibraryHeader lib_header = {
+      .count = XbSymbolDatabase_GenerateLibraryFilter(xbe_buffer, NULL),
+      .filters = (XbSDBLibrary*)malloc(lib_header.count * sizeof(XbSDBLibrary))
+  };
+  if (!lib_header.filters) {
+    return false;
+  }
+  XbSymbolDatabase_GenerateLibraryFilter(xbe_buffer, &lib_header);
+
+  XbSDBSectionHeader sect_header = {
+      .count = XbSymbolDatabase_GenerateSectionFilter(xbe_buffer, NULL, 1),
+      .filters = (XbSDBSection*)malloc(sect_header.count * sizeof(XbSDBSection))
+  };
+  if (!sect_header.filters) {
+    free(lib_header.filters);
+    return false;
+  }
+  XbSymbolDatabase_GenerateSectionFilter(xbe_buffer, &sect_header, 1);
+
+  XbSymbolContextHandle ctx;
+  bool status = XbSymbolDatabase_CreateXbSymbolContext(&ctx,
+    reg_cb,
+    lib_header,
+    sect_header,
+    XbSymbolDatabase_GetKernelThunkAddress(xbe_buffer));
+  assert(status == 1);
+  XbSymbolContext_ScanManual(ctx);
+  XbSymbolContext_ScanAllLibraryFilter(ctx);
+  XbSymbolContext_RegisterXRefs(ctx);
+  XbSymbolContext_Release(ctx);
+
+  msg("[XbSymbolDatabase] Scan complete, %d symbols named\n", num_dbsymbols);
+
+  return true;
 }
 
 void xbe_parse_xtlid(XBEFile& file)
@@ -416,6 +493,8 @@ bool load_application_xbe(linput_t* li)
   import_module("xboxkrnl", NULL, kernel_node, NULL, "xbox");
 
   xbe_setup_netnode(file);
+
+  xbe_scan_symboldb(file);
 
   xbe_parse_xtlid(file);
 

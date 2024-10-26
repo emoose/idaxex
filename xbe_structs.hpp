@@ -64,7 +64,7 @@ namespace xbe
     uint32_t Writable : 1;
     uint32_t Preload : 1;
     uint32_t Executable : 1;
-    uint32_t InsertFile : 1;
+    uint32_t InsertedFile : 1;
     uint32_t HeadPageReadOnly : 1;
     uint32_t TailPageReadOnly : 1;
   };
@@ -89,7 +89,10 @@ namespace xbe
     uint16_t MajorVersion;
     uint16_t MinorVersion;
     uint16_t BuildVersion;
-    uint16_t QFEVersion : 13;
+    uint16_t QFEVersion : 8;
+    uint16_t Unused : 3;
+    uint16_t LibFeature : 1;
+    uint16_t XBEVersion : 1;
     uint16_t ApprovedLibrary : 2;
     uint16_t DebugBuild : 1;
   };

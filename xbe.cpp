@@ -27,6 +27,11 @@ bool XBEFile::load(void* file)
   image_length_ = tell(file);
   seek(file, 0, SEEK_SET);
 
+  // keep a copy of the full XBE so we can pass it to XbSymbolDatabase later
+  xbe_data_.resize(image_length_);
+  read(xbe_data_.data(), 1, image_length_, file);
+  seek(file, 0, SEEK_SET);
+
   sections_.clear();
   load_error_ = uint32_t(XBELoadError::Unfinished);
 

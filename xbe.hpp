@@ -38,6 +38,7 @@ class XBEFile
   size_t image_length_ = 0; // length of xbe file
 
   xbe::XbeHeader xbe_header_ = {};
+  std::vector<uint8_t> xbe_data_;
   std::vector<uint8_t> header_data_;
 
   std::vector<XBESection> sections_;
@@ -77,6 +78,7 @@ public:
   IMAGE_TLS_DIRECTORY32 tls_directory() { return tls_directory_; }
   const std::vector<uint32_t>& tls_callbacks() { return tls_callbacks_; }
 
+  const std::vector<uint8_t>& xbe_data() { return xbe_data_; }
   const std::vector<uint8_t>& header_data() { return header_data_; }
   const std::vector<XBESection>& sections() { return sections_; }
   const std::map<uint32_t, uint32_t>& kernel_imports() { return kernel_imports_; }
