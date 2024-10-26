@@ -6,6 +6,7 @@
 #include <entry.hpp>
 #include <typeinf.hpp>
 #include <bytes.hpp>
+#include <segregs.hpp>
 
 struct exehdr {}; // needed for pe.h
 #include <pe.h>
@@ -26,13 +27,18 @@ struct exehdr {}; // needed for pe.h
 std::string DoNameGen(const std::string& libName, int id, int version); // namegen.cpp
 std::string DoXTLIDNameGen(uint32_t id); // namegen_xtlid.cpp
 
-std::array<std::string, 7> kDataSectionNames = {
+std::array<std::string, 11> kDataSectionNames = {
   ".rdata",
   ".data",
   ".data1",
   "DOLBY",
   "XON_RD",
-  "WMADEC"
+  "WMADEC",
+  ".XBLD",
+  "D3D_RW",
+  "D3DX_RW",
+  "XGRPH_RW",
+  "XTIMAGE",
 };
 
 void xbe_add_sections(XBEFile& file)
@@ -51,6 +57,8 @@ void xbe_add_sections(XBEFile& file)
   xbe_segm.perm = SEGPERM_READ | SEGPERM_WRITE;
   add_segm_ex(&xbe_segm, "HEADER", "DATA", 0);
   mem2base(xbe_header.data(), xbe_segm.start_ea, xbe_segm.end_ea, -1);*/
+
+  sel_t ds = BADADDR;
 
   for (const auto& section : file.sections())
   {
@@ -83,15 +91,25 @@ void xbe_add_sections(XBEFile& file)
     segment_t segm;
     segm.start_ea = seg_addr;
     segm.end_ea = seg_addr + section.Info.VirtualSize;
-    segm.align = saRelDble;
+    segm.align = saRelByte;
     segm.bitness = 1;
     segm.perm = seg_perms;
+    segm.sel = allocate_selector(0);
+    for (int i = 0; i < SREG_NUM; i++)
+      segm.defsr[i] = BADADDR;
+
+    if (section.Name == ".data")
+      ds = segm.sel;
+
     add_segm_ex(&segm, section.Name.c_str(), seg_class, 0);
 
     // Load data into IDA
     if (seg_size > 0)
       mem2base(section.Data.data(), seg_addr, seg_addr + seg_size, -1);
   }
+
+  if (ds != BADADDR)
+    set_default_dataseg(ds);
 }
 
 void xbe_setup_netnode(XBEFile& file)
@@ -392,6 +410,14 @@ bool load_application_xbe(linput_t* li)
     add_func(file.entry_point());
     add_entry(0, file.entry_point(), "start", 1);
     inf_set_main(file.entry_point());
+    inf_set_start_ip(file.entry_point());
+
+    sel_t cs = 0;
+    segment_t* cs_seg = getseg(file.entry_point());
+    if(cs_seg)
+      cs = cs_seg->sel;
+
+    inf_set_start_cs(cs);
   }
 
   auto& header = file.header();
@@ -419,7 +445,7 @@ bool load_application_xbe(linput_t* li)
   }
 
   const xbe::XbeLibraryVersion* kernel_lib = nullptr;
-  add_pgm_cmt("");
+  add_pgm_cmt("\nXTL versions:");
   for (auto& library : file.libraries())
   {
     if (!strncasecmp("XBOXKRNL", library.LibraryName, 8))
@@ -429,7 +455,7 @@ bool load_application_xbe(linput_t* li)
     std::copy_n(library.LibraryName, 8, name);
     name[8] = '\0';
 
-    add_pgm_cmt("%s v%d.%d.%d.%d", name, library.MajorVersion, library.MinorVersion, library.BuildVersion, library.QFEVersion);
+    add_pgm_cmt(" %s v%d.%d.%d.%d", name, library.MajorVersion, library.MinorVersion, library.BuildVersion, library.QFEVersion);
   }
 
   auto tls_directory_va = file.tls_directory_va();
