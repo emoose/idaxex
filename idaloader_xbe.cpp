@@ -228,32 +228,43 @@ bool xbe_scan_symboldb(XBEFile& file)
   msg("[XbSymbolDatabase] Scanning for library symbols, database version %x\n", XbSymbolDatabase_LibraryVersion());
   num_dbsymbols = 0;
 
-  void* xbe_buffer = (void*)file.xbe_data().data();
+  // Make copy of xbe_data so we can apply transformations before passing to XbSymbolDatabase
+  std::vector<uint8_t> xbe_data = file.xbe_data();
+  xbe::XbeHeader* xbe_header = (xbe::XbeHeader*)xbe_data.data();
+
+  if (file.is_xorkey_beta())
+  {
+    // Recrypt beta keys to retail, to workaround XbSymbolDatabase lacking beta keys
+    xbe_header->XboxKernelThunkDataOffset =
+      file.header().XboxKernelThunkDataOffset /* decrypted */
+      ^ XBE_XOR_KT_RETAIL; /* retail thunk key (TODO: if any beta games use debug libs we should switch to debug key here?) */
+
+    xbe_header->AddressOfEntryPoint =
+      file.header().AddressOfEntryPoint /* decrypted */
+      ^ XBE_XOR_EP_RETAIL;
+  }
+
   XbSDBLibraryHeader lib_header = {
-      .count = XbSymbolDatabase_GenerateLibraryFilter(xbe_buffer, NULL),
+      .count = XbSymbolDatabase_GenerateLibraryFilter(xbe_header, NULL),
       .filters = (XbSDBLibrary*)malloc(lib_header.count * sizeof(XbSDBLibrary))
   };
   if (!lib_header.filters) {
     return false;
   }
-  XbSymbolDatabase_GenerateLibraryFilter(xbe_buffer, &lib_header);
+  XbSymbolDatabase_GenerateLibraryFilter(xbe_header, &lib_header);
 
   XbSDBSectionHeader sect_header = {
-      .count = XbSymbolDatabase_GenerateSectionFilter(xbe_buffer, NULL, 1),
+      .count = XbSymbolDatabase_GenerateSectionFilter(xbe_header, NULL, 1),
       .filters = (XbSDBSection*)malloc(sect_header.count * sizeof(XbSDBSection))
   };
   if (!sect_header.filters) {
     free(lib_header.filters);
     return false;
   }
-  XbSymbolDatabase_GenerateSectionFilter(xbe_buffer, &sect_header, 1);
+  XbSymbolDatabase_GenerateSectionFilter(xbe_header, &sect_header, 1);
 
   XbSymbolContextHandle ctx;
-  bool status = XbSymbolDatabase_CreateXbSymbolContext(&ctx,
-    reg_cb,
-    lib_header,
-    sect_header,
-    file.header().XboxKernelThunkDataOffset);
+  bool status = XbSymbolDatabase_CreateXbSymbolContext(&ctx, reg_cb, lib_header, sect_header, XbSymbolDatabase_GetKernelThunkAddress(xbe_header));
   if (status)
   {
     XbSymbolContext_ScanManual(ctx);
@@ -353,31 +364,30 @@ void xbe_parse_xtlid(XBEFile& file)
           (fn_id >= 0xb0005 && fn_id <= 0xb000e) ||
           (fn_id >= 0xb0012 && fn_id <= 0xb002b);
 
-        if (!isDSoundData &&
-          std::find(kDataXTLIDs.begin(), kDataXTLIDs.end(), fn_id) == kDataXTLIDs.end())
+        if (isDSoundData || std::find(kDataXTLIDs.begin(), kDataXTLIDs.end(), fn_id) != kDataXTLIDs.end())
+          continue;
+
+        // Make sure func is inside a code segment
+        auto* seg = getseg(fn_addr);
+        qstring name;
+        get_segm_class(&name, seg);
+        if (name != "CODE")
+          continue;
+
+        // workaround IDA insisting on creating mainXapiStartup as dword
+        show_auto(fn_addr);
+        del_items(fn_addr);
+        auto_make_proc(fn_addr);
+        func_t* existing = get_func(fn_addr);
+        if (existing)
         {
-          // Make sure func is inside a code segment
-          auto* seg = getseg(fn_addr);
-          qstring name;
-          get_segm_class(&name, seg);
-          if (name == "CODE")
-          {
-            // workaround IDA insisting on creating mainXapiStartup as dword
-            show_auto(fn_addr);
-            del_items(fn_addr);
-            auto_make_proc(fn_addr);
-            func_t* existing = get_func(fn_addr);
-            if (existing)
-            {
-              existing->flags |= FUNC_LIB;
-              update_func(existing);
-            }
-            else
-            {
-              func_t func(fn_addr, BADADDR, FUNC_LIB);
-              add_func_ex(&func);
-            }
-          }
+          existing->flags |= FUNC_LIB;
+          update_func(existing);
+        }
+        else
+        {
+          func_t func(fn_addr, BADADDR, FUNC_LIB);
+          add_func_ex(&func);
         }
       }
     }
@@ -540,7 +550,6 @@ bool load_application_xbe(linput_t* li)
   xbe_setup_netnode(file);
 
   xbe_scan_symboldb(file);
-
   xbe_parse_xtlid(file);
 
   return true;

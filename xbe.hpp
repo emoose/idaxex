@@ -11,6 +11,20 @@
 #define MAGIC_XBEH 0x48454258
 #define MAGIC_XBEH_BE 0x58424548
 
+// Keys are derived by kernel via: 
+//   uint32_t* key_base = (uint32_t*)&XePublicKeyData[0x80]
+//   KernelThunkKey = key_base[1] ^ key_base[2];
+//   EntryPointKey = key_base[0] ^ key_base[4];
+// Where XePublicKeyData is export 355 from kernel, beginning with RSA1 header
+#define XBE_XOR_KT_RETAIL 0x5B6D40B6
+#define XBE_XOR_EP_RETAIL 0xA8FC57AB
+#define XBE_XOR_KT_DEBUG 0xEFB1F152
+#define XBE_XOR_EP_DEBUG 0x94859D4B
+#define XBE_XOR_KT_XBL_BETA 0x46437DCD
+#define XBE_XOR_EP_XBL_BETA 0xE682F45B
+#define XBE_XOR_KT_CHIHIRO 0x2290059D
+#define XBE_XOR_EP_CHIHIRO 0x40B5C16E
+
 struct XBESection
 {
   std::string Name;
@@ -74,6 +88,7 @@ public:
   uint32_t entry_point() { return xbe_header_.AddressOfEntryPoint; }
   uint32_t image_size() { return xbe_header_.SizeOfImage; }
   int xorkey_index() { return xorkey_index_; }
+  bool is_xorkey_beta();
 
   const std::string& pe_module_name() { return pe_module_name_; }
 

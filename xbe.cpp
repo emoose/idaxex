@@ -9,22 +9,17 @@
 
 #include "xbe.hpp"
 
-// Keys are derived by kernel via: 
-//   uint32_t* key_base = (uint32_t*)&XePublicKeyData[0x80]
-//   KernelThunkKey = key_base[1] ^ key_base[2];
-//   EntryPointKey = key_base[0] ^ key_base[4];
-// Where XePublicKeyData is export 355 from kernel, beginning with RSA1 header
 std::array<uint32_t, 4> kKernelThunkXORKeys = {
-  0x5B6D40B6, // Retail
-  0xEFB1F152, // Debug
-  0x46437DCD, // XBL Beta
-  0x2290059D, // Chihiro
+  XBE_XOR_KT_RETAIL,
+  XBE_XOR_KT_DEBUG,
+  XBE_XOR_KT_XBL_BETA,
+  XBE_XOR_KT_CHIHIRO,
 };
 std::array<uint32_t, 4> kEntryPointXORKeys = {
-  0xA8FC57AB, // Retail
-  0x94859D4B, // Debug
-  0xE682F45B, // XBL Beta
-  0x40B5C16E, // Chihiro
+  XBE_XOR_EP_RETAIL,
+  XBE_XOR_EP_DEBUG,
+  XBE_XOR_EP_XBL_BETA,
+  XBE_XOR_EP_CHIHIRO,
 };
 std::array<const char*, 4> kXORKeyNames = {
   "Retail",
@@ -38,6 +33,14 @@ const char* XBEFile::key_name(int xor_key_idx)
   if (xor_key_idx >= 0 && xor_key_idx < kXORKeyNames.size())
     return kXORKeyNames[xor_key_idx];
   return "Unknown";
+}
+
+bool XBEFile::is_xorkey_beta()
+{
+  if (xorkey_index_ < 0 || xorkey_index_ >= kKernelThunkXORKeys.size())
+    return false;
+
+  return kKernelThunkXORKeys[xorkey_index_] == XBE_XOR_KT_XBL_BETA;
 }
 
 bool XBEFile::load(void* file)
