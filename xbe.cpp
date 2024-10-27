@@ -9,7 +9,11 @@
 
 #include "xbe.hpp"
 
-// XOR keys comes from first 4 bytes of public key used to verify the image signature
+// Keys are derived by kernel via: 
+//   uint32_t* key_base = (uint32_t*)&XePublicKeyData[0x80]
+//   KernelThunkKey = key_base[1] ^ key_base[2];
+//   EntryPointKey = key_base[0] ^ key_base[4];
+// Where XePublicKeyData is export 355 from kernel, beginning with RSA1 header
 std::array<uint32_t, 4> kKernelThunkXORKeys = {
   0x5B6D40B6, // Retail
   0xEFB1F152, // Debug
