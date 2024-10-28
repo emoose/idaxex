@@ -15,7 +15,6 @@
 #include <memory>
 #include <cstdlib>
 
-#include "3rdparty/aes.hpp"
 #include <excrypt.h>
 
 int lzx_decompress(const void* lzx_data, size_t lzx_len, void* dest,
@@ -748,14 +747,10 @@ bool XEXFile::read_basefile_raw(void* file, bool encrypted)
 
   if (encrypted)
   {
-    AES_ctx aes;
-    uint8_t iv[] = {
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    };
-
-    AES_init_ctx_iv(&aes, session_key_, iv);
-    AES_CBC_decrypt_buffer(&aes, pe_data_.data(), data_length_);
+    uint8_t aes_iv[0x10] = { 0 };
+    EXCRYPT_AES_STATE aes_state;
+    ExCryptAesKey(&aes_state, session_key_);
+    ExCryptAesCbc(&aes_state, pe_data_.data(), data_length_, pe_data_.data(), aes_iv, false);
   }
 
   return true;
@@ -778,14 +773,10 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
     num_blocks,
     xex_blocks.get());
 
-  AES_ctx aes;
-  uint8_t iv[] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-  };
-
+  uint8_t aes_iv[0x10] = { 0 };
+  EXCRYPT_AES_STATE aes_state;
   if (encrypted)
-    AES_init_ctx_iv(&aes, session_key_, iv);
+    ExCryptAesKey(&aes_state, session_key_);
 
   pe_data_.resize(image_size());
   uint32_t position = 0;
@@ -799,7 +790,7 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
       // Read first 16 bytes of block and decrypt
       auto pos = tell(file);
       read(pe_data_.data(), 1, 0x10, file);
-      AES_ECB_decrypt(&aes, pe_data_.data());
+      ExCryptAesEcb(&aes_state, pe_data_.data(), pe_data_.data(), false);
 
 #ifdef IDALDR
       // Check basefile header - needed for IDALDR since we don't compute image hash for that
@@ -813,14 +804,14 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
 #endif
 
       // Reinit AES & seek back to start of block
-      AES_init_ctx_iv(&aes, session_key_, iv);
+      ExCryptAesKey(&aes_state, session_key_);
       seek(file, pos, 0);
     }
 
     read(pe_data_.data() + position, 1, xex_blocks[i].DataSize, file);
 
     if (encrypted)
-      AES_CBC_decrypt_buffer(&aes, pe_data_.data() + position, xex_blocks[i].DataSize);
+      ExCryptAesCbc(&aes_state, pe_data_.data() + position, xex_blocks[i].DataSize, pe_data_.data() + position, aes_iv, false);
 
     position += xex_blocks[i].DataSize;
     memset(pe_data_.data() + position, 0, xex_blocks[i].ZeroSize);
@@ -834,15 +825,10 @@ bool XEXFile::read_basefile_uncompressed(void* file, bool encrypted)
 // Reads (and optionally decrypts) the basefile from the XEX in LZX-compressed format
 bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
 {
-  AES_ctx aes;
+  uint8_t aes_iv[0x10] = { 0 };
+  EXCRYPT_AES_STATE aes_state;
   if (encrypted)
-  {
-    uint8_t iv[] = {
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    };
-    AES_init_ctx_iv(&aes, session_key_, iv);
-  }
+    ExCryptAesKey(&aes_state, session_key_);
 
   // read windowsize & first block from file_data_descriptor header
   xex_opt::XexCompressedDataDescriptor compression_info = 
@@ -877,7 +863,7 @@ bool XEXFile::read_basefile_compressed(void* file, bool encrypted)
     read(block_data, 1, cur_block->Size, file);
 
     if (encrypted)
-      AES_CBC_decrypt_buffer(&aes, block_data, cur_block->Size);
+      ExCryptAesCbc(&aes_state, block_data, cur_block->Size, block_data, aes_iv, false);
 
     // Check hash of the block - don't want to attempt decompressing invalid data!
     uint8_t sha_hash[0x14];
@@ -926,7 +912,7 @@ end:
   if (retcode != 0)
   {
     load_error_ = retcode;
-    dbgmsg("[!] read_basefile_decompressed error code = %d!\n", retcode);
+    dbgmsg("[!] read_basefile_compressed error code = %d!\n", retcode);
   }
 
   return retcode == 0;
@@ -1315,9 +1301,9 @@ bool XEXFile::read_basefile(void* file, int key_index)
   {
     dbgmsg("[+] Attempting decrypt with %s key...\n", key_names[key_index]);
     std::copy_n(security_info_.ImageInfo.ImageKey, 0x10, session_key_);
-    AES_ctx key_ctx;
-    AES_init_ctx(&key_ctx, key_bytes[key_index]);
-    AES_ECB_decrypt(&key_ctx, session_key_);
+    EXCRYPT_AES_STATE aes_state;
+    ExCryptAesKey(&aes_state, key_bytes[key_index]);
+    ExCryptAesEcb(&aes_state, session_key_, session_key_, false);
   }
 
   bool result = false;

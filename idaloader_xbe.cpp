@@ -185,6 +185,26 @@ void xbe_setup_netnode(XBEFile& file)
   }
 }
 
+void mark_lib_func(ea_t func_ea)
+{
+  // workaround IDA insisting on creating mainXapiStartup as dword
+  show_auto(func_ea);
+  del_items(func_ea);
+  auto_make_proc(func_ea);
+
+  func_t* existing = get_func(func_ea);
+  if (existing)
+  {
+    existing->flags |= FUNC_LIB;
+    update_func(existing);
+  }
+  else
+  {
+    func_t func(func_ea, BADADDR, FUNC_LIB);
+    add_func_ex(&func);
+  }
+}
+
 static int num_dbsymbols = 0;
 
 static void reg_cb(const char* library_str,
@@ -204,22 +224,7 @@ static void reg_cb(const char* library_str,
 
   if (symbol_type == symbol_function)
   {
-    // workaround IDA insisting on creating mainXapiStartup as dword
-    show_auto(address);
-    del_items(address);
-    auto_make_proc(address);
-
-    func_t* existing = get_func(address);
-    if (existing)
-    {
-      existing->flags |= FUNC_LIB;
-      update_func(existing);
-    }
-    else
-    {
-      func_t func(address, BADADDR, FUNC_LIB);
-      add_func_ex(&func);
-    }
+    mark_lib_func(address);
   }
 }
 
@@ -277,7 +282,8 @@ bool xbe_scan_symboldb(XBEFile& file)
     msg("[XbSymbolDatabase] CreateXbSymbolContext failed...\n");
   }
 
-  XbSymbolContext_Release(ctx);
+  if(ctx)
+    XbSymbolContext_Release(ctx);
 
   free(sect_header.filters);
   free(lib_header.filters);
@@ -330,69 +336,51 @@ void xbe_parse_xtlid(XBEFile& file)
       if (fn_name.empty())
       {
         msg("[XTLID] Name for XTLID 0x%x not found\n", fn_id);
+        continue;
       }
-      else
-      {
-        set_name(fn_addr, fn_name.c_str(), SN_FORCE);
-        named_fns++;
+      set_name(fn_addr, fn_name.c_str(), SN_FORCE);
+      named_fns++;
 
-        // Check if we should create func for this XTLID
-        // List of some known non-function XTLIDs
-        static std::vector<uint32_t> kDataXTLIDs = {
-          0xb002d, // DirectSoundRequiredMixBins_3D
-          0xb002e, // DirectSoundRequiredMixBins_5Channel3D
-          0xb0033, // g_dwDirectSoundDebugBreakLevel
-          0xb0034, // g_dwDirectSoundDebugLevel
-          0xb0035, // g_pfnDirectSoundDebugCallback
-          0x60001, // XDEVICE_TYPE_KEYBOARD_TABLE
-          0x1007b, // XDEVICE_TYPE_DEBUG_MOUSE_TABLE
-          0x1007c, // XDEVICE_TYPE_GAMEPAD_TABLE
-          0x1007d, // XDEVICE_TYPE_IR_REMOTE_TABLE
-          0x1007e, // XDEVICE_TYPE_MEMORY_UNIT_TABLE
-          0x1007b, // XDEVICE_TYPE_DEBUG_MOUSE_TABLE
-          0x50001, // XDEVICE_TYPE_DEBUG_KEYBOARD_TABLE
-          0x80001, // D3D__Device
-          0x80002, // D3D__NullHardware
-          0x80003, // D3D__pDevice
-          0x80004, // D3D__SingleStepPusher
-          0x70001, // XDEVICE_TYPE_HIGHFIDELITY_MICROPHONE_TABLE
-          0x70002, // XDEVICE_TYPE_VOICE_HEADPHONE_TABLE
-          0x70003, // XDEVICE_TYPE_VOICE_MICROPHONE_TABLE
-        };
+      // Check if we should create func for this XTLID
+      // List of some known non-function XTLIDs
+      static std::vector<uint32_t> kDataXTLIDs = {
+        0xb002d, // DirectSoundRequiredMixBins_3D
+        0xb002e, // DirectSoundRequiredMixBins_5Channel3D
+        0xb0033, // g_dwDirectSoundDebugBreakLevel
+        0xb0034, // g_dwDirectSoundDebugLevel
+        0xb0035, // g_pfnDirectSoundDebugCallback
+        0x60001, // XDEVICE_TYPE_KEYBOARD_TABLE
+        0x1007b, // XDEVICE_TYPE_DEBUG_MOUSE_TABLE
+        0x1007c, // XDEVICE_TYPE_GAMEPAD_TABLE
+        0x1007d, // XDEVICE_TYPE_IR_REMOTE_TABLE
+        0x1007e, // XDEVICE_TYPE_MEMORY_UNIT_TABLE
+        0x1007b, // XDEVICE_TYPE_DEBUG_MOUSE_TABLE
+        0x50001, // XDEVICE_TYPE_DEBUG_KEYBOARD_TABLE
+        0x80001, // D3D__Device
+        0x80002, // D3D__NullHardware
+        0x80003, // D3D__pDevice
+        0x80004, // D3D__SingleStepPusher
+        0x70001, // XDEVICE_TYPE_HIGHFIDELITY_MICROPHONE_TABLE
+        0x70002, // XDEVICE_TYPE_VOICE_HEADPHONE_TABLE
+        0x70003, // XDEVICE_TYPE_VOICE_MICROPHONE_TABLE
+      };
 
-        bool isDSoundData =
-          (fn_id >= 0xb0005 && fn_id <= 0xb000e) ||
-          (fn_id >= 0xb0012 && fn_id <= 0xb002b);
+      bool isDSoundData =
+        (fn_id >= 0xb0005 && fn_id <= 0xb000e) ||
+        (fn_id >= 0xb0012 && fn_id <= 0xb002b);
 
-        if (isDSoundData || std::find(kDataXTLIDs.begin(), kDataXTLIDs.end(), fn_id) != kDataXTLIDs.end())
-          continue;
+      if (isDSoundData || std::find(kDataXTLIDs.begin(), kDataXTLIDs.end(), fn_id) != kDataXTLIDs.end())
+        continue;
 
-        // Make sure func is inside a code segment
-        auto* seg = getseg(fn_addr);
-        qstring name;
-        get_segm_class(&name, seg);
-        if (name != "CODE")
-          continue;
-
-        // workaround IDA insisting on creating mainXapiStartup as dword
-        show_auto(fn_addr);
-        del_items(fn_addr);
-        auto_make_proc(fn_addr);
-        func_t* existing = get_func(fn_addr);
-        if (existing)
-        {
-          existing->flags |= FUNC_LIB;
-          update_func(existing);
-        }
-        else
-        {
-          func_t func(fn_addr, BADADDR, FUNC_LIB);
-          add_func_ex(&func);
-        }
-      }
+      // Make sure func is inside a code segment
+      auto* seg = getseg(fn_addr);
+      qstring name;
+      get_segm_class(&name, seg);
+      if (name == "CODE")
+        mark_lib_func(fn_addr);
     }
-    msg("[XTLID] XTLID naming finished, %d names added\n", named_fns);
 
+    msg("[XTLID] XTLID naming finished, %d names added\n", named_fns);
     break;
   }
 }

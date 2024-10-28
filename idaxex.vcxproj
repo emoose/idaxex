@@ -62,8 +62,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="3rdparty\aes.c" />
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_aes.c" />
     <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c" />
+    <ClCompile Include="3rdparty\excrypt\src\rijndael.c" />
     <ClCompile Include="3rdparty\mspack\lzxd.c" />
     <ClCompile Include="3rdparty\mspack\system.c" />
     <ClCompile Include="3rdparty\XbSymbolDatabase\src\lib\libXbSymbolDatabase.c" />
@@ -76,12 +77,8 @@
     <ClCompile Include="xex.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="3rdparty\aes.h" />
-    <ClInclude Include="3rdparty\aes.hpp" />
     <ClInclude Include="3rdparty\byte_order.hpp" />
     <ClInclude Include="pe_structs.hpp" />
-    <ClInclude Include="3rdparty\sha1.h" />
-    <ClInclude Include="3rdparty\sha1.hpp" />
     <ClInclude Include="xbe.hpp" />
     <ClInclude Include="xbe_structs.hpp" />
     <ClInclude Include="xex.hpp" />

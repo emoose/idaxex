@@ -21,9 +21,6 @@
     <ClCompile Include="xex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\aes.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="xdbf\xdbf.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -63,6 +60,12 @@
     <ClCompile Include="3rdparty\excrypt\src\excrypt_rotsum.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_aes.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\excrypt\src\rijndael.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xex_headerids.hpp">
@@ -83,19 +86,7 @@
     <ClInclude Include="pe_structs.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="3rdparty\aes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="3rdparty\aes.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="3rdparty\byte_order.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="3rdparty\sha1.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="3rdparty\sha1.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="3rdparty\cxxopts.hpp">
