@@ -606,13 +606,10 @@ uint32_t XEXFile::verify_secinfo(void* file)
     int pubkey_idx = 0;
     for (; pubkey_idx < num_pubkeys; pubkey_idx++)
     {
-      EXCRYPT_RSAPUB_2048 pubKey;
-      ExCryptBn_BeToLeKey((EXCRYPT_RSA*)&pubKey, pubkey_bytes[pubkey_idx], 0x110);
-
       EXCRYPT_SIG tmp;
       std::copy_n(reinterpret_cast<EXCRYPT_SIG*>(imageinfo.get()), 1, &tmp);
 
-      valid_signature_ = ExCryptBnQwBeSigVerify(&tmp, hash, (uint8_t*)salt, (EXCRYPT_RSA*)&pubKey);
+      valid_signature_ = ExCryptBnQwBeSigVerify(&tmp, hash, (uint8_t*)salt, (EXCRYPT_RSA*)pubkey_bytes[pubkey_idx]);
       if (valid_signature_)
       {
         signkey_index_ = pubkey_idx;
