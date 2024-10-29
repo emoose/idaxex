@@ -5,6 +5,10 @@ project(idaxex)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 
+# Enable AES NI intrinsic
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -maes")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
+
 include($ENV{IDASDK}/ida-cmake/common.cmake)
 
 set(LOADER_NAME    idaxex)
