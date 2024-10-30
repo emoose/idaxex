@@ -90,7 +90,6 @@
   <ItemGroup>
     <ClCompile Include="3rdparty\excrypt\src\excrypt_aes.c" />
     <ClCompile Include="3rdparty\excrypt\src\excrypt_bn.c" />
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_key.cpp" />
     <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_mod.cpp" />
     <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_sig.c" />
     <ClCompile Include="3rdparty\excrypt\src\excrypt_mem.cpp" />

@@ -39,9 +39,6 @@
     <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_sig.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_key.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c">
       <Filter>Source Files</Filter>
     </ClCompile>
