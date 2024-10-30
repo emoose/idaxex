@@ -41,7 +41,7 @@ std::array<std::string, 11> kDataSectionNames = {
   "XTIMAGE",
 };
 
-void xbe_add_sections(XBEFile& file)
+void xbe_add_sections(linput_t* li, XBEFile& file)
 {
   auto& xbe_header = file.header_data();
 
@@ -86,7 +86,7 @@ void xbe_add_sections(XBEFile& file)
     const char* seg_class = has_code ? "CODE" : "DATA";
 
     uint32 seg_addr = section.Info.VirtualAddress;
-    size_t seg_size = section.Data.size();
+    size_t seg_size = section.DataSize;
 
     segment_t segm;
     segm.start_ea = seg_addr;
@@ -105,7 +105,7 @@ void xbe_add_sections(XBEFile& file)
 
     // Load data into IDA
     if (seg_size > 0)
-      mem2base(section.Data.data(), seg_addr, seg_addr + seg_size, -1);
+      file2base(li, section.Info.PointerToRawData, seg_addr, seg_addr + seg_size, FILEREG_PATCHABLE);
   }
 
   if (ds != BADADDR)
@@ -298,13 +298,13 @@ void xbe_parse_xtlid(XBEFile& file)
     if (section.Name != ".XTLID")
       continue;
 
-    uint32_t* xtlid = (uint32_t*)section.Data.data();
+    uint32_t* xtlid = (uint32_t*)(file.xbe_data().data() + section.Info.PointerToRawData);
 
     // xtlid header
     uint32_t unk0 = *(xtlid++);
     uint32_t lib_version = *(xtlid++);
 
-    uint32_t num_fns = (section.Data.size() - 8) / 8;
+    uint32_t num_fns = (section.DataSize - 8) / 8;
 
     if (unk0 != 0 || (lib_version == 0 || lib_version > 5933))
     {
@@ -402,7 +402,7 @@ bool load_application_xbe(linput_t* li)
   inf_set_baseaddr(file.base_address() >> 4);
   set_imagebase(file.base_address());
 
-  xbe_add_sections(file);
+  xbe_add_sections(li, file);
 
   if (file.entry_point())
   {

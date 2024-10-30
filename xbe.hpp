@@ -16,7 +16,7 @@ struct XBESection
 {
   std::string Name;
   xbe::XbeSection Info;
-  std::vector<uint8_t> Data;
+  uint32_t DataSize;
 };
 
 enum class XBELoadError

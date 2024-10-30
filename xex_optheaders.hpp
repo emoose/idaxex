@@ -257,7 +257,7 @@ namespace xex_opt {
     xe::be<uint16_t> Flags;
     xe::be<uint16_t> Format;
 
-    XexDataFormat DataFormat()
+    XexDataFormat DataFormat() const
     {
       return static_cast<XexDataFormat>((uint16_t)Format);
     }

@@ -212,6 +212,12 @@ public:
   uint32_t encryption_key_index() { return key_index_; }
   uint8_t* session_key() { return session_key_; }
 
+  bool is_encrypted() { return data_descriptor_->Flags != 0; }
+  bool is_compressed() {
+    return (data_descriptor_->DataFormat() == xex_opt::XexDataFormat::Compressed || 
+      data_descriptor_->DataFormat() == xex_opt::XexDataFormat::DeltaCompressed);
+  }
+
   // Optional headers
   uint32_t image_size() {
     return std::max(data_length_, (uint32_t)security_info_.ImageSize);

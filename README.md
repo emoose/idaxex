@@ -28,6 +28,7 @@ Includes support for the following Xbox executables:
 - AES-NI support to help improve load times of larger XEXs.
 - Marks functions from .pdata exception directory & allows IDA's eh_parse plugin to read exception information.
 - Passes codeview information over to IDA, allowing it to prompt for & load PDBs without warnings/errors.
+- Patched bytes can be written back to input file via IDA `Apply patches to input` option (works for all XBEs, XEX must be both uncompressed & decrypted using `xextool -eu -cu input.xex` first)
 - XBE: adds kernel imports to IDA imports view
 - XBE: tries naming SDK library functions using [XbSymbolDatabase](https://github.com/Cxbx-Reloaded/XbSymbolDatabase) & data from XTLID section
 

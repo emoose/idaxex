@@ -103,10 +103,11 @@ void label_regsaveloads(ea_t start, ea_t end)
   }
 }
 
-void pe_add_sections(XEXFile& file)
+void pe_add_sections(linput_t* li, XEXFile& file)
 {
   init_ignore_micro();
 
+  uint32_t first_segment_address = 0;
   for (const auto& section : file.sections())
   {
     // New buffer for section name so we can null-terminate it
@@ -163,14 +164,65 @@ void pe_add_sections(XEXFile& file)
     segm.perm = seg_perms;
     add_segm_ex(&segm, name, seg_class, 0);
 
+    // Load data into IDA
     if (seg_size > 0 && file.pe_data_length() > seg_offset)
     {
-      // Load data into IDA
+      if (!first_segment_address || first_segment_address > seg_addr)
+        first_segment_address = seg_addr;
+
       mem2base(file.pe_data() + seg_offset, seg_addr, seg_addr + seg_size, -1);
 
       if (has_code)
         label_regsaveloads(seg_addr, seg_addr + section.VirtualSize);
     }
+  }
+
+  if (file.is_compressed() || file.is_encrypted())
+    return;
+
+  // TODO: check if this works for other XEX formats
+  if (file.header().Magic != MAGIC_XEX2)
+    return;
+
+  // Not compressed/encrypted, lets inform IDA of file mappings
+  msg("[+] XEX isn't compressed or encrypted, setting up file mappings to allow applying patches back to file\n");
+
+  const auto* data_descriptor = file.data_descriptor();
+
+  if (data_descriptor->DataFormat() == xex_opt::XexDataFormat::None)
+  {
+    // TODO: find a file to check this with (might be pre-XEX2 only...)
+    auto first_segment_offset = first_segment_address - file.base_address();
+    auto end_address = file.base_address() + file.image_size();
+    file2base(li, file.header().SizeOfHeaders + first_segment_offset, first_segment_address, end_address, FILEREG_PATCHABLE);
+    return;
+  }
+
+  const xex_opt::XexRawDataDescriptor* xex_blocks = 
+    (const xex_opt::XexRawDataDescriptor*)(file.xex_headers() + file.opt_header(XEX_FILE_DATA_DESCRIPTOR_HEADER) + 8);
+  int num_blocks = (data_descriptor->Size - 8) / 8;
+
+  uint32_t address = 0;
+  uint32_t file_position = 0;
+  for (int i = 0; i < num_blocks; i++)
+  {
+    const auto& block = xex_blocks[i];
+    auto block_end = address + block.DataSize;
+
+    uint32_t addr_start = file.base_address() + address;
+    uint32_t addr_end = file.base_address() + block_end;
+
+    uint32_t block_offset = 0;
+
+    // If first segment is inside this block, offset data we read so prior data (PE headers etc) won't be added to DB
+    if (first_segment_address >= addr_start && addr_end > first_segment_address)
+      block_offset = first_segment_address - addr_start;
+
+    if (addr_start + block_offset >= first_segment_address)
+      file2base(li, file.header().SizeOfHeaders + file_position + block_offset, addr_start + block_offset, addr_end, FILEREG_PATCHABLE);
+
+    address += block.DataSize + block.ZeroSize;
+    file_position += block.DataSize;
   }
 }
 
@@ -346,7 +398,7 @@ bool load_application(linput_t* li)
   if (file.header().Magic == MAGIC_XEX2)
       add_til("x360.til", ADDTIL_INCOMP);
 
-  pe_add_sections(file);
+  pe_add_sections(li, file);
 
   if (file.entry_point())
   {

@@ -83,17 +83,13 @@ bool XBEFile::load(void* file)
     seek(file, xbe_va_to_offset(section.Info.SectionNameOffset), SEEK_SET);
     section.Name = read_null_terminated(file, 64);
 
-    // Read section data
-    size_t section_size = section.Info.VirtualSize;
+    // Figure out section data size
+    section.DataSize = section.Info.VirtualSize;
 
     // If virtual size is beyond file bounds, resize it to what we can fit
     // TODO: should probably check against offset of other sections too, so we don't include their data
-    if (section.Info.PointerToRawData + section_size > image_length_)
-      section_size = image_length_ - section.Info.PointerToRawData;
-
-    section.Data.resize(section_size);
-    seek(file, section.Info.PointerToRawData, SEEK_SET);
-    read(section.Data.data(), 1, section_size, file);
+    if (section.Info.PointerToRawData + section.DataSize > image_length_)
+      section.DataSize = image_length_ - section.Info.PointerToRawData;
 
     sections_.push_back(section);
 
