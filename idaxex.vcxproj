@@ -80,6 +80,7 @@
     <ClInclude Include="3rdparty\byte_order.hpp" />
     <ClInclude Include="pe_structs.hpp" />
     <ClInclude Include="xbe.hpp" />
+    <ClInclude Include="xbe_keys.hpp" />
     <ClInclude Include="xbe_structs.hpp" />
     <ClInclude Include="xex.hpp" />
     <ClInclude Include="xex_headerids.hpp" />
