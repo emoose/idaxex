@@ -83,5 +83,8 @@
     <ClInclude Include="xbe_structs.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="xbe_keys.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

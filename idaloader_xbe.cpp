@@ -242,11 +242,11 @@ bool xbe_scan_symboldb(XBEFile& file)
     // Recrypt beta keys to retail, to workaround XbSymbolDatabase lacking beta keys
     xbe_header->XboxKernelThunkDataOffset =
       file.header().XboxKernelThunkDataOffset /* decrypted */
-      ^ XBE_XOR_KT_RETAIL; /* retail thunk key (TODO: if any beta games use debug libs we should switch to debug key here?) */
+      ^ kXbeXorKernel_Retail; /* retail thunk key (TODO: if any beta games use debug libs we should switch to debug key here?) */
 
     xbe_header->AddressOfEntryPoint =
       file.header().AddressOfEntryPoint /* decrypted */
-      ^ XBE_XOR_EP_RETAIL;
+      ^ kXbeXorEntry_Retail;
   }
 
   XbSDBLibraryHeader lib_header = {

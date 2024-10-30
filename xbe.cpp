@@ -10,16 +10,16 @@
 #include "xbe.hpp"
 
 std::array<uint32_t, 4> kKernelThunkXORKeys = {
-  XBE_XOR_KT_RETAIL,
-  XBE_XOR_KT_DEBUG,
-  XBE_XOR_KT_XBL_BETA,
-  XBE_XOR_KT_CHIHIRO,
+  kXbeXorKernel_Retail,
+  kXbeXorKernel_Debug,
+  kXbeXorKernel_XBLBeta,
+  kXbeXorKernel_Chihiro,
 };
 std::array<uint32_t, 4> kEntryPointXORKeys = {
-  XBE_XOR_EP_RETAIL,
-  XBE_XOR_EP_DEBUG,
-  XBE_XOR_EP_XBL_BETA,
-  XBE_XOR_EP_CHIHIRO,
+  kXbeXorEntry_Retail,
+  kXbeXorEntry_Debug,
+  kXbeXorEntry_XBLBeta,
+  kXbeXorEntry_Chihiro,
 };
 std::array<const char*, 4> kXORKeyNames = {
   "Retail",
@@ -40,7 +40,7 @@ bool XBEFile::is_xorkey_beta()
   if (xorkey_index_ < 0 || xorkey_index_ >= kKernelThunkXORKeys.size())
     return false;
 
-  return kKernelThunkXORKeys[xorkey_index_] == XBE_XOR_KT_XBL_BETA;
+  return kKernelThunkXORKeys[xorkey_index_] == kXbeXorKernel_XBLBeta;
 }
 
 bool XBEFile::load(void* file)
