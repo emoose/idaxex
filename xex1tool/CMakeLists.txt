@@ -11,10 +11,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
 
 add_executable(xex1tool
   ../xex1tool.cpp
-  ../xex.cpp
   ../namegen.cpp
-  ../lzx.cpp
-  ../xdbf/xdbf.cc
+  ../formats/xdbf.cpp
+  ../formats/xex.cpp
   ../3rdparty/excrypt/src/excrypt_aes.c
   ../3rdparty/excrypt/src/rijndael.c
   ../3rdparty/excrypt/src/excrypt_bn.c
@@ -24,6 +23,7 @@ add_executable(xex1tool
   ../3rdparty/excrypt/src/excrypt_rc4.c
   ../3rdparty/excrypt/src/excrypt_rotsum.c
   ../3rdparty/excrypt/src/excrypt_sha.c
+  ../3rdparty/lzx.cpp
   ../3rdparty/mspack/lzxd.c
   ../3rdparty/mspack/system.c
 )

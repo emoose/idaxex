@@ -65,28 +65,28 @@
     <ClCompile Include="3rdparty\excrypt\src\excrypt_aes.c" />
     <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c" />
     <ClCompile Include="3rdparty\excrypt\src\rijndael.c" />
+    <ClCompile Include="3rdparty\lzx.cpp" />
     <ClCompile Include="3rdparty\mspack\lzxd.c" />
     <ClCompile Include="3rdparty\mspack\system.c" />
     <ClCompile Include="3rdparty\XbSymbolDatabase\src\lib\libXbSymbolDatabase.c" />
+    <ClCompile Include="formats\xbe.cpp" />
+    <ClCompile Include="formats\xex.cpp" />
     <ClCompile Include="idaloader.cpp" />
     <ClCompile Include="idaloader_xbe.cpp" />
-    <ClCompile Include="lzx.cpp" />
     <ClCompile Include="namegen.cpp" />
     <ClCompile Include="namegen_xtlid.cpp" />
-    <ClCompile Include="xbe.cpp" />
-    <ClCompile Include="xex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3rdparty\byte_order.hpp" />
-    <ClInclude Include="pe_structs.hpp" />
-    <ClInclude Include="xbe.hpp" />
-    <ClInclude Include="xbe_keys.hpp" />
-    <ClInclude Include="xbe_structs.hpp" />
-    <ClInclude Include="xex.hpp" />
-    <ClInclude Include="xex_headerids.hpp" />
-    <ClInclude Include="xex_keys.hpp" />
-    <ClInclude Include="xex_optheaders.hpp" />
-    <ClInclude Include="xex_structs.hpp" />
+    <ClInclude Include="formats\pe_structs.hpp" />
+    <ClInclude Include="formats\xbe.hpp" />
+    <ClInclude Include="formats\xbe_keys.hpp" />
+    <ClInclude Include="formats\xbe_structs.hpp" />
+    <ClInclude Include="formats\xex.hpp" />
+    <ClInclude Include="formats\xex_headerids.hpp" />
+    <ClInclude Include="formats\xex_keys.hpp" />
+    <ClInclude Include="formats\xex_optheaders.hpp" />
+    <ClInclude Include="formats\xex_structs.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

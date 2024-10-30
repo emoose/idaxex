@@ -97,29 +97,29 @@
     <ClCompile Include="3rdparty\excrypt\src\excrypt_rotsum.c" />
     <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c" />
     <ClCompile Include="3rdparty\excrypt\src\rijndael.c" />
+    <ClCompile Include="3rdparty\lzx.cpp" />
     <ClCompile Include="3rdparty\mspack\lzxd.c" />
     <ClCompile Include="3rdparty\mspack\system.c">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
-    <ClCompile Include="lzx.cpp" />
+    <ClCompile Include="formats\xdbf.cpp" />
+    <ClCompile Include="formats\xex.cpp" />
     <ClCompile Include="namegen.cpp" />
-    <ClCompile Include="xdbf\xdbf.cc" />
-    <ClCompile Include="xex.cpp" />
     <ClCompile Include="xex1tool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3rdparty\byte_order.hpp" />
     <ClInclude Include="3rdparty\cxxopts.hpp" />
     <ClInclude Include="3rdparty\date.hpp" />
-    <ClInclude Include="pe_structs.hpp" />
-    <ClInclude Include="xdbf\xdbf.hpp" />
-    <ClInclude Include="xdbf\xdbf_xbox.hpp" />
-    <ClInclude Include="xex.hpp" />
-    <ClInclude Include="xex_headerids.hpp" />
-    <ClInclude Include="xex_keys.hpp" />
-    <ClInclude Include="xex_optheaders.hpp" />
-    <ClInclude Include="xex_structs.hpp" />
+    <ClInclude Include="formats\pe_structs.hpp" />
+    <ClInclude Include="formats\xdbf.hpp" />
+    <ClInclude Include="formats\xdbf_structs.hpp" />
+    <ClInclude Include="formats\xex.hpp" />
+    <ClInclude Include="formats\xex_headerids.hpp" />
+    <ClInclude Include="formats\xex_keys.hpp" />
+    <ClInclude Include="formats\xex_optheaders.hpp" />
+    <ClInclude Include="formats\xex_structs.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

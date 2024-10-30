@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cassert>
-#include "3rdparty/byte_order.hpp"
+#include "../3rdparty/byte_order.hpp"
 #include "xex_structs.hpp"
 
 namespace xex_opt {
@@ -21,6 +21,13 @@ namespace xex_opt {
     uint8_t Unused;
     uint8_t ModuleIndex;
     xe::be<uint16_t> ImportCount;
+
+    inline void endian_swap()
+    {
+      *(uint32_t*)&Version = xe::byte_swap(*(uint32_t*)&Version);
+      *(uint32_t*)&VersionMin = xe::byte_swap(*(uint32_t*)&VersionMin);
+    }
+
   };
   static_assert(sizeof(XexImportTable) == 0x28, "xex_opt::XexImportTable");
 
@@ -60,6 +67,13 @@ namespace xex_opt {
     uint8_t DiscNum; // 0x12 sz:0x1
     uint8_t DiscsInSet; // 0x13 sz:0x1
     xe::be<uint32_t> SaveGameID; // 0x14 sz:0x4
+
+    inline void endian_swap()
+    {
+      *(uint32_t*)&BaseVersion = xe::byte_swap(*(uint32_t*)&BaseVersion);
+      *(uint32_t*)&Version = xe::byte_swap(*(uint32_t*)&Version);
+    }
+
   }; // size 24
   static_assert(sizeof(XexExecutionId) == 0x18, "xex_opt::XexExecutionId");
 
@@ -83,6 +97,12 @@ namespace xex_opt {
       xe::be<uint32_t> DiscNum;
       xe::be<uint32_t> DiscsInSet;
       xe::be<uint32_t> SaveGameID;
+
+      inline void endian_swap()
+      {
+        *(uint32_t*)&Version = xe::byte_swap(*(uint32_t*)&Version);
+      }
+
     }; // size 32
     static_assert(sizeof(XexExecutionId) == 32, "xex_opt::xex25::XexExecutionId");
   }
@@ -108,6 +128,12 @@ namespace xex_opt {
       uint8_t ExecutableType;
       uint8_t SaveGameID;
       uint8_t DiscNum;
+
+      inline void endian_swap()
+      {
+        *(uint32_t*)&Version = xe::byte_swap(*(uint32_t*)&Version);
+      }
+
     }; // size 24
     static_assert(sizeof(xex_opt::xex2d::XexExecutionId) == 0x18, "xex_opt::xex25::XexExecutionId");
   }

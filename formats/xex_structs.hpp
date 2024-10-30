@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cassert>
-#include "3rdparty/byte_order.hpp"
+#include "../3rdparty/byte_order.hpp"
 
 namespace xex {
   struct XexModuleFlags {
@@ -26,6 +26,10 @@ namespace xex {
     xe::be<uint32_t> SizeOfDiscardableHeaders; // 0xC sz:0x4
     xe::be<uint32_t> SecurityInfo; // 0x10 sz:0x4
     xe::be<uint32_t> HeaderDirectoryEntryCount; // 0x14 sz:0x4
+
+    inline void endian_swap() {
+      *(uint32_t*)&ModuleFlags = xe::byte_swap(*(uint32_t*)&ModuleFlags);
+    }
   }; // size 0x18
   static_assert(sizeof(XexHeader) == 0x18, "xex::XexHeader");
 
@@ -145,6 +149,11 @@ namespace xex {
       uint32_t SizeInfo;
     };
     uint8_t DataDigest[0x14]; // Digest of the next page + next page descriptor
+
+    inline void endian_swap()
+    {
+      SizeInfo = xe::byte_swap(SizeInfo);
+    }
   };
   static_assert(sizeof(HvPageInfo) == 0x18, "xex:HvPageInfo");
 
@@ -181,6 +190,12 @@ namespace xex2 {
     HvImageInfo ImageInfo;
     xex::AllowedMediaTypes AllowedMediaTypes;
     xe::be<uint32_t> PageDescriptorCount;
+
+    void endian_swap()
+    {
+      *(uint32_t*)&ImageInfo.ImageFlags = xe::byte_swap(*(uint32_t*)&ImageInfo.ImageFlags);
+      *(uint32_t*)&AllowedMediaTypes = xe::byte_swap(*(uint32_t*)&AllowedMediaTypes);
+    }
   };
   static_assert(sizeof(SecurityInfo) == 0x184, "xex2::SecurityInfo");
 };

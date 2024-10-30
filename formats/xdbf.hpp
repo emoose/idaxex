@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "xdbf_xbox.hpp"
+#include "xdbf_structs.hpp"
 
 namespace xe {
 namespace kernel {

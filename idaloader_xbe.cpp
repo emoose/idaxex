@@ -18,7 +18,7 @@ struct exehdr {}; // needed for pe.h
 
 #include <libXbSymbolDatabase.h>
 
-#include "xbe.hpp"
+#include "formats/xbe.hpp"
 
 #ifdef _WIN32
 #define strncasecmp _strnicmp

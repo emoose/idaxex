@@ -9,10 +9,10 @@
 #include "3rdparty/cxxopts.hpp"
 #include "3rdparty/date.hpp"
 
-#include "xex.hpp"
-#include "xex_headerids.hpp"
+#include "formats/xex.hpp"
+#include "formats/xex_headerids.hpp"
 
-#include "xdbf/xdbf.hpp"
+#include "formats/xdbf.hpp"
 
 extern const char* key_names[4];
 extern bool xex_log_verbose;
@@ -729,7 +729,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   auto* title_ids = xex.opt_header_ptr<uint32_t>(XEX_HEADER_ALTERNATE_TITLE_IDS);
   if (title_ids)
   {
-    uint32_t size = _byteswap_ulong(*title_ids);
+    uint32_t size = xe::byte_swap(*title_ids);
     uint32_t count = (size - 4) / sizeof(uint32_t);
     if (count > 0)
     {
@@ -737,7 +737,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
       title_ids++;
       for (uint32_t i = 0; i < count; i++)
       {
-        uint32_t tid = _byteswap_ulong(*title_ids);
+        uint32_t tid = xe::byte_swap(*title_ids);
         title_ids++;
         printf("  %3d) %s\n", i, titleid2str(tid).c_str());
       }
@@ -748,11 +748,11 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   if (patch_info_og) {
     xex_opt::XexDeltaPatchDescriptor patch_info = *patch_info_og;
 
-    *(uint32_t*)&patch_info.SourceVersion = _byteswap_ulong(*(uint32_t*)&patch_info.SourceVersion);
-    *(uint32_t*)&patch_info.TargetVersion = _byteswap_ulong(*(uint32_t*)&patch_info.TargetVersion);
+    *(uint32_t*)&patch_info.SourceVersion = xe::byte_swap(*(uint32_t*)&patch_info.SourceVersion);
+    *(uint32_t*)&patch_info.TargetVersion = xe::byte_swap(*(uint32_t*)&patch_info.TargetVersion);
 
     uint32_t media_id;
-    media_id = _byteswap_ulong(*(uint32_t*)(&xex.security_info().ImageInfo.MediaID[0xC]));
+    media_id = xe::byte_swap(*(uint32_t*)(&xex.security_info().ImageInfo.MediaID[0xC]));
 
     printf("\nDelta Patch Descriptor\n");
     printf("  Media ID:               %08X\n", media_id);

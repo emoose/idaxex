@@ -12,8 +12,8 @@
 #include <cstdint>
 #include <cstring>
 
-#include "3rdparty/mspack/lzx.h"
-#include "3rdparty/mspack/mspack.h"
+#include "../3rdparty/mspack/lzx.h"
+#include "../3rdparty/mspack/mspack.h"
 
  // BitScanForward (bsf).
  // Search the value from least significant bit (LSB) to the most significant bit

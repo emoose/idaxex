@@ -13,30 +13,24 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
     </Filter>
+    <Filter Include="Header Files\formats">
+      <UniqueIdentifier>{b9a1b327-7db0-4490-abf7-1b7deabf3b71}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats">
+      <UniqueIdentifier>{a4c096a6-e13b-4af5-8a6c-776b53f9acd5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\excrypt">
+      <UniqueIdentifier>{2e3fab5a-2e7a-443e-8abb-92c47a5ca017}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lzx">
+      <UniqueIdentifier>{eb5158b2-1fed-4520-848c-17295b1940e8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="namegen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="xex.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="idaloader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="3rdparty\mspack\lzxd.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="3rdparty\mspack\system.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="lzx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="xbe.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="idaloader_xbe.cpp">
@@ -48,43 +42,61 @@
     <ClCompile Include="3rdparty\XbSymbolDatabase\src\lib\libXbSymbolDatabase.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="formats\xex.cpp">
+      <Filter>Source Files\formats</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\xbe.cpp">
+      <Filter>Source Files\formats</Filter>
+    </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\excrypt_aes.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\excrypt</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c">
+      <Filter>Source Files\excrypt</Filter>
     </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\rijndael.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\excrypt</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\mspack\lzxd.c">
+      <Filter>Source Files\lzx</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\mspack\system.c">
+      <Filter>Source Files\lzx</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\lzx.cpp">
+      <Filter>Source Files\lzx</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="xex_structs.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xex_optheaders.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pe_structs.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xex_headerids.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xex.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="3rdparty\byte_order.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="xex_keys.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="formats\pe_structs.hpp">
+      <Filter>Header Files\formats</Filter>
     </ClInclude>
-    <ClInclude Include="xbe.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="formats\xbe.hpp">
+      <Filter>Header Files\formats</Filter>
     </ClInclude>
-    <ClInclude Include="xbe_structs.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="formats\xbe_keys.hpp">
+      <Filter>Header Files\formats</Filter>
     </ClInclude>
-    <ClInclude Include="xbe_keys.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="formats\xbe_structs.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_headerids.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_keys.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_optheaders.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_structs.hpp">
+      <Filter>Header Files\formats</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

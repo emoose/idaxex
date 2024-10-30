@@ -20,10 +20,11 @@ struct exehdr {}; // needed for pe.h
 #include <filesystem>
 #include <list>
 
-#include "xex.hpp"
-#include "xex_headerids.hpp"
+#include "formats/xex.hpp"
+#include "formats/xex_headerids.hpp"
 
-#include "xbe.hpp"
+#include "formats/xbe.hpp"
+
 netnode ignore_micro;
 
 bool exclude_unneeded_sections = true;
@@ -214,7 +215,7 @@ void pe_add_sections(linput_t* li, XEXFile& file)
 
     uint32_t block_offset = 0;
 
-    // If first segment is inside this block, offset data we read so prior data (PE headers etc) won't be added to DB
+    // If first segment is inside this block, offset the data we read so prior data (PE headers etc) won't be added to DB
     if (first_segment_address >= addr_start && addr_end > first_segment_address)
       block_offset = first_segment_address - addr_start;
 

@@ -15,14 +15,14 @@ set(LOADER_NAME idaxex)
 set(LOADER_SOURCES
   idaloader.cpp
   idaloader_xbe.cpp
-  xbe.cpp
-  xex.cpp
-  lzx.cpp
   namegen.cpp
   namegen_xtlid.cpp
+  formats/xbe.cpp
+  formats/xex.cpp
   3rdparty/excrypt/src/excrypt_aes.c
   3rdparty/excrypt/src/rijndael.c
   3rdparty/excrypt/src/excrypt_sha.c
+  3rdparty/lzx.cpp
   3rdparty/mspack/lzxd.c
   3rdparty/mspack/system.c
   3rdparty/XbSymbolDatabase/src/lib/libXbSymbolDatabase.c

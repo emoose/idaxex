@@ -8,9 +8,9 @@
  */
 
 #include <cstring>
-#include "../xex.hpp"
+#include "xex.hpp"
 #include "xdbf.hpp"
-#include "xdbf_xbox.hpp"
+#include "xdbf_structs.hpp"
 
 namespace xe {
 namespace kernel {

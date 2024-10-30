@@ -9,80 +9,74 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="Source Files\Resource Files">
+    <Filter Include="Resource Files">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\formats">
+      <UniqueIdentifier>{bcbb88ec-15d3-4ca7-b4ad-94813d536d60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\excrypt">
+      <UniqueIdentifier>{166b01ed-282b-4f1c-b5e9-26e8696318b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\formats">
+      <UniqueIdentifier>{bf9da4ae-4f30-46ac-881f-014918c66db9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lzx">
+      <UniqueIdentifier>{7071ccd0-cad0-4907-9d95-90600bd9d1f5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="xex1tool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="xex.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="xdbf\xdbf.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="namegen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\mspack\lzxd.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="3rdparty\mspack\system.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="lzx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_sig.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_aes.c">
+      <Filter>Source Files\excrypt</Filter>
     </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\excrypt_bn.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\excrypt</Filter>
     </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_mod.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\excrypt</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_rc4.c">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_bn_sig.c">
+      <Filter>Source Files\excrypt</Filter>
     </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\excrypt_mem.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\excrypt</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_rc4.c">
+      <Filter>Source Files\excrypt</Filter>
     </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\excrypt_rotsum.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\excrypt</Filter>
     </ClCompile>
-    <ClCompile Include="3rdparty\excrypt\src\excrypt_aes.c">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="3rdparty\excrypt\src\excrypt_sha.c">
+      <Filter>Source Files\excrypt</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\xex.cpp">
+      <Filter>Source Files\formats</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\mspack\lzxd.c">
+      <Filter>Source Files\lzx</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\mspack\system.c">
+      <Filter>Source Files\lzx</Filter>
     </ClCompile>
     <ClCompile Include="3rdparty\excrypt\src\rijndael.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\excrypt</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\lzx.cpp">
+      <Filter>Source Files\lzx</Filter>
+    </ClCompile>
+    <ClCompile Include="formats\xdbf.cpp">
+      <Filter>Source Files\formats</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="xex_headerids.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xex_keys.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xex_optheaders.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xex_structs.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xex.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pe_structs.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="3rdparty\byte_order.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -92,11 +86,29 @@
     <ClInclude Include="3rdparty\date.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="xdbf\xdbf.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="formats\pe_structs.hpp">
+      <Filter>Header Files\formats</Filter>
     </ClInclude>
-    <ClInclude Include="xdbf\xdbf_xbox.hpp">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="formats\xex.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_headerids.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_keys.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_optheaders.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xex_structs.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xdbf.hpp">
+      <Filter>Header Files\formats</Filter>
+    </ClInclude>
+    <ClInclude Include="formats\xdbf_structs.hpp">
+      <Filter>Header Files\formats</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
