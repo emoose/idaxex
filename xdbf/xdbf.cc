@@ -17,8 +17,6 @@ namespace kernel {
 namespace xam {
 namespace xdbf {
 
-constexpr uint32_t kXdbfMagicXdbf = 'XDBF';
-
 bool XdbfFile::Read(const uint8_t* data, size_t data_size) {
   if (!data || data_size <= sizeof(X_XDBF_HEADER)) {
     return false;

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstdio>
 #include <filesystem>
+#include <cinttypes>
 
 #include "3rdparty/cxxopts.hpp"
 #include "3rdparty/date.hpp"
@@ -98,9 +99,9 @@ void PrintImports(XEXFile& xex) {
     {
       auto& table_header = tables.at(libname);
 
-      printf("# %s v%d.%d.%d.%d\n# (min v%d.%d.%d.%d, %llu imports)\n", libname.c_str(),
+      printf("# %s v%d.%d.%d.%d\n# (min v%d.%d.%d.%d, %d imports)\n", libname.c_str(),
         table_header.Version.Major, table_header.Version.Minor, table_header.Version.Build, table_header.Version.QFE,
-        table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE, lib.second.size());
+        table_header.VersionMin.Major, table_header.VersionMin.Minor, table_header.VersionMin.Build, table_header.VersionMin.QFE, int(lib.second.size()));
 
       version = table_header.Version.Build;
     }
@@ -603,13 +604,13 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     // TODO: print these as strings!
     if (time_range)
     {
-      printf("  Start Date:         %llX\n", (uint64_t)time_range->Start);
-      printf("  End Date:           %llX\n", (uint64_t)time_range->End);
+      printf("  Start Date:         %" PRIX64 "\n", (uint64_t)time_range->Start);
+      printf("  End Date:           %" PRIX64 "\n", (uint64_t)time_range->End);
     }
     if (kv_privs)
     {
-      printf("  KeyVault Mask:      %llX\n", (uint64_t)kv_privs->Mask);
-      printf("  KeyVault Value:     %llX\n", (uint64_t)kv_privs->Match);
+      printf("  KeyVault Mask:      %" PRIX64 "\n", (uint64_t)kv_privs->Mask);
+      printf("  KeyVault Value:     %" PRIX64 "\n", (uint64_t)kv_privs->Match);
     }
     // TODO: consoleID table
   }
@@ -896,7 +897,7 @@ int main(int argc, char* argv[])
 
   if (!result.count("positional"))
   {
-    printf(options.help().c_str());
+    printf("%s", options.help().c_str());
     return 0;
   }
 
@@ -904,7 +905,7 @@ int main(int argc, char* argv[])
 
   if (!positional.size())
   {
-    printf(options.help().c_str());
+    printf("%s", options.help().c_str());
     return 0;
   }
 

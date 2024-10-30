@@ -23,11 +23,13 @@ namespace xdbf {
 // https://github.com/oukiar/freestyledash/blob/master/Freestyle/Tools/XEX/SPA.h
 // https://github.com/oukiar/freestyledash/blob/master/Freestyle/Tools/XEX/SPA.cpp
 
+constexpr uint32_t kXdbfMagicXdbf = 0x46424458; // XDBF
+
 enum class SpaID : uint64_t {
-  Xach = 'XACH',
-  Xstr = 'XSTR',
-  Xstc = 'XSTC',
-  Xthd = 'XTHD',
+  Xach = 0x48434158, // XACH
+  Xstr = 0x52545358, // XSTR
+  Xstc = 0x43545358, // XSTC
+  Xthd = 0x44485458, // XTHD
   Title = 0x8000,
 };
 
@@ -161,7 +163,7 @@ struct Entry {
 class XdbfFile {
  public:
   XdbfFile() {
-    header_.magic = 'XDBF';
+    header_.magic = kXdbfMagicXdbf;
     header_.version = 1;
   }
 
