@@ -66,6 +66,33 @@
     <ClCompile Include="3rdparty\lzx.cpp">
       <Filter>Source Files\lzx</Filter>
     </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\D3D8_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\D3D8LTCG_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\DSound_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\JVS_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XActEng_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\Xapi_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XGraphic_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XNet_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XOnline_OOVPA.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3rdparty\byte_order.hpp">

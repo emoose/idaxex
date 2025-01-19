@@ -26,6 +26,15 @@ set(LOADER_SOURCES
   3rdparty/mspack/lzxd.c
   3rdparty/mspack/system.c
   3rdparty/XbSymbolDatabase/src/lib/libXbSymbolDatabase.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/D3D8_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/D3D8LTCG_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/DSound_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/JVS_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XActEng_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/Xapi_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XGraphic_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XNet_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XOnline_OOVPA.c
 )
 set(LOADER_INCLUDE_DIRECTORIES 3rdparty/excrypt/src 3rdparty/XbSymbolDatabase/include 3rdparty/XbSymbolDatabase/src/OOVPADatabase $ENV{IDASDK}/ldr/pe)
 add_compile_definitions(IDALDR=1)

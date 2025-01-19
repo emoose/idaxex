@@ -69,6 +69,15 @@
     <ClCompile Include="3rdparty\mspack\lzxd.c" />
     <ClCompile Include="3rdparty\mspack\system.c" />
     <ClCompile Include="3rdparty\XbSymbolDatabase\src\lib\libXbSymbolDatabase.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\D3D8LTCG_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\D3D8_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\DSound_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\JVS_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XActEng_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\Xapi_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XGraphic_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XNet_OOVPA.c" />
+    <ClCompile Include="3rdparty\XbSymbolDatabase\src\OOVPADatabase\XOnline_OOVPA.c" />
     <ClCompile Include="formats\xbe.cpp" />
     <ClCompile Include="formats\xex.cpp" />
     <ClCompile Include="idaloader.cpp" />
