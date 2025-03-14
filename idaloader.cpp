@@ -397,7 +397,10 @@ bool load_application(linput_t* li)
 
   // If this is XEX2 try loading in x360.til, in case we have one
   if (file.header().Magic == MAGIC_XEX2)
+  {
       add_til("x360.til", ADDTIL_INCOMP);
+      add_til("xkelib.til", ADDTIL_INCOMP);
+  }
 
   pe_add_sections(li, file);
 
