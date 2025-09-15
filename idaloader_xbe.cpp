@@ -219,7 +219,7 @@ static void reg_cb(const char* library_str,
   const XbSDBSymbolParam* param_list)
 {
   num_dbsymbols++;
-  const char* symbol_name = XbSymbolDatabase_SymbolReferenceToString(xref_index);
+  const char* symbol_name = XbSDB_SymbolReferenceToString(xref_index);
   set_name(address, symbol_name);
 
   if (symbol_type == symbol_function)
@@ -230,7 +230,7 @@ static void reg_cb(const char* library_str,
 
 bool xbe_scan_symboldb(XBEFile& file)
 {
-  msg("[XbSymbolDatabase] Scanning for library symbols, database version %x\n", XbSymbolDatabase_LibraryVersion());
+  msg("[XbSymbolDatabase] Scanning for library symbols, database version %x\n", XbSDB_LibraryVersion());
   num_dbsymbols = 0;
 
   // Make copy of xbe_data so we can apply transformations before passing to XbSymbolDatabase
@@ -250,31 +250,31 @@ bool xbe_scan_symboldb(XBEFile& file)
   }
 
   XbSDBLibraryHeader lib_header = {
-      .count = XbSymbolDatabase_GenerateLibraryFilter(xbe_header, NULL),
+      .count = XbSDB_GenerateLibraryFilter(xbe_header, NULL),
       .filters = (XbSDBLibrary*)malloc(lib_header.count * sizeof(XbSDBLibrary))
   };
   if (!lib_header.filters) {
     return false;
   }
-  XbSymbolDatabase_GenerateLibraryFilter(xbe_header, &lib_header);
+  XbSDB_GenerateLibraryFilter(xbe_header, &lib_header);
 
   XbSDBSectionHeader sect_header = {
-      .count = XbSymbolDatabase_GenerateSectionFilter(xbe_header, NULL, 1),
+      .count = XbSDB_GenerateSectionFilter(xbe_header, NULL, 1),
       .filters = (XbSDBSection*)malloc(sect_header.count * sizeof(XbSDBSection))
   };
   if (!sect_header.filters) {
     free(lib_header.filters);
     return false;
   }
-  XbSymbolDatabase_GenerateSectionFilter(xbe_header, &sect_header, 1);
+  XbSDB_GenerateSectionFilter(xbe_header, &sect_header, 1);
 
-  XbSymbolContextHandle ctx;
-  bool status = XbSymbolDatabase_CreateXbSymbolContext(&ctx, reg_cb, lib_header, sect_header, XbSymbolDatabase_GetKernelThunkAddress(xbe_header));
+  XbSDBContextHandle ctx;
+  bool status = XbSDB_CreateContext(&ctx, reg_cb, lib_header, sect_header, XbSDB_GetKernelThunkAddress(xbe_header));
   if (status)
   {
-    XbSymbolContext_ScanManual(ctx);
-    XbSymbolContext_ScanAllLibraryFilter(ctx);
-    XbSymbolContext_RegisterXRefs(ctx);
+    XbSDBContext_ScanManual(ctx);
+    XbSDBContext_ScanAllLibraryFilter(ctx);
+    XbSDBContext_RegisterXRefs(ctx);
     msg("[XbSymbolDatabase] Scan complete, %d symbols named\n", num_dbsymbols);
   }
   else
@@ -283,7 +283,7 @@ bool xbe_scan_symboldb(XBEFile& file)
   }
 
   if(ctx)
-    XbSymbolContext_Release(ctx);
+    XbSDBContext_Release(ctx);
 
   free(sect_header.filters);
   free(lib_header.filters);
