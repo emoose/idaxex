@@ -12,6 +12,7 @@
 #include <entry.hpp>
 #include <typeinf.hpp>
 #include <bytes.hpp>
+#include <segregs.hpp>
 
 struct exehdr {}; // needed for pe.h
 #include <pe.h>
@@ -104,6 +105,37 @@ void label_regsaveloads(ea_t start, ea_t end)
   }
 }
 
+static void file2base_patchable_clamped(linput_t* li, uint64_t file_offset, ea_t start_ea, ea_t end_ea, const char* what)
+{
+  if (end_ea <= start_ea)
+    return;
+
+  const uint64_t file_size = (uint64_t)qlsize(li);
+  if (file_offset >= file_size)
+  {
+    msg("[!] Skipping %s patch-back mapping at file offset 0x%llX: input file size is 0x%llX\n",
+      what, (unsigned long long)file_offset, (unsigned long long)file_size);
+    return;
+  }
+
+  uint64_t map_len = (uint64_t)(end_ea - start_ea);
+  const uint64_t available = file_size - file_offset;
+  if (map_len > available)
+  {
+    msg("[!] Clamping %s patch-back mapping at file offset 0x%llX from 0x%llX to 0x%llX bytes\n",
+      what,
+      (unsigned long long)file_offset,
+      (unsigned long long)map_len,
+      (unsigned long long)available);
+    map_len = available;
+  }
+
+  if (!map_len)
+    return;
+
+  file2base(li, file_offset, start_ea, start_ea + (ea_t)map_len, FILEREG_PATCHABLE);
+}
+
 void pe_add_sections(linput_t* li, XEXFile& file)
 {
   ignore_micro.init_ignore_micro();
@@ -157,12 +189,15 @@ void pe_add_sections(linput_t* li, XEXFile& file)
 
     const char* seg_class = has_code ? "CODE" : "DATA";
 
-    segment_t segm;
+    segment_t segm{};
     segm.start_ea = seg_addr;
     segm.end_ea = seg_addr + section.VirtualSize;
     segm.align = saRelDble;
     segm.bitness = 1;
     segm.perm = seg_perms;
+    segm.sel = allocate_selector(0);
+    for (int i = 0; i < SREG_NUM; i++)
+      segm.defsr[i] = BADSEL;
     add_segm_ex(&segm, name, seg_class, 0);
 
     // Load data into IDA
@@ -193,9 +228,19 @@ void pe_add_sections(linput_t* li, XEXFile& file)
   if (data_descriptor->DataFormat() == xex_opt::XexDataFormat::None)
   {
     // TODO: find a file to check this with (might be pre-XEX2 only...)
+    if (!first_segment_address)
+    {
+      msg("[!] Skipping patch-back mapping: no loadable bytes were added to the database\n");
+      return;
+    }
+
     auto first_segment_offset = first_segment_address - file.base_address();
     auto end_address = file.base_address() + file.image_size();
-    file2base(li, file.header().SizeOfHeaders + first_segment_offset, first_segment_address, end_address, FILEREG_PATCHABLE);
+    file2base_patchable_clamped(li,
+      uint64_t(file.header().SizeOfHeaders) + first_segment_offset,
+      first_segment_address,
+      end_address,
+      "raw");
     return;
   }
 
@@ -220,7 +265,11 @@ void pe_add_sections(linput_t* li, XEXFile& file)
       block_offset = first_segment_address - addr_start;
 
     if (addr_start + block_offset >= first_segment_address)
-      file2base(li, file.header().SizeOfHeaders + file_position + block_offset, addr_start + block_offset, addr_end, FILEREG_PATCHABLE);
+      file2base_patchable_clamped(li,
+        uint64_t(file.header().SizeOfHeaders) + file_position + block_offset,
+        addr_start + block_offset,
+        addr_end,
+        "block");
 
     address += block.DataSize + block.ZeroSize;
     file_position += block.DataSize;
