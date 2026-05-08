@@ -1,6 +1,6 @@
 # idaxex
 
-idaxex is a native loader plugin for IDA Pro, adding support for loading in Xbox360 XEX & Xbox XBE executables.
+idaxex is a native loader plugin for IDA Pro 9.3, adding support for loading Xbox 360 XEX and Xbox XBE executables.
 
 Originally started as an [IDAPython loader](https://github.com/emoose/reversing/blob/master/xbox360.py), work was continued as a native DLL to solve the shortcomings of it.
 
@@ -33,11 +33,11 @@ Includes support for the following Xbox executables:
 - XBE: tries naming SDK library functions using [XbSymbolDatabase](https://github.com/Cxbx-Reloaded/XbSymbolDatabase) & data from XTLID section
 
 ## Install
-Builds for IDA 9 are available in the releases section.
+Prebuilt releases are available for supported IDA Pro 9.x versions.
 
-To install the loader just extract the contents of the folder for your IDA version into IDA's install folder (eg. C:\Program Files\IDA Professional 9.0\)
+Copy the loader files into the matching IDA installation's loader/plugin directory, or follow the build steps below and install the resulting binary into your IDA SDK output folder.
 
-I recommend pairing this loader with the PPCAltivec plugin, an updated version for IDA 7 is available at hayleyxyz's repo here: https://github.com/hayleyxyz/PPC-Altivec-IDA
+For PPC Altivec analysis, the PPCAltivec plugin remains a useful companion: https://github.com/hayleyxyz/PPC-Altivec-IDA
 
 ## Building
 
@@ -45,21 +45,22 @@ Make sure to clone repo recursively for excrypt submodule to get pulled in.
 
 **Windows**
 
-Clone the repo into your idasdk\ldr\ folder and then build idaxex.sln with VS2022.
+- Clone the repo with submodules enabled so the bundled crypto code is available.
+- Point `IDASDK` at your IDA SDK 9.3 root.
+- Use the SDK's CMake bootstrap or the generated Visual Studio project flow that comes with the SDK.
 
 **Linux**
 
-- Setup [ida-cmake](https://github.com/allthingsida/ida-cmake) in your idasdk folder
-- Make sure IDASDK env var points to your idasdk folder
-- Clone idaxex repo
-- Run `cmake . -DEA64=YES` inside idaxex folder
-- Run `make`
-- To build xex1tool run cmake/make inside the xex1tool folder
+- Use the IDA SDK 9.3 CMake bootstrap from `src/cmake/bootstrap.cmake` if your SDK tree has it, or the standalone [ida-cmake](https://github.com/allthingsida/ida-cmake) bootstrap if you keep that package separately.
+- Make sure `IDASDK` points at the SDK root.
+- Run `cmake -S . -B build` from the repo root.
+- Run `cmake --build build`.
+- To build `xex1tool`, run `cmake -S xex1tool -B xex1tool/build` and `cmake --build xex1tool/build`.
 
-On newest IDA you may need to edit ida-cmake common.cmake and change `libida64.so` to `libida.so` for build to link properly.
+On newer IDA SDKs, `libida.so` may be the correct library name in place of `libida64.so`.
 
 ## Credits
-Based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, and probably many others I forgot to name.
+Based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, XeCLI, and probably many others I forgot to name.
 
 Thanks to everyone involved in the Xbox 360 modding/reverse-engineering community!
 

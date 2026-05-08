@@ -58,7 +58,7 @@ void xbe_add_sections(linput_t* li, XBEFile& file)
   add_segm_ex(&xbe_segm, "HEADER", "DATA", 0);
   mem2base(xbe_header.data(), xbe_segm.start_ea, xbe_segm.end_ea, -1);*/
 
-  sel_t ds = BADADDR;
+  sel_t ds = BADSEL;
 
   for (const auto& section : file.sections())
   {
@@ -88,7 +88,7 @@ void xbe_add_sections(linput_t* li, XBEFile& file)
     uint32 seg_addr = section.Info.VirtualAddress;
     size_t seg_size = section.DataSize;
 
-    segment_t segm;
+    segment_t segm{};
     segm.start_ea = seg_addr;
     segm.end_ea = seg_addr + section.Info.VirtualSize;
     segm.align = saRelByte;
@@ -96,7 +96,7 @@ void xbe_add_sections(linput_t* li, XBEFile& file)
     segm.perm = seg_perms;
     segm.sel = allocate_selector(0);
     for (int i = 0; i < SREG_NUM; i++)
-      segm.defsr[i] = BADADDR;
+      segm.defsr[i] = BADSEL;
 
     if (section.Name == ".data")
       ds = segm.sel;
@@ -108,7 +108,7 @@ void xbe_add_sections(linput_t* li, XBEFile& file)
       file2base(li, section.Info.PointerToRawData, seg_addr, seg_addr + seg_size, FILEREG_PATCHABLE);
   }
 
-  if (ds != BADADDR)
+  if (ds != BADSEL)
     set_default_dataseg(ds);
 }
 
@@ -249,19 +249,17 @@ bool xbe_scan_symboldb(XBEFile& file)
       ^ kXbeXorEntry_Retail;
   }
 
-  XbSDBLibraryHeader lib_header = {
-      .count = XbSDB_GenerateLibraryFilter(xbe_header, NULL),
-      .filters = (XbSDBLibrary*)malloc(lib_header.count * sizeof(XbSDBLibrary))
-  };
+  XbSDBLibraryHeader lib_header{};
+  lib_header.count = XbSDB_GenerateLibraryFilter(xbe_header, NULL);
+  lib_header.filters = (XbSDBLibrary*)malloc(lib_header.count * sizeof(XbSDBLibrary));
   if (!lib_header.filters) {
     return false;
   }
   XbSDB_GenerateLibraryFilter(xbe_header, &lib_header);
 
-  XbSDBSectionHeader sect_header = {
-      .count = XbSDB_GenerateSectionFilter(xbe_header, NULL, 1),
-      .filters = (XbSDBSection*)malloc(sect_header.count * sizeof(XbSDBSection))
-  };
+  XbSDBSectionHeader sect_header{};
+  sect_header.count = XbSDB_GenerateSectionFilter(xbe_header, NULL, 1);
+  sect_header.filters = (XbSDBSection*)malloc(sect_header.count * sizeof(XbSDBSection));
   if (!sect_header.filters) {
     free(lib_header.filters);
     return false;
