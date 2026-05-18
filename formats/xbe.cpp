@@ -83,8 +83,8 @@ bool XBEFile::load(void* file)
     seek(file, xbe_va_to_offset(section.Info.SectionNameOffset), SEEK_SET);
     section.Name = read_null_terminated(file, 64);
 
-    // Figure out section data size
-    section.DataSize = section.Info.VirtualSize;
+    // Figure out section data size — cap to SizeOfRawData (BSS sections like .textbss have zero raw data)
+    section.DataSize = std::min(section.Info.VirtualSize, section.Info.SizeOfRawData);
 
     // If virtual size is beyond file bounds, resize it to what we can fit
     // TODO: should probably check against offset of other sections too, so we don't include their data
@@ -155,7 +155,9 @@ bool XBEFile::load(void* file)
   }
 
   // Read debug info
-  // TODO: scan for codeview RSDS header in older XBEs which don't include codeview offset in headers?
+  bool found_rsds = false;
+
+  // First try the CodeViewDebugInfoOffset from the XBE header
   if (xbe_header_.has_codeview_offset() && xbe_header_.CodeViewDebugInfoOffset)
   {
     auto codeview_offset = xbe_va_to_offset(xbe_header_.CodeViewDebugInfoOffset);
@@ -175,7 +177,63 @@ bool XBEFile::load(void* file)
         cv_data[sizeof(CV_INFO_PDB70) + cv_fname.length()] = 0;
 
         codeview_data_.push_back(cv_data);
+        found_rsds = true;
       }
+    }
+  }
+
+  // Fallback: scan for RSDS signature in the raw file data
+  // Some XBEs (like those built with older XDKs) have an invalid CodeViewDebugInfoOffset
+  if (!found_rsds)
+  {
+    // RSDS signature bytes
+    const uint8_t rsds_sig[4] = { 0x52, 0x53, 0x44, 0x53 }; // 'RSDS'
+
+    for (const auto& section : sections_)
+    {
+      if (section.Info.PointerToRawData + sizeof(CV_INFO_PDB70) > image_length_)
+        continue;
+
+      // Search within this section's raw data for RSDS
+      auto* section_start = xbe_data_.data() + section.Info.PointerToRawData;
+      size_t section_size = std::min((size_t)section.DataSize, image_length_ - section.Info.PointerToRawData);
+
+      for (size_t pos = 0; pos + sizeof(CV_INFO_PDB70) <= section_size; pos++)
+      {
+        if (memcmp(section_start + pos, rsds_sig, 4) != 0)
+          continue;
+
+        CV_INFO_PDB70 cv_info;
+        if (pos + sizeof(CV_INFO_PDB70) > section_size)
+          break;
+        memcpy(&cv_info, section_start + pos, sizeof(CV_INFO_PDB70));
+
+        if (cv_info.CvSignature != CV_INFO_RSDS_SIGNATURE)
+          continue;
+
+        // Read PDB filename
+        std::string cv_fname;
+        const char* fname_start = (const char*)(section_start + pos + sizeof(CV_INFO_PDB70));
+        size_t max_fname_len = section_size - pos - sizeof(CV_INFO_PDB70);
+        for (size_t i = 0; i < max_fname_len && i < 256; i++)
+        {
+          if (fname_start[i] == '\0')
+            break;
+          cv_fname += fname_start[i];
+        }
+
+        std::vector<uint8_t> cv_data;
+        cv_data.resize(sizeof(CV_INFO_PDB70) + cv_fname.length() + 1);
+        std::copy_n((uint8_t*)&cv_info, sizeof(CV_INFO_PDB70), cv_data.data());
+        std::copy_n(cv_fname.c_str(), cv_fname.length(), cv_data.data() + sizeof(CV_INFO_PDB70));
+        cv_data[sizeof(CV_INFO_PDB70) + cv_fname.length()] = 0;
+
+        codeview_data_.push_back(cv_data);
+        found_rsds = true;
+        break;
+      }
+      if (found_rsds)
+        break;
     }
   }
 
