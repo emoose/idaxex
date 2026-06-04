@@ -20,6 +20,26 @@ if(DEFINED ENV{IDASDK})
 
   include("${_IDASDK_BOOTSTRAP}")
   find_package(idasdk REQUIRED)
+
+  foreach(_IDAXEX_QT_HELPER_TARGET IN ITEMS
+      build_qt
+      qt6_external
+      qt6_external-download
+      qt6_external-configure
+      qt6_external-build
+      qt6_external-install
+    )
+    if(TARGET ${_IDAXEX_QT_HELPER_TARGET})
+      set_target_properties(${_IDAXEX_QT_HELPER_TARGET} PROPERTIES
+        EXCLUDE_FROM_ALL TRUE
+        EXCLUDE_FROM_DEFAULT_BUILD TRUE
+        EXCLUDE_FROM_DEFAULT_BUILD_DEBUG TRUE
+        EXCLUDE_FROM_DEFAULT_BUILD_RELEASE TRUE
+        EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO TRUE
+        EXCLUDE_FROM_DEFAULT_BUILD_MINSIZEREL TRUE
+      )
+    endif()
+  endforeach()
 else()
   message(FATAL_ERROR "Set IDASDK to an IDA SDK root before configuring idaxex")
 endif()
