@@ -45,9 +45,10 @@ Make sure to clone repo recursively for excrypt submodule to get pulled in.
 
 **Windows**
 
-- Clone the repo with submodules enabled so the bundled crypto code is available.
-- Point `IDASDK` at your IDA SDK 9.3 root.
-- Use the SDK's CMake bootstrap or the generated Visual Studio project flow that comes with the SDK.
+- Point `IDASDK` environment variable at your IDA SDK 9.3 root.
+- Run CMake to generate the VS solution: `cmake -B build -G "Visual Studio 18 2026"`
+- Build with `cmake --build build` or use the `idaxex.slnx` file.
+- idaxex.dll will be built at `$IDASDK\src\bin\loaders\idaxex.dll`
 
 **Linux**
 
@@ -73,5 +74,3 @@ Also included is an attempt at recreating xorloser's XexTool, for working with o
 So far it can print info about the various XEX headers via `-l`, and extract the basefile (PE/XUIZ) from inside the XEX.
 
 For XEX files that are both decrypted & decompressed xex1tool can also convert a VA address to a file offset for you, making file patching a little easier.
-
-Support for other XexTool features may slowly be added over time (of course any help is appreciated!)
