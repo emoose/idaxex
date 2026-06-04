@@ -43,20 +43,95 @@ std::array<std::string, 11> kDataSectionNames = {
 
 void xbe_add_sections(linput_t* li, XBEFile& file)
 {
-  auto& xbe_header = file.header_data();
 
-  // TODO: adding a HEADER segment is likely needed for PDB loading
-  // though PDBs currently can't load properly due to other segment issues (see note at end of xbe_setup_netnode)
-  // so we'll skip adding this for now
-  /*
-  segment_t xbe_segm;
-  xbe_segm.start_ea = 0x10000;
-  xbe_segm.end_ea = 0x10000 + xbe_header.size();
-  xbe_segm.align = saRelDble;
-  xbe_segm.bitness = 1;
-  xbe_segm.perm = SEGPERM_READ | SEGPERM_WRITE;
-  add_segm_ex(&xbe_segm, "HEADER", "DATA", 0);
-  mem2base(xbe_header.data(), xbe_segm.start_ea, xbe_segm.end_ea, -1);*/
+  // Add a HEADER segment that holds reconstructed PE headers.
+  // This is needed so that IDA's PDB plugin can find the PE section
+  // headers and properly resolve (section_index, offset) pairs from
+  // the DIA SDK into virtual addresses inside the database.
+  {
+    const auto& sections = file.sections();
+    size_t num_sections = sections.size();
+
+    // Build synthetic PE header: DOS stub + NT headers + section headers
+    IMAGE_DOS_HEADER dos_header{};
+    dos_header.MZSignature = EXE_MZ_SIGNATURE;
+    dos_header.AddressOfNewExeHeader = sizeof(IMAGE_DOS_HEADER);
+
+    IMAGE_NT_HEADERS nt{};
+    nt.Signature = EXE_NT_SIGNATURE;
+    nt.FileHeader.Machine = 0x14C;
+    nt.FileHeader.NumberOfSections = (uint16_t)num_sections;
+    nt.FileHeader.TimeDateStamp = file.header().NtTimeDateStamp;
+    nt.FileHeader.SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER32);
+
+    auto& opt = nt.OptionalHeader;
+    opt.Magic = 0x10B;
+    opt.MajorLinkerVersion = 8;
+    opt.AddressOfEntryPoint = file.header().AddressOfEntryPoint;
+    opt.ImageBase = file.header().NtBaseOfDll;
+    opt.SectionAlignment = 0x1000;
+    opt.FileAlignment = 0x400;
+    opt.MajorOperatingSystemVersion = 4;
+    opt.MajorSubsystemVersion = 4;
+    opt.SizeOfImage = file.header().NtSizeOfImage;
+    opt.SizeOfHeaders = file.header().SizeOfHeaders;
+    opt.Subsystem = 2;
+    opt.SizeOfStackCommit = file.header().SizeOfStackCommit;
+    opt.SizeOfHeapReserve = file.header().SizeOfHeapReserve;
+    opt.SizeOfHeapCommit = file.header().SizeOfHeapCommit;
+    opt.NumberOfRvaAndSizes = 16;
+
+    // Build section headers from XBE sections
+    std::vector<IMAGE_SECTION_HEADER> sec_hdrs(num_sections);
+    for (size_t i = 0; i < num_sections; i++)
+    {
+      auto& sh = sec_hdrs[i];
+      memset(&sh, 0, sizeof(sh));
+      const auto& s = sections[i];
+
+      size_t name_len = std::min(s.Name.size(), (size_t)8);
+      memcpy(sh.Name, s.Name.c_str(), name_len);
+
+      sh.VirtualAddress = s.Info.VirtualAddress - file.header().NtBaseOfDll;
+      sh.VirtualSize = s.Info.VirtualSize;
+      sh.SizeOfRawData = s.Info.SizeOfRawData;
+      sh.PointerToRawData = s.Info.PointerToRawData;
+
+      uint32_t chars = IMAGE_SCN_MEM_READ;
+      if (s.Info.SectionFlags.Executable)
+        chars |= IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_CNT_CODE;
+      else
+        chars |= IMAGE_SCN_CNT_INITIALIZED_DATA;
+      if (s.Info.SectionFlags.Writable)
+        chars |= IMAGE_SCN_MEM_WRITE;
+      sh.Characteristics = chars;
+    }
+
+    // Calculate total header size (must be SectionAlignment-aligned)
+    size_t headers_size = sizeof(IMAGE_DOS_HEADER) + sizeof(IMAGE_NT_HEADERS)
+                          + num_sections * sizeof(IMAGE_SECTION_HEADER);
+    headers_size = (headers_size + 0xFFF) & ~0xFFF;
+
+    std::vector<uint8_t> pe_buf(headers_size, 0);
+    memcpy(pe_buf.data(), &dos_header, sizeof(dos_header));
+    memcpy(pe_buf.data() + sizeof(IMAGE_DOS_HEADER), &nt, sizeof(nt));
+    memcpy(pe_buf.data() + sizeof(IMAGE_DOS_HEADER) + sizeof(IMAGE_NT_HEADERS),
+           sec_hdrs.data(), num_sections * sizeof(IMAGE_SECTION_HEADER));
+
+    uint32_t base_va = file.base_address();
+    segment_t xbe_segm{};
+    xbe_segm.start_ea = base_va;
+    xbe_segm.end_ea = base_va + headers_size;
+    xbe_segm.align = saRelDble;
+    xbe_segm.bitness = 1;
+    xbe_segm.perm = SEGPERM_READ;
+    xbe_segm.sel = allocate_selector(0);
+    for (int i = 0; i < SREG_NUM; i++)
+      xbe_segm.defsr[i] = BADSEL;
+    add_segm_ex(&xbe_segm, "HEADER", "DATA", 0);
+
+    mem2base(pe_buf.data(), base_va, base_va + headers_size, -1);
+  }
 
   sel_t ds = BADSEL;
 
@@ -133,7 +208,7 @@ void xbe_setup_netnode(XBEFile& file)
   opt.Magic = 0x10B;
   opt.MajorLinkerVersion = 8;
   opt.AddressOfEntryPoint = xbe_header.AddressOfEntryPoint;
-  opt.ImageBase = xbe_header.BaseAddress;
+  opt.ImageBase = xbe_header.NtBaseOfDll;
   opt.SectionAlignment = 0x1000;
   opt.FileAlignment = 0x400;
   opt.MajorOperatingSystemVersion = 4;
@@ -146,10 +221,48 @@ void xbe_setup_netnode(XBEFile& file)
   opt.SizeOfHeapCommit = xbe_header.SizeOfHeapCommit;
   opt.NumberOfRvaAndSizes = 16;
 
-  penode.set(&nt_header, sizeof(IMAGE_NT_HEADERS));
+  // Build IMAGE_SECTION_HEADERs for each XBE section and store them
+  // after the NT headers in the netnode. IDA's PDB plugin reads these
+  // to map (section_index, offset) from DIA into virtual addresses.
+  {
+    const auto& sections = file.sections();
+    std::vector<IMAGE_SECTION_HEADER> sec_hdrs(sections.size());
+    for (size_t i = 0; i < sections.size(); i++)
+    {
+      auto& sh = sec_hdrs[i];
+      memset(&sh, 0, sizeof(sh));
+      const auto& s = sections[i];
+
+      size_t name_len = std::min(s.Name.size(), (size_t)8);
+      memcpy(sh.Name, s.Name.c_str(), name_len);
+
+      sh.VirtualAddress = s.Info.VirtualAddress - file.header().NtBaseOfDll;
+      sh.VirtualSize = s.Info.VirtualSize;
+      sh.SizeOfRawData = s.Info.SizeOfRawData;
+      sh.PointerToRawData = s.Info.PointerToRawData;
+
+      uint32_t chars = IMAGE_SCN_MEM_READ;
+      if (s.Info.SectionFlags.Executable)
+        chars |= IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_CNT_CODE;
+      else
+        chars |= IMAGE_SCN_CNT_INITIALIZED_DATA;
+      if (s.Info.SectionFlags.Writable)
+        chars |= IMAGE_SCN_MEM_WRITE;
+      sh.Characteristics = chars;
+    }
+
+    size_t blob_size = sizeof(IMAGE_NT_HEADERS)
+                       + sections.size() * sizeof(IMAGE_SECTION_HEADER);
+    std::vector<uint8_t> blob(blob_size, 0);
+    memcpy(blob.data(), &nt_header, sizeof(IMAGE_NT_HEADERS));
+    memcpy(blob.data() + sizeof(IMAGE_NT_HEADERS),
+           sec_hdrs.data(), sections.size() * sizeof(IMAGE_SECTION_HEADER));
+
+    penode.set(blob.data(), blob_size);
+  }
 
   // Update imagebase
-  penode.altset(PE_ALT_IMAGEBASE, file.base_address());
+  penode.altset(PE_ALT_IMAGEBASE, file.header().NtBaseOfDll);
 
   // Update IDA with any codeview data
   size_t cv_length = 0;
@@ -169,19 +282,13 @@ void xbe_setup_netnode(XBEFile& file)
     // Copy cv_data into RSDS tag
     penode.setblob(cv_data, cv_length, 0, RSDS_TAG);
 
-    // TODO: pdb loading doesn't currently work for xbe files
-    // Even though cvdump shows that the symbols are relative to each segment
-    // It looks like DIA (and PDBIDA) both lookup the segment address from something inside the PDB, rather than from the IDB
-    // PDB segments are based on the original EXE layout, not the XBE version, so this causes it to use wrong address for symbols
-    // 
-    // (guess there must be some way for DIA to adjust segment addrs since XboxSDK allows XBE+PDB debugging
-    // but IDA probably isn't setup to make use of that, or if it is I haven't seen a way for us to change it...)
-#if 0
     // Prompt for PDB load
-    msg("Prompting for PDB load...\n(full X360 type loading may require pdb.cfg PDB_PROVIDER = PDB_PROVIDER_MSDIA !)\n");
+    msg("Prompting for PDB load...\n");
     auto* plugin = find_plugin("pdb", true);
-    run_plugin(plugin, 1LL);
-#endif
+    if (plugin)
+      run_plugin(plugin, 1LL);
+    else
+      msg("PDB plugin not found, skipping PDB load.\n");
   }
 }
 
