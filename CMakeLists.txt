@@ -27,6 +27,8 @@ project(idaxex CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
+option(IDAXEX_STRICT_WARNINGS
+  "Enable strict compiler warnings for compatibility validation" OFF)
 
 # `cmake --build` writes the loader into the build tree (build/bin/loaders/).
 # `cmake --install` (below) is what copies it into IDA's directory. This must
@@ -78,7 +80,20 @@ endif()
 target_compile_options(idaxex PRIVATE
   $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-non-pod-varargs>)
 
-ida_disable_warnings(idaxex)
+if(IDAXEX_STRICT_WARNINGS)
+  target_compile_options(idaxex PRIVATE
+    $<$<COMPILE_LANG_AND_ID:C,MSVC>:/W4>
+    $<$<COMPILE_LANG_AND_ID:C,MSVC>:/wd4201>
+    $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/W4>
+    $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4201>
+    $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Wall>
+    $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Wextra>
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall>
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wextra>
+  )
+else()
+  ida_disable_warnings(idaxex)
+endif()
 
 # `cmake --install build` installs the loader so IDA picks it up automatically.
 # Default the install prefix to IDA's per-user directory (loaders/ subdir):

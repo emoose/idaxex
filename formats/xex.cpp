@@ -123,7 +123,7 @@ bool XEXFile::load(void* file)
   // Read security info
   has_secinfo_ = read_secinfo(file);
   if (has_secinfo_) {
-    uint32_t state = verify_secinfo(file);
+    verify_secinfo(file);
 
     // Kinda hacky way to get the security info size...
     // Maybe should save this somewhere when reading instead?
@@ -324,7 +324,6 @@ bool XEXFile::read_imports(void* file)
   // Get import table hashes ready for verifying...
   // (Hash is of +4 into the table, ie skipping the TableSize field)
   uint8_t hash_expected[20];
-  uint8_t hash[20];
   std::copy_n(security_info_.ImageInfo.ImportDigest, 20, hash_expected);
 
   valid_imports_hash_ = true;
@@ -339,6 +338,7 @@ bool XEXFile::read_imports(void* file)
     // TODO: this only seems to work for XEX2 atm, need to find method for XEX1...
     if (valid_imports_hash_) // Only check import hashes while they're valid
     {
+      uint8_t hash[20];
       xe::be<uint32_t> table_size;
       read(&table_size, 4, 1, file);
 
@@ -423,7 +423,8 @@ bool XEXFile::read_imports(void* file)
         *(uint32_t*)(pe_data() + record_offset + 4) = xe::byte_swap(0x38800000 | ordinal);
       }
       else // todo: does this ever appear?
-        dbgmsg("[+] %s import %d (@ 0x%X) unknown type %d!\n", libname.c_str(), ordinal, record_addr, record_type);
+        dbgmsg("[+] %s import %d (@ 0x%X) unknown type %d!\n",
+          libname.c_str(), ordinal, uint32_t(record_addr), uint32_t(record_type));
 
       imports_[libname][ordinal] = imp;
     }
@@ -466,7 +467,9 @@ bool XEXFile::read_imports(void* file)
       // Sanity check the callcap info, values from first dword should match values in second
       if (ordinal_1 != ordinal_2 || moduleidx_1 != moduleidx_2)
       {
-        dbgmsg("[!] Invalid callcap at 0x%X? (%X %X %X %X)\n", addr, ordinal_1, ordinal_2, moduleidx_1, moduleidx_2);
+        dbgmsg("[!] Invalid callcap at 0x%X? (%X %X %X %X)\n",
+          uint32_t(addr), uint32_t(ordinal_1), uint32_t(ordinal_2),
+          uint32_t(moduleidx_1), uint32_t(moduleidx_2));
         continue;
       }
 
@@ -498,6 +501,9 @@ bool XEXFile::read_imports(void* file)
 // Reads function info defined inside XEX export table
 bool XEXFile::read_exports(void* file)
 {
+#ifdef IDALDR
+  (void)file;
+#endif
   uint32_t exports_va = security_info_.ImageInfo.ExportTableAddress;
   if (xex_header_.Magic == MAGIC_XEX1 && directory_entries_.count(XEX_HEADER_EXPORTS_XEX1))
     exports_va = directory_entries_[XEX_HEADER_EXPORTS_XEX1];
@@ -516,7 +522,9 @@ bool XEXFile::read_exports(void* file)
     export_table.Magic[1] != XEX_HV_MAGIC_HVE ||
     export_table.Magic[2] != XEX_HV_MAGIC_2)
   {
-    dbgmsg("[+] Export table magic is invalid! (0x%X 0x%X 0x%X)\n", export_table.Magic[0], export_table.Magic[1], export_table.Magic[2]);
+    dbgmsg("[+] Export table magic is invalid! (0x%X 0x%X 0x%X)\n",
+      uint32_t(export_table.Magic[0]), uint32_t(export_table.Magic[1]),
+      uint32_t(export_table.Magic[2]));
     return false;
   }
 
@@ -552,6 +560,9 @@ bool XEXFile::read_exports(void* file)
 
 uint32_t XEXFile::verify_secinfo(void* file)
 {
+#ifdef IDALDR
+  (void)file;
+#endif
   valid_signature_ = false;
   valid_header_hash_ = false;
 
@@ -1155,7 +1166,6 @@ bool XEXFile::pe_load(const uint8_t* data)
           auto* callbacks = reinterpret_cast<const xe::be<uint32_t>*>(data + callback_offset);
           while (*callbacks)
           {
-            uint32_t callback = *callbacks;
             tls_callbacks_.push_back(*callbacks);
             callbacks++;
           }
@@ -1203,11 +1213,11 @@ bool XEXFile::pe_load(const uint8_t* data)
         if (!cv_ptr)
           continue;
 
-        std::vector<uint8_t> data;
-        data.resize(dir.SizeOfData);
-        std::copy_n((uint8_t*)cv_ptr, dir.SizeOfData, data.data());
+        std::vector<uint8_t> cv_data;
+        cv_data.resize(dir.SizeOfData);
+        std::copy_n((uint8_t*)cv_ptr, dir.SizeOfData, cv_data.data());
 
-        codeview_data_.push_back(data);
+        codeview_data_.push_back(cv_data);
       }
     }
   }

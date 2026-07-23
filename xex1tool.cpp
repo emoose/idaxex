@@ -143,7 +143,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     break;
   case MAGIC_XEX3F:
     exe_type = "XEX3F ('XEX?')";
-    exe_versions = ">=1434";
+    exe_versions = ">=1529";
     break;
   case MAGIC_XEX0:
     exe_type = "XEX0";

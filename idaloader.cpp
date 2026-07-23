@@ -185,7 +185,6 @@ void pe_add_sections(linput_t* li, XEXFile& file)
       seg_perms |= SEGPERM_WRITE;
 
     bool has_code = (section.Characteristics & IMAGE_SCN_CNT_CODE);
-    bool has_data = (section.Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) || (section.Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA);
 
     const char* seg_class = has_code ? "CODE" : "DATA";
 
@@ -304,7 +303,6 @@ void pe_parse_pdata(XEXFile& file)
       sec_addr = section.PointerToRawData;
       sec_size = section.SizeOfRawData; // TODO: verify this?
     }
-    ea_t seg_addr = (ea_t)file.base_address() + (ea_t)section.VirtualAddress;
     // Size could be beyond file bounds, if so fix the size to what we can fit
     if (sec_addr + sec_size > file.image_size())
       sec_size = file.image_size() - sec_addr;
@@ -741,7 +739,7 @@ static int idaapi accept_file(
   else if (magic == MAGIC_XEX3F)
   {
     valid = 1;
-    *fileformatname = "Xbox360 XEX?/XEX3F File (>=1434)";
+    *fileformatname = "Xbox360 XEX?/XEX3F File (>=1529)";
   }
   else if (magic == MAGIC_XEX0)
   {

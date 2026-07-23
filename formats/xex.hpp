@@ -207,9 +207,10 @@ public:
   uint32_t encryption_key_index() { return key_index_; }
   uint8_t* session_key() { return session_key_; }
 
-  bool is_encrypted() { return data_descriptor_->Flags != 0; }
+  bool is_encrypted() { return data_descriptor_ != nullptr && data_descriptor_->Flags != 0; }
   bool is_compressed() {
-    return (data_descriptor_->DataFormat() == xex_opt::XexDataFormat::Compressed || 
+    return data_descriptor_ != nullptr &&
+      (data_descriptor_->DataFormat() == xex_opt::XexDataFormat::Compressed ||
       data_descriptor_->DataFormat() == xex_opt::XexDataFormat::DeltaCompressed);
   }
 
