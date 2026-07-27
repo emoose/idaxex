@@ -131,6 +131,9 @@ public:
 #ifndef IDALDR
 #ifdef _MSC_VER
     read = (read_fn)fread; seek = (seek_fn)_fseeki64; tell = (tell_fn)_ftelli64; dbgmsg = stdio_msg;
+#elif defined(__APPLE__)
+    // On macOS/BSD off_t is already 64-bit, so fseeko/ftello are the 64-bit variants.
+    read = (read_fn)fread; seek = (seek_fn)fseeko; tell = (tell_fn)ftello; dbgmsg = stdio_msg;
 #else
     read = (read_fn)fread; seek = (seek_fn)fseeko64; tell = (tell_fn)ftello64; dbgmsg = stdio_msg;
 #endif

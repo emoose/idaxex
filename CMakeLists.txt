@@ -1,48 +1,42 @@
-cmake_minimum_required(VERSION 3.27 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
-project(idaxex)
+# ---------------------------------------------------------------------------
+# IDA SDK
+#
+# The loader builds against the official IDA SDK
+# (https://github.com/HexRaysSA/ida-sdk), vendored as the 3rdparty/ida-sdk
+# submodule. That repository ships its own CMake package
+# (find_package(idasdk)) together with the link stub libraries, so no separate
+# SDK download or IDASDK environment variable is needed -- just make sure the
+# submodules are checked out (git submodule update --init --recursive).
+# ---------------------------------------------------------------------------
+set(IDAXEX_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ida-sdk")
+
+if(NOT EXISTS "${IDAXEX_SDK_ROOT}/src/include/pro.h")
+  message(FATAL_ERROR
+    "IDA SDK submodule not found at ${IDAXEX_SDK_ROOT}. "
+    "Run: git submodule update --init --recursive")
+endif()
+
+# idasdk_init.cmake resolves the SDK, makes find_package(idasdk) reachable, and
+# pre-selects MSVC on Windows. It must be included before project().
+set(ENV{IDASDK} "${IDAXEX_SDK_ROOT}/src")
+include("${IDAXEX_SDK_ROOT}/src/cmake/idasdk_init.cmake")
+
+project(idaxex CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 
-if(DEFINED ENV{IDASDK})
-  file(TO_CMAKE_PATH "$ENV{IDASDK}" _IDASDK_ROOT)
-  set(_IDASDK_BOOTSTRAP "")
-  if(EXISTS "${_IDASDK_ROOT}/src/cmake/bootstrap.cmake")
-    set(_IDASDK_BOOTSTRAP "${_IDASDK_ROOT}/src/cmake/bootstrap.cmake")
-  elseif(EXISTS "${_IDASDK_ROOT}/ida-cmake/bootstrap.cmake")
-    set(_IDASDK_BOOTSTRAP "${_IDASDK_ROOT}/ida-cmake/bootstrap.cmake")
-  endif()
-
-  if(NOT _IDASDK_BOOTSTRAP)
-    message(FATAL_ERROR "Could not find ida-cmake bootstrap under $ENV{IDASDK}")
-  endif()
-
-  include("${_IDASDK_BOOTSTRAP}")
-  find_package(idasdk REQUIRED)
-
-  foreach(_IDAXEX_QT_HELPER_TARGET IN ITEMS
-      build_qt
-      qt6_external
-      qt6_external-download
-      qt6_external-configure
-      qt6_external-build
-      qt6_external-install
-    )
-    if(TARGET ${_IDAXEX_QT_HELPER_TARGET})
-      set_target_properties(${_IDAXEX_QT_HELPER_TARGET} PROPERTIES
-        EXCLUDE_FROM_ALL TRUE
-        EXCLUDE_FROM_DEFAULT_BUILD TRUE
-        EXCLUDE_FROM_DEFAULT_BUILD_DEBUG TRUE
-        EXCLUDE_FROM_DEFAULT_BUILD_RELEASE TRUE
-        EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO TRUE
-        EXCLUDE_FROM_DEFAULT_BUILD_MINSIZEREL TRUE
-      )
-    endif()
-  endforeach()
-else()
-  message(FATAL_ERROR "Set IDASDK to an IDA SDK root before configuring idaxex")
+# `cmake --build` writes the loader into the build tree (build/bin/loaders/).
+# `cmake --install` (below) is what copies it into IDA's directory. This must
+# be set before find_package(), which bakes the output location into
+# ida_add_loader().
+if(NOT DEFINED IDABIN AND NOT DEFINED ENV{IDABIN})
+  set(IDABIN "${CMAKE_BINARY_DIR}/bin")
 endif()
+
+find_package(idasdk REQUIRED)
 
 ida_add_loader(idaxex
   SOURCES
@@ -72,17 +66,37 @@ ida_add_loader(idaxex
     3rdparty/excrypt/src
     3rdparty/XbSymbolDatabase/include
     3rdparty/XbSymbolDatabase/src/OOVPADatabase
-    ${_IDASDK_ROOT}/src/ldr/pe
-    ${_IDASDK_ROOT}/ldr/pe
   DEFINES
     IDALDR=1
 )
 
+# excrypt's AES path uses x86 AES-NI intrinsics (wmmintrin.h); enable them on
+# x86/x64 only. MSVC exposes the intrinsics without an explicit switch.
+if((IDA_X64 OR IDA_X86) AND NOT MSVC)
+  target_compile_options(idaxex PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-maes>)
+endif()
 target_compile_options(idaxex PRIVATE
-  $<$<AND:$<NOT:$<C_COMPILER_ID:MSVC>>,$<COMPILE_LANGUAGE:C>>:-maes>
-  $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<COMPILE_LANGUAGE:CXX>>:-maes>
-  $<$<CXX_COMPILER_ID:Clang>:-Wno-non-pod-varargs>
-  $<$<CXX_COMPILER_ID:AppleClang>:-Wno-non-pod-varargs>
-)
+  $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-non-pod-varargs>)
 
 ida_disable_warnings(idaxex)
+
+# `cmake --install build` installs the loader so IDA picks it up automatically.
+# Default the install prefix to IDA's per-user directory (loaders/ subdir):
+#   ~/.idapro/loaders                     on Linux/macOS
+#   %APPDATA%\Hex-Rays\IDA Pro\loaders    on Windows
+# Pass -DCMAKE_INSTALL_PREFIX=<dir> to install elsewhere (e.g. an IDA
+# installation directory); the loader always lands in <prefix>/loaders.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  if(WIN32)
+    set(_idaxex_userdir "$ENV{APPDATA}/Hex-Rays/IDA Pro")
+  else()
+    set(_idaxex_userdir "$ENV{HOME}/.idapro")
+  endif()
+  set(CMAKE_INSTALL_PREFIX "${_idaxex_userdir}" CACHE PATH
+      "Install location (IDA directory)" FORCE)
+endif()
+
+install(FILES "$<TARGET_FILE:idaxex>" DESTINATION "loaders")
+
+# xex1tool: standalone command-line companion (does not use the IDA SDK).
+add_subdirectory(xex1tool)

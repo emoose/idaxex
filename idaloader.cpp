@@ -15,8 +15,8 @@
 #include <segregs.hpp>
 
 struct exehdr {}; // needed for pe.h
-#include <pe.h>
-#include <common.h>
+#include <ldr/pe/pe.h>
+#include <ldr/pe/common.h>
 
 #include <filesystem>
 #include <list>
