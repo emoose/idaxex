@@ -22,7 +22,7 @@ namespace xe {
 #define XENIA_BASE_BYTE_SWAP_16 _byteswap_ushort
 #define XENIA_BASE_BYTE_SWAP_32 _byteswap_ulong
 #define XENIA_BASE_BYTE_SWAP_64 _byteswap_uint64
-#elif XE_PLATFORM_MAC
+#elif defined(XE_PLATFORM_MAC) || defined(__APPLE__)
 #include <libkern/OSByteOrder.h>
 #define XENIA_BASE_BYTE_SWAP_16 OSSwapInt16
 #define XENIA_BASE_BYTE_SWAP_32 OSSwapInt32

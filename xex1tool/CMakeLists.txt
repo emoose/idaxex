@@ -1,13 +1,14 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.25)
 
-project(xex1tool)
+# xex1tool is a standalone command-line tool and does NOT use the IDA SDK. It
+# can be built on its own (cmake -S xex1tool -B xex1tool/build) or as part of
+# the loader build via add_subdirectory() from the repo-root CMakeLists.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  project(xex1tool CXX C)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
-
-# Enable AES NI intrinsic
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -maes")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(xex1tool
   ../xex1tool.cpp
@@ -28,4 +29,25 @@ add_executable(xex1tool
   ../3rdparty/mspack/system.c
 )
 
-target_include_directories(xex1tool PRIVATE ${PROJECT_SOURCE_DIR}/../3rdparty/excrypt/src)
+target_include_directories(xex1tool PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/excrypt/src")
+
+# excrypt's AES path uses x86 AES-NI intrinsics (wmmintrin.h); enable them on
+# x86/x64 only. MSVC exposes the intrinsics without an explicit switch.
+set(_xex1tool_x86 FALSE)
+if(CMAKE_OSX_ARCHITECTURES)
+  if(CMAKE_OSX_ARCHITECTURES MATCHES "x86_64|i386")
+    set(_xex1tool_x86 TRUE)
+  endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i[3-6]86|x86")
+  set(_xex1tool_x86 TRUE)
+endif()
+if(_xex1tool_x86 AND NOT MSVC)
+  target_compile_options(xex1tool PRIVATE -maes)
+endif()
+
+# formats/xex.cpp passes byte-swapped be<> wrappers (trivially copyable) through
+# printf-style varargs; clang flags this as an error by default. The loader
+# target suppresses the same warning.
+target_compile_options(xex1tool PRIVATE
+  $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-non-pod-varargs>)

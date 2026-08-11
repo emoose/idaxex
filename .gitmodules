@@ -4,3 +4,6 @@
 [submodule "3rdparty/XbSymbolDatabase"]
 	path = 3rdparty/XbSymbolDatabase
 	url = https://github.com/Cxbx-Reloaded/XbSymbolDatabase.git
+[submodule "3rdparty/ida-sdk"]
+	path = 3rdparty/ida-sdk
+	url = https://github.com/HexRaysSA/ida-sdk.git

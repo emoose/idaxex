@@ -1,6 +1,6 @@
 # idaxex
 
-idaxex is a native loader plugin for IDA Pro 9.3, adding support for loading Xbox 360 XEX and Xbox XBE executables.
+idaxex is a native loader plugin for IDA Pro 9.4, adding support for loading Xbox 360 XEX and Xbox XBE executables.
 
 Originally started as an [IDAPython loader](https://github.com/emoose/reversing/blob/master/xbox360.py), work was continued as a native DLL to solve the shortcomings of it.
 
@@ -41,24 +41,33 @@ For PPC Altivec analysis, the PPCAltivec plugin remains a useful companion: http
 
 ## Building
 
-Make sure to clone repo recursively for excrypt submodule to get pulled in.
+Dependencies are pulled in as submodules, so clone recursively:
 
-**Windows**
+```
+git clone --recursive https://github.com/emoose/idaxex.git
+# or, if already cloned:
+git submodule update --init --recursive
+```
 
-- Point `IDASDK` environment variable at your IDA SDK 9.3 root.
-- Run CMake to generate the VS solution: `cmake -B build -G "Visual Studio 18 2026"`
-- Build with `cmake --build build` or use the `idaxex.slnx` file.
-- idaxex.dll will be built at `$IDASDK\src\bin\loaders\idaxex.dll`
+Then build with the Ninja generator from the repo root:
 
-**Linux**
+```
+cmake -S . -B build -G Ninja
+cmake --build build
+```
 
-- Use the IDA SDK 9.3 CMake bootstrap from `src/cmake/bootstrap.cmake` if your SDK tree has it, or the standalone [ida-cmake](https://github.com/allthingsida/ida-cmake) bootstrap if you keep that package separately.
-- Make sure `IDASDK` points at the SDK root.
-- Run `cmake -S . -B build` from the repo root.
-- Run `cmake --build build`.
-- To build `xex1tool`, run `cmake -S xex1tool -B xex1tool/build` and `cmake --build xex1tool/build`.
+This builds the loader at `build/bin/loaders/` (`idaxex.dll` on Windows,
+`idaxex.so` on Linux, `idaxex.dylib` on macOS). To install it into IDA's
+per-user directory so it's picked up automatically, run:
 
-On newer IDA SDKs, `libida.so` may be the correct library name in place of `libida64.so`.
+```
+cmake --install build
+```
+
+- **Windows:** run the commands from a Visual Studio Developer Command Prompt
+  (or any shell where `cl.exe` is on `PATH`).
+- To build `xex1tool`, run `cmake -S xex1tool -B xex1tool/build -G Ninja` and
+  `cmake --build xex1tool/build`.
 
 ## Credits
 Based on work by the Xenia project, XEX2.bt by Anthony, xextool 0.1 by xor37h, Xex Loader & x360_imports.idc by xorloser, xkelib, XeCLI, and probably many others I forgot to name.
