@@ -9,12 +9,17 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(IDAXEX_STRICT_WARNINGS
+  "Enable strict compiler warnings for compatibility validation" OFF)
 
-add_executable(xex1tool
+set(XEX1TOOL_FIRST_PARTY_SOURCES
   ../xex1tool.cpp
   ../namegen.cpp
   ../formats/xdbf.cpp
   ../formats/xex.cpp
+)
+
+set(XEX1TOOL_THIRD_PARTY_SOURCES
   ../3rdparty/excrypt/src/excrypt_aes.c
   ../3rdparty/excrypt/src/rijndael.c
   ../3rdparty/excrypt/src/excrypt_bn.c
@@ -27,6 +32,11 @@ add_executable(xex1tool
   ../3rdparty/lzx.cpp
   ../3rdparty/mspack/lzxd.c
   ../3rdparty/mspack/system.c
+)
+
+add_executable(xex1tool
+  ${XEX1TOOL_FIRST_PARTY_SOURCES}
+  ${XEX1TOOL_THIRD_PARTY_SOURCES}
 )
 
 target_include_directories(xex1tool PRIVATE
@@ -51,3 +61,20 @@ endif()
 # target suppresses the same warning.
 target_compile_options(xex1tool PRIVATE
   $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-non-pod-varargs>)
+
+if(IDAXEX_STRICT_WARNINGS)
+  set_property(SOURCE ${XEX1TOOL_FIRST_PARTY_SOURCES} APPEND PROPERTY
+    COMPILE_OPTIONS
+      $<$<CXX_COMPILER_ID:MSVC>:/W4>
+      $<$<CXX_COMPILER_ID:MSVC>:/wd4201>
+      $<$<CXX_COMPILER_ID:MSVC>:/wd4127>
+      $<$<CXX_COMPILER_ID:MSVC>:/wd4702>
+      $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall>
+      $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wextra>
+  )
+  set_property(SOURCE ${XEX1TOOL_THIRD_PARTY_SOURCES} APPEND PROPERTY
+    COMPILE_OPTIONS
+      $<$<CXX_COMPILER_ID:MSVC>:/W0>
+      $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
+  )
+endif()

@@ -13,7 +13,44 @@ import ida_segment
 
 
 def segment_for_ea(ea):
-    return ida_segment.get_segment_ea(ea) != ida_idaapi.BADADDR
+    if hasattr(ida_segment, "get_segment_ea"):
+        return ida_segment.get_segment_ea(ea) != ida_idaapi.BADADDR
+    return ida_segment.getseg(ea) is not None
+
+
+def segment_details(index):
+    if hasattr(ida_segment, "segment_info_t"):
+        segment = ida_segment.segment_info_t()
+        if not ida_segment.get_segment_info_by_num(
+            segment, index, ida_segment.GSI_NAME
+        ):
+            return None
+
+        return {
+            "name": segment.get_name(),
+            "start_ea": int(segment.start_ea),
+            "end_ea": int(segment.end_ea),
+            "permissions": int(segment.get_perm()),
+        }
+
+    segment = ida_segment.getnseg(index)
+    if segment is None:
+        return None
+
+    return {
+        "name": ida_segment.get_segm_name(segment),
+        "start_ea": int(segment.start_ea),
+        "end_ea": int(segment.end_ea),
+        "permissions": int(segment.perm),
+    }
+
+
+def function_ea_by_num(index):
+    if hasattr(ida_funcs, "get_func_ea_by_num"):
+        return ida_funcs.get_func_ea_by_num(index)
+
+    function = ida_funcs.getn_func(index)
+    return ida_idaapi.BADADDR if function is None else function.start_ea
 
 
 input_path = ida_nalt.get_input_file_path()
@@ -26,15 +63,13 @@ segments = []
 loaded_segments = 0
 
 for index in range(ida_segment.get_segm_qty()):
-    segment = ida_segment.segment_info_t()
-    if not ida_segment.get_segment_info_by_num(
-        segment, index, ida_segment.GSI_NAME
-    ):
+    segment = segment_details(index)
+    if segment is None:
         errors.append("segment %d is unavailable" % index)
         continue
 
-    start = int(segment.start_ea)
-    end = int(segment.end_ea)
+    start = segment["start_ea"]
+    end = segment["end_ea"]
     if start >= end:
         errors.append("segment %d has an invalid range" % index)
 
@@ -48,11 +83,11 @@ for index in range(ida_segment.get_segm_qty()):
     segments.append(
         {
             "index": index,
-            "name": segment.get_name(),
+            "name": segment["name"],
             "start_ea": start,
             "end_ea": end,
             "size": end - start,
-            "permissions": int(segment.get_perm()),
+            "permissions": segment["permissions"],
             "start_loaded": bool(loaded),
         }
     )
@@ -60,7 +95,7 @@ for index in range(ida_segment.get_segm_qty()):
 function_count = ida_funcs.get_func_qty()
 orphan_functions = 0
 for index in range(function_count):
-    function_ea = ida_funcs.get_func_ea_by_num(index)
+    function_ea = function_ea_by_num(index)
     if function_ea == ida_idaapi.BADADDR or not segment_for_ea(function_ea):
         orphan_functions += 1
 
@@ -74,8 +109,11 @@ for index in range(entry_count):
 
 if not file_type.startswith("Xbox"):
     errors.append("unexpected file type: %s" % file_type)
-if processor.upper() != "PPC":
-    errors.append("unexpected processor: %s" % processor)
+expected_processor = "metapc" if file_type.startswith("Xbox XBE") else "PPC"
+if processor.upper() != expected_processor.upper():
+    errors.append(
+        "unexpected processor: %s (expected %s)" % (processor, expected_processor)
+    )
 if not segments:
     errors.append("loader created no segments")
 if segments and not loaded_segments:

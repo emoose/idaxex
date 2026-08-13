@@ -501,9 +501,7 @@ bool XEXFile::read_imports(void* file)
 // Reads function info defined inside XEX export table
 bool XEXFile::read_exports(void* file)
 {
-#ifdef IDALDR
   (void)file;
-#endif
   uint32_t exports_va = security_info_.ImageInfo.ExportTableAddress;
   if (xex_header_.Magic == MAGIC_XEX1 && directory_entries_.count(XEX_HEADER_EXPORTS_XEX1))
     exports_va = directory_entries_[XEX_HEADER_EXPORTS_XEX1];
