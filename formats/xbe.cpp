@@ -137,7 +137,8 @@ bool XBEFile::load(void* file)
       if (tls_directory_.AddressOfCallBacks)
       {
         auto callback_offset = xbe_va_to_offset(tls_directory_.AddressOfCallBacks);
-        dbgmsg("[+] Reading TLS callbacks from 0x%X (directory: 0x%X)\n", tls_directory_.AddressOfCallBacks, tls_directory_va_);
+        dbgmsg("[+] Reading TLS callbacks from 0x%X (directory: 0x%X)\n",
+          uint32_t(tls_directory_.AddressOfCallBacks), tls_directory_va_);
 
         if (image_length_ >= (callback_offset + sizeof(uint32_t)))
         {

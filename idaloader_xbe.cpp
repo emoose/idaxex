@@ -299,6 +299,18 @@ void mark_lib_func(ea_t func_ea)
   del_items(func_ea);
   auto_make_proc(func_ea);
 
+#if IDA_SDK_VERSION >= 940
+  if (get_func_start(func_ea) != BADADDR)
+  {
+    set_func_flag(func_ea, FUNC_LIB);
+  }
+  else
+  {
+    func_entry_info_t func(func_ea, BADADDR);
+    func.set_flag(FUNC_LIB);
+    add_function_ex(&func);
+  }
+#else
   func_t* existing = get_func(func_ea);
   if (existing)
   {
@@ -310,20 +322,21 @@ void mark_lib_func(ea_t func_ea)
     func_t func(func_ea, BADADDR, FUNC_LIB);
     add_func_ex(&func);
   }
+#endif
 }
 
 static int num_dbsymbols = 0;
 
-static void reg_cb(const char* library_str,
-  uint32_t library_flag,
+static void reg_cb(const char*,
+  uint32_t,
   uint32_t xref_index,
-  const char* symbol_str,
+  const char*,
   xbaddr address,
-  uint32_t build_version,
+  uint32_t,
   uint32_t symbol_type,
-  uint32_t call_type,
-  uint32_t param_count,
-  const XbSDBSymbolParam* param_list)
+  uint32_t,
+  uint32_t,
+  const XbSDBSymbolParam*)
 {
   num_dbsymbols++;
   const char* symbol_name = XbSDB_SymbolReferenceToString(xref_index);
@@ -649,7 +662,7 @@ bool load_application_xbe(linput_t* li)
 }
 
 //------------------------------------------------------------------------------
-void idaapi load_file_xbe(linput_t* li, ushort _neflags, const char* fileformatname)
+void idaapi load_file_xbe(linput_t* li, ushort _neflags, const char*)
 {
   bool reloading = (_neflags & NEF_RELOAD) == NEF_RELOAD;
 

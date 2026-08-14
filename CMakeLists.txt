@@ -27,6 +27,8 @@ project(idaxex CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
+option(IDAXEX_STRICT_WARNINGS
+  "Enable strict compiler warnings for compatibility validation" OFF)
 
 # `cmake --build` writes the loader into the build tree (build/bin/loaders/).
 # `cmake --install` (below) is what copies it into IDA's directory. This must
@@ -38,30 +40,38 @@ endif()
 
 find_package(idasdk REQUIRED)
 
+set(IDAXEX_FIRST_PARTY_SOURCES
+  idaloader.cpp
+  idaloader_xbe.cpp
+  namegen.cpp
+  namegen_xtlid.cpp
+  formats/xbe.cpp
+  formats/xex.cpp
+)
+
+set(IDAXEX_THIRD_PARTY_SOURCES
+  3rdparty/excrypt/src/excrypt_aes.c
+  3rdparty/excrypt/src/rijndael.c
+  3rdparty/excrypt/src/excrypt_sha.c
+  3rdparty/lzx.cpp
+  3rdparty/mspack/lzxd.c
+  3rdparty/mspack/system.c
+  3rdparty/XbSymbolDatabase/src/lib/libXbSymbolDatabase.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/D3D8_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/D3D8LTCG_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/DSound_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/JVS_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XActEng_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/Xapi_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XGraphic_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XNet_OOVPA.c
+  3rdparty/XbSymbolDatabase/src/OOVPADatabase/XOnline_OOVPA.c
+)
+
 ida_add_loader(idaxex
   SOURCES
-    idaloader.cpp
-    idaloader_xbe.cpp
-    namegen.cpp
-    namegen_xtlid.cpp
-    formats/xbe.cpp
-    formats/xex.cpp
-    3rdparty/excrypt/src/excrypt_aes.c
-    3rdparty/excrypt/src/rijndael.c
-    3rdparty/excrypt/src/excrypt_sha.c
-    3rdparty/lzx.cpp
-    3rdparty/mspack/lzxd.c
-    3rdparty/mspack/system.c
-    3rdparty/XbSymbolDatabase/src/lib/libXbSymbolDatabase.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/D3D8_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/D3D8LTCG_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/DSound_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/JVS_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/XActEng_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/Xapi_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/XGraphic_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/XNet_OOVPA.c
-    3rdparty/XbSymbolDatabase/src/OOVPADatabase/XOnline_OOVPA.c
+    ${IDAXEX_FIRST_PARTY_SOURCES}
+    ${IDAXEX_THIRD_PARTY_SOURCES}
   INCLUDES
     3rdparty/excrypt/src
     3rdparty/XbSymbolDatabase/include
@@ -78,7 +88,34 @@ endif()
 target_compile_options(idaxex PRIVATE
   $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-non-pod-varargs>)
 
-ida_disable_warnings(idaxex)
+if(IDAXEX_STRICT_WARNINGS)
+  # ida_add_loader() suppresses warnings for the complete mixed-source target.
+  # Remove that target-wide switch, then enable strict checks only for code
+  # maintained in this repository. Vendored sources keep their own warning
+  # policy and cannot obscure new first-party warnings.
+  get_target_property(_idaxex_compile_options idaxex COMPILE_OPTIONS)
+  if(_idaxex_compile_options)
+    list(FILTER _idaxex_compile_options EXCLUDE REGEX "^(/w|/W0|-w)$")
+    set_property(TARGET idaxex PROPERTY COMPILE_OPTIONS
+      "${_idaxex_compile_options}")
+  endif()
+
+  set_property(SOURCE ${IDAXEX_FIRST_PARTY_SOURCES} APPEND PROPERTY
+    COMPILE_OPTIONS
+      $<$<CXX_COMPILER_ID:MSVC>:/W4>
+      $<$<CXX_COMPILER_ID:MSVC>:/wd4201>
+      $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall>
+      $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wextra>
+  )
+  set_property(SOURCE ${IDAXEX_THIRD_PARTY_SOURCES} APPEND PROPERTY
+    COMPILE_OPTIONS
+      $<$<CXX_COMPILER_ID:MSVC>:/W0>
+      $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
+  )
+  unset(_idaxex_compile_options)
+else()
+  ida_disable_warnings(idaxex)
+endif()
 
 # `cmake --install build` installs the loader so IDA picks it up automatically.
 # Default the install prefix to IDA's per-user directory (loaders/ subdir):

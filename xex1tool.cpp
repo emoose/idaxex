@@ -109,7 +109,6 @@ void PrintImports(XEXFile& xex) {
     for (auto& imp : lib.second)
     {
       auto imp_name = DoNameGen(libname, imp.first, version);
-      auto imp_addr = imp.second.ThunkAddr;
 
       printf("  %3d) %s\n", imp.first, imp_name.c_str());
     }
@@ -729,8 +728,8 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
   auto* title_ids = xex.opt_header_ptr<uint32_t>(XEX_HEADER_ALTERNATE_TITLE_IDS);
   if (title_ids)
   {
-    uint32_t size = xe::byte_swap(*title_ids);
-    uint32_t count = (size - 4) / sizeof(uint32_t);
+    uint32_t title_ids_size = xe::byte_swap(*title_ids);
+    uint32_t count = (title_ids_size - 4) / sizeof(uint32_t);
     if (count > 0)
     {
       printf("\nAlternate Title Ids\n");
@@ -857,7 +856,7 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
     uint32_t address = xex.base_address();
     for (auto page : page_descriptors)
     {
-      auto size = page.Size * page_size;
+      auto page_byte_size = page.Size * page_size;
       auto details = "Data";
       if (page.Info & xex::PageInfoFlag_NoWrite)
       {
@@ -867,8 +866,9 @@ void PrintInfo(XEXFile& xex, bool print_mem_pages)
           details = "Code";
       }
 
-      printf("  %3d) %08X - %08X : %s\n", i, address, address + size, details);
-      address += size;
+      printf("  %3d) %08X - %08X : %s\n", i, address,
+        address + page_byte_size, details);
+      address += page_byte_size;
       i++;
     }
   }
@@ -915,13 +915,13 @@ int main(int argc, char* argv[])
 
   printf("Reading and parsing input XEX file...\n");
 
-  FILE* file;
-  auto res = fopen_s(&file, filepath.c_str(), "rb");
+  FILE* file = nullptr;
+  int input_open_result = fopen_s(&file, filepath.c_str(), "rb");
 
-  if (!file)
+  if (input_open_result != 0 || !file)
   {
     printf("Error opening XEX file %s\n", filepath.c_str());
-    return 0;
+    return input_open_result != 0 ? input_open_result : 1;
   }
 
   XEXFile xex;
@@ -931,6 +931,7 @@ int main(int argc, char* argv[])
   if (!loadresult)
   {
     printf("Error %d while loading XEX file %s\n", xex.load_error(), filepath.c_str());
+    fclose(file);
     return xex.load_error();
   }
 
@@ -957,23 +958,23 @@ int main(int argc, char* argv[])
       if (xex.header().Magic != MAGIC_XEX2)
         printf("XEX isn't XEX2, addresses might not be correct!\n");
 
-      uint32_t result = 0;
+      uint32_t converted_address = 0;
       if (rva >= xex.base_address())
       {
-        result = xex.xex_va_to_offset(rva);
+        converted_address = xex.xex_va_to_offset(rva);
         printf("Virtual Address -> File Offset\n");
         printf("Virtual Addr: 0x%X\n", rva);
-        printf("File Offset:  0x%X\n", result);
+        printf("File Offset:  0x%X\n", converted_address);
       }
       else
       {
-        result = xex.xex_offset_to_va(rva);
+        converted_address = xex.xex_offset_to_va(rva);
         printf("File Offset -> Virtual Address\n");
         printf("File Offset:  0x%X\n", rva);
-        printf("Virtual Addr: 0x%X\n", result);
+        printf("Virtual Addr: 0x%X\n", converted_address);
       }
 
-      if (!result)
+      if (!converted_address)
       {
         printf("\nThe given address was unable to be converted, either:\n");
         printf("- The given number is invalid\n");
@@ -989,10 +990,11 @@ int main(int argc, char* argv[])
   if (result.count("b"))
   {
     auto& basefile = result["b"].as<std::string>();
-    FILE* output;
-    auto res = fopen_s(&output, basefile.c_str(), "wb");
-    if (res != 0 || !output) {
-      printf("Error %d opening basefile %s for write\n", res, basefile.c_str());
+    FILE* output = nullptr;
+    int basefile_open_result = fopen_s(&output, basefile.c_str(), "wb");
+    if (basefile_open_result != 0 || !output) {
+      printf("Error %d opening basefile %s for write\n",
+        basefile_open_result, basefile.c_str());
     }
     else {
       fwrite(xex.pe_data(), 1, xex.pe_data_length(), output);
@@ -1037,9 +1039,12 @@ int main(int argc, char* argv[])
         dumped_names.push_back(sectname);
 
         std::filesystem::path res_path = dump_path / sectname;
-        FILE* file;
-        if (auto res = fopen_s(&file, res_path.string().c_str(), "wb") != 0 || !file) {
-          printf("Error %d opening file %s for writing\n", res, res_path.string().c_str());
+        FILE* resource_file = nullptr;
+        int resource_open_result = fopen_s(
+          &resource_file, res_path.string().c_str(), "wb");
+        if (resource_open_result != 0 || !resource_file) {
+          printf("Error %d opening file %s for writing\n",
+            resource_open_result, res_path.string().c_str());
         }
         else {
 
@@ -1048,8 +1053,9 @@ int main(int argc, char* argv[])
             addr = section.PointerToRawData;
 
           auto* data = xex.pe_data() + addr;
-          fwrite(data, 1, std::min(section.SizeOfRawData, section.VirtualSize), file);
-          fclose(file);
+          fwrite(data, 1, std::min(section.SizeOfRawData, section.VirtualSize),
+            resource_file);
+          fclose(resource_file);
           printf("Extracted resource %.8s to %s\n", section.Name, res_path.string().c_str());
         }
       }
@@ -1061,4 +1067,7 @@ int main(int argc, char* argv[])
 
   if (result["l"].as<bool>() || result["m"].as<bool>())
     PrintInfo(xex, result["m"].as<bool>());
+
+  fclose(file);
+  return 0;
 }
