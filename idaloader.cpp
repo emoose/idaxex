@@ -677,6 +677,25 @@ void idaapi load_file(linput_t *li, ushort _neflags, const char* fileformatname)
   // Set processor to PPC
   set_processor_type("ppc:vmx128", SETPROC_LOADER);
 
+  // The Xenon core is a 64-bit PowerPC with a 32-bit address space: the
+  // registers, the stack slots and the instruction set are 64-bit while
+  // pointers stay 4 bytes. Without the ILP32 model the 64-bit instructions
+  // the compiler emits (ld/std/rldicl/cntlzd/divdu...) are modeled with
+  // 32-bit registers, which gives wrong operand types and badly broken
+  // decompiler output. This must be set before the ABI name, because the
+  // processor module picks the 32-bit or the 64-bit flavor of the ABI
+  // depending on it.
+  inf_set_ilp32();
+
+  // Without this the ABI is guessed, and the guess ("xbox" for a big-endian
+  // VMX128 PE) only fires once the file type is f_PE, which happens later in
+  // load_application() - by then the ABI has already been resolved to the
+  // SysV default. The SysV frame layout and register roles are wrong for the
+  // Xbox 360: the parameter area, the saved link register slot, the vector
+  // argument registers and r13 (thread pointer, not a small-data-area base)
+  // all differ.
+  set_abi_name("xbox");
+
   // Set PPC_LISOFF to true
   // should help analyzer convert "lis r11, -0x7C46" to "lis r11, unk_83BA5600@h"
   uint32 val = 1;
